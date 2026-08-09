@@ -1,5 +1,8 @@
 # MVP Acceptance
 
+**Status: complete.** Every gate below has executable or production evidence. The final browser
+journey observed authoritative database and runtime state rather than accepting HTTP status alone.
+
 ## Product Gate
 
 - The product model in [`15-product-design.md`](15-product-design.md) is complete and internally consistent.
@@ -41,3 +44,28 @@
 - Production Registry shows both peer-published target artifacts under one Extension Version.
 - Against the real shared production database, the selected Extension is installed, enabled and observed running on `client-web`, enabled and observed running on `core-py`, disabled on both, then uninstalled.
 - The final database and peer/runtime observations prove `absent → installed/disabled → peer-bound/running → disabled → absent`; HTTP success alone is insufficient.
+
+## Final Evidence
+
+- Registry main `55b52eed130c07062c77c9cdc2dd2cbd0aed08af` passed exact-main checks and
+  release run `31340825004`; public Runtime/API `0.1.3` contains the browser fetch-receiver fix.
+- Client runtime PR [#61](https://github.com/InKCre/client-web/pull/61) merged as
+  `f29c98983a6fb29a5bb46e7b5cf3d4cd7ed1beb9`. Exact-main checks run
+  `31341300838` and Pages delivery run `31341424369` passed.
+- Client acceptance-record PR [#62](https://github.com/InKCre/client-web/pull/62) merged as the
+  docs-only main revision `4c391f64d8e416026272588a25cce955eaf8129f`; exact-main checks
+  `31342369939` and exact-artifact Pages delivery `31342493450` passed without republishing the
+  Twitter target. The accepted runtime identity remains `f29c9898`.
+- Production selected Web target `web-module-federation-v1` at
+  `sha256:1cfb7744dcb97cecfe427b39f79994a3809f02a88be7ad67e2ef42f92d0a8220`
+  and Core target `python-core-v1` at
+  `sha256:70d12049bd31c27e8bf024d26f9df91761a44fe4b58a7110681b171c50d1d679`
+  for the same `inkcre/twitter@0.1.0` installation.
+- UI install created one shared installation and no bindings. Web enable and reload bound and
+  cold-restored the exact Web digest; Core enable bound the exact Python digest and published
+  three Twitter routes. Disabling both peers removed their bindings and runtime side effects;
+  uninstall left zero installation rows, bindings, and Core Twitter routes.
+- A focused probe showed Chromium emits `requestfailed(net::ERR_ABORTED)` after exposing the
+  uninstall's valid cross-origin 204 response. Correct CORS, resolved UI await, authoritative 404,
+  and zero residue prove the operation succeeded; every other page, console, and request failure
+  remained rejected.
