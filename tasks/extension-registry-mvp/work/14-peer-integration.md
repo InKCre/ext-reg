@@ -61,6 +61,9 @@ Runtime/API `0.1.2` therefore:
   lock constraint, without placing that constraint in wheel metadata;
 - installs the built wheel with its `client` extra on Python 3.12 after pinning
   the exact core-py FastAPI/Pydantic versions, and asserts neither is replaced;
+- attaches the packed Web Runtime/API tarball to the public GitHub Release in
+  addition to publishing GitHub Packages, so public consumers have an immutable
+  anonymous distribution path;
 - keeps Python and Web Runtime/API versions coherent at `0.1.2`.
 
 This is also package metadata only. Registry endpoints, contract revision,
