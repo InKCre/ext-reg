@@ -2,9 +2,9 @@
 
 ## Status
 
-**Current.** Public infrastructure and the Worker exist. Exact-main CD needs to
-replay the verified compatibility-date correction before peer credentials are
-seeded.
+**Complete for the Registry slice.** Public infrastructure, exact-main delivery,
+scoped peer credentials, and the production black box are verified. Peer
+integration is next.
 
 ## Repository And Release Identity
 
@@ -49,17 +49,37 @@ seeded.
    2332 ms and Cloudflare assigned version
    `e4e8b3dc-7b26-4cda-ac82-152985105531`.
 5. Public `GET /livez` returned HTTP 200 and `{"status":"ok"}`.
+6. Registry checks run `31329108569` passed on source `08eb84f`, including the
+   real Worker black box. Its workflow-run production delivery `31329161874`
+   deployed the pinned source successfully. After recording the public origin
+   as a repository variable, production run `31329229785` repeated the exact
+   deployment and passed both configured public smoke requests.
 
 The successful diagnostic deployment used exact source from remote main and
 only overrode runtime compatibility arguments. The checked-in configuration
-now carries the same pin so the canonical delivery remains exact-main CD.
+now carries the same pin and exact-main CD has replaced that diagnostic version.
 
-## Next Evidence
+## Publisher And Public Black Box
 
-1. Remote Registry checks pass on the compatibility-pin commit.
-2. Exact-main production delivery deploys the same source and public `/livez`
-   smoke passes.
-3. Scoped publisher credential hashes are inserted into D1 while raw values go
-   only to the two peer GitHub repositories.
-4. A public black box publishes, resolves, downloads, and verifies one target
-   through the production origin before peer integration begins.
+- D1 contains active `core-py-cd` and `client-web-cd` credentials scoped to the
+  `inkcre` namespace. Their raw values were streamed directly into each peer's
+  `INKCRE_EXTENSION_REGISTRY_TOKEN` GitHub Secret and were never printed or
+  written to repository files.
+- Both peer repositories expose the non-secret
+  `INKCRE_EXTENSION_REGISTRY_URL` variable for the public origin.
+- Temporary credential `production-smoke-20260810` published
+  `inkcre/blackbox@0.1.0`, then was disabled.
+- Public release, canonical manifest, and `remoteEntry.js` returned HTTP 200.
+  The recomputed manifest identity equals
+  `sha256:3d51fd949dacea5fcc9907328024eaeaf480b9d4ffd2b979857fb799d6a00f2a`,
+  and the downloaded file SHA-256 equals its declared descriptor.
+- The first acceptance assertion looked for a serialized `digest` property.
+  The contract instead defines digest as the SHA-256 of canonical manifest
+  bytes; recomputing the contract identity corrected the assertion without a
+  service change.
+
+## Handoff
+
+Open fresh feature worktrees from each peer's fetched `origin/main`. Implement
+the deployment lock/adapters before adding peer CD publication, and preserve
+core-py's no-runtime-download boundary.
