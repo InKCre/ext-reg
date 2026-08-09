@@ -2,9 +2,10 @@
 
 ## Status
 
-**Current.** Fresh peer worktrees exist. Runtime/API `0.1.1` is released and
-proved Python 3.12 support; core integration then exposed a second packaging-only
-consumer compatibility correction that is being released as `0.1.2`.
+**Current.** Runtime/API `0.1.2` and both peer integrations are released. Real
+production Chromium acceptance exposed a browser-native fetch receiver bug in
+the public Web Runtime/API and the Host adapter. The Host correction is deployed;
+Runtime/API `0.1.3` owns the SDK correction.
 
 ## Fresh Baselines
 
@@ -73,14 +74,28 @@ Runtime/API `0.1.2` therefore:
 This is also package metadata only. Registry endpoints, contract revision,
 Extension Version semantics, and target matching remain unchanged.
 
+## Browser Fetch Receiver Correction
+
+The production browser reached the public Registry install and Web-target enable
+paths but Chromium rejected both native fetch calls with `Illegal invocation`.
+The cause was observable JavaScript method binding, not CORS or Registry state:
+the Web `RegistryClient` stored `globalThis.fetch` and later called it as a private
+member, rebinding the native function's receiver to the client instance. The Host
+adapter independently repeated the same pattern for artifact-manifest reads.
+
+Runtime/API `0.1.3` therefore binds the selected fetch implementation to
+`globalThis` at construction and adds a regression test whose default fetch stub
+enforces that browser receiver. The already-deployed Host correction applies the
+same rule at its adapter boundary. This is a Web Runtime/API implementation fix;
+Registry endpoints, target identity, compatibility semantics, and Extension
+Version remain unchanged.
+
 ## Execution Order
 
-1. Merge/release Runtime/API `0.1.2` through Registry protected-main checks.
-2. Core-py: create its local task control surface and Impact Handshake; add the
-   shared deployment installation/binding schema, adapter, admitted target, and
-   publication CD; merge and deploy.
-3. Client-web: regenerate the exact core database contract, consume Web Runtime
-   `0.1.1`, integrate the target resolver/lifecycle/UI, publish Twitter, merge,
-   and deploy.
-4. Run the production install/enable/run/disable/uninstall journey against the
-   shared database and record exact source, target, binding, and runtime effects.
+1. [complete] Release Runtime/API `0.1.2` through Registry protected-main checks.
+2. [complete] Add and deploy Core's shared installation/binding schema, adapter,
+   admitted target, and publication CD.
+3. [complete] Regenerate the exact Web database contract, integrate the resolver,
+   lifecycle, UI, Twitter target, and release-intent-aware CD.
+4. [in progress] Release Runtime/API `0.1.3`, update client-web's immutable
+   Runtime/API tarball, and rerun the full production journey.
