@@ -64,6 +64,17 @@ jobs:
       - name: Run repository contract
         run: pnpm check
 
+      - name: Prove Python 3.12 Runtime/API compatibility
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12 /tmp/inkcre-extension-runtime-python312
+          runtime_wheel="$(find dist -maxdepth 1 -name 'inkcre_extension_registry-*.whl' -print -quit)"
+          uv pip install \
+            --python /tmp/inkcre-extension-runtime-python312/bin/python \
+            "${runtime_wheel}[client]"
+          /tmp/inkcre-extension-runtime-python312/bin/python -c \
+            'from inkcre_extension_registry import PlatformProfile, __version__; from inkcre_extension_registry.client import RegistryClient; assert __version__ == "0.1.1"; PlatformProfile(capabilities={}); RegistryClient("https://registry.example")'
+
       - name: Initialize isolated local Registry
         run: |
           pnpm exec wrangler d1 migrations apply DB --local --config wrangler.jsonc

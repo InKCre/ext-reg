@@ -1,9 +1,9 @@
 [project]
 name = "inkcre-extension-registry"
-version = "0.1.0"
+version = "0.1.1"
 description = "Public package registry and Runtime/API contracts for InKCre Extensions"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.14"
 license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+client = [
+  "httpx>=0.28,<0.29",
+]
 cli = [
   "httpx>=0.28,<0.29",
   "typer>=0.21,<0.22",

@@ -7,6 +7,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from .. import __version__
 from ..contracts.models import (
     DIGEST_PATTERN,
     ReleaseRecord,
@@ -72,7 +73,7 @@ def _map_repository_error(error: Exception) -> HTTPException:
 def create_app() -> FastAPI:
     app = FastAPI(
         title="InKCre Extension Registry",
-        version="0.1.0",
+        version=__version__,
         description="Public metadata/artifact reads and scoped Extension target publication.",
     )
     app.add_middleware(
