@@ -1,0 +1,92 @@
+name: Production Registry delivery
+
+on:
+  workflow_run:
+    workflows:
+      - Registry checks
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Migrate and deploy exact current main
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout verified source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Reject a moved main branch
+        run: |
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$current_main" = "$SOURCE_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        run: python -m pip install uv==0.12.3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install frozen delivery dependencies
+        run: |
+          uv sync --frozen
+          pnpm install --frozen-lockfile
+
+      - name: Apply forward D1 migrations
+        run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
+
+      - name: Deploy exact Worker source
+        run: uv run pywrangler deploy
+
+      - name: Smoke configured public origin
+        if: vars.INKCRE_EXTENSION_REGISTRY_URL != ''
+        env:
+          REGISTRY_URL: ${{ vars.INKCRE_EXTENSION_REGISTRY_URL }}
+        run: |
+          curl --fail --show-error --silent "$REGISTRY_URL/livez"
+          curl --fail --show-error --silent "$REGISTRY_URL/v1/extensions"
+
+      - name: Record delivery identity
+        env:
+          REGISTRY_URL: ${{ vars.INKCRE_EXTENSION_REGISTRY_URL }}
+        run: |
+          {
+            echo '## Extension Registry production'
+            echo
+            echo "- Source: \`$SOURCE_SHA\`"
+            echo "- Worker: \`inkcre-extension-registry\`"
+            echo "- Origin: \`${REGISTRY_URL:-record-after-first-deploy}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
