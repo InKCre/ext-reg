@@ -8,7 +8,11 @@ import httpx
 
 from inkcre_extension_registry.cli import build_target_manifest
 from inkcre_extension_registry.client import RegistryClient
-from inkcre_extension_registry.contracts.models import TargetAssociation, TargetPublishConfig
+from inkcre_extension_registry.contracts.models import (
+    TargetAssociation,
+    TargetManifest,
+    TargetPublishConfig,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +60,9 @@ def main() -> None:
     manifest_response = httpx.get(manifest_url)
     manifest_response.raise_for_status()
     assert manifest_response.headers["cache-control"].endswith("immutable")
-    assert manifest_response.json() == manifest.model_dump(mode="json")
+    received_manifest = TargetManifest.model_validate(manifest_response.json())
+    assert received_manifest.digest == manifest.digest
+    assert received_manifest.canonical_bytes() == manifest.canonical_bytes()
 
     file_response = httpx.get(file_url)
     file_response.raise_for_status()

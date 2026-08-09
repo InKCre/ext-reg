@@ -40,6 +40,10 @@ are complete. Repository delivery and production deployment are next.
    MiB (2.12 MiB gzip).
 6. The Worker compatibility date is pinned to the newest date supported by the
    checked-in Wrangler/workerd release, not the local calendar date.
+7. The first remote CI black box correctly exposed that an immutable manifest's
+   canonical condition order can differ from producer input order. The smoke
+   now validates the parsed manifest digest and canonical bytes rather than
+   treating semantically irrelevant array input order as identity.
 
 ## Verification Evidence
 
