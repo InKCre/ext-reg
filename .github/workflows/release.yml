@@ -65,6 +65,7 @@ jobs:
           pnpm install --frozen-lockfile
           uv run python -m build
           pnpm --filter @inkcre/extension-runtime build
+          pnpm --filter @inkcre/extension-runtime pack --pack-destination dist
 
       - name: Verify one coherent package version
         id: version
@@ -106,7 +107,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: >-
           gh release create "v$VERSION"
-          dist/*.tar.gz dist/*.whl
+          dist/*.tar.gz dist/*.tgz dist/*.whl
           --repo "$GITHUB_REPOSITORY"
           --target "$SOURCE_SHA"
           --title "v$VERSION"
