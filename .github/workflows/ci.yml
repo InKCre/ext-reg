@@ -115,7 +115,7 @@ jobs:
             --token inkcre-local-publisher-token
 
       - name: Pack the exact Web Runtime/API
-        run: pnpm --filter @inkcre/extension-runtime pack --pack-destination ../../dist
+        run: pnpm --filter @inkcre/extension-runtime pack --pack-destination dist
 
       - name: Upload exact package evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

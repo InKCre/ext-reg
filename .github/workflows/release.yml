@@ -65,7 +65,7 @@ jobs:
           pnpm install --frozen-lockfile
           uv run python -m build
           pnpm --filter @inkcre/extension-runtime build
-          pnpm --filter @inkcre/extension-runtime pack --pack-destination ../../dist
+          pnpm --filter @inkcre/extension-runtime pack --pack-destination dist
 
       - name: Verify one coherent package version
         id: version

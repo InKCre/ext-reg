@@ -64,6 +64,10 @@ Runtime/API `0.1.2` therefore:
 - attaches the packed Web Runtime/API tarball to the public GitHub Release in
   addition to publishing GitHub Packages, so public consumers have an immutable
   anonymous distribution path;
+- uses the workspace-root `dist/` as the pack destination; the previous
+  `../../dist` argument escaped the checkout when pnpm executed the filtered
+  command from the workspace root and therefore did not upload Web package
+  evidence;
 - keeps Python and Web Runtime/API versions coherent at `0.1.2`.
 
 This is also package metadata only. Registry endpoints, contract revision,
