@@ -1,0 +1,24 @@
+{
+  "artifact_formats": [
+    "module-federation-esm-v1",
+    "python-bundle-v1"
+  ],
+  "condition_keys": [
+    "inkcre.extension-api",
+    "inkcre.integration",
+    "module-federation.runtime",
+    "module-federation.share-scope",
+    "python",
+    "shared.@inkcre/core",
+    "shared.vue",
+    "web.ecmascript"
+  ],
+  "contract_revision": 1,
+  "extension_version": "strict-semver-without-build-metadata",
+  "release_states": [
+    "preparing",
+    "published",
+    "yanked",
+    "blocked"
+  ]
+}

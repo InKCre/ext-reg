@@ -1,0 +1,9 @@
+.agents/skills/svc/SKILL.md
+.wrangler/
+AGENTS.md
+contracts/
+docs/index.md
+dist/
+node_modules/
+pnpm-lock.yaml
+tasks/

@@ -1,0 +1,148 @@
+{
+  "$defs": {
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "semver"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "operator",
+        "value"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "FileDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 20971520,
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sha256",
+        "size",
+        "media_type"
+      ],
+      "title": "FileDescriptor",
+      "type": "object"
+    },
+    "TargetManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_format": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Artifact Format",
+          "type": "string"
+        },
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "title": "Conditions",
+          "type": "array"
+        },
+        "entrypoint": {
+          "title": "Entrypoint",
+          "type": "string"
+        },
+        "files": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FileDescriptor"
+          },
+          "maxProperties": 2048,
+          "minProperties": 1,
+          "title": "Files",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_format",
+        "entrypoint",
+        "conditions",
+        "files"
+      ],
+      "title": "TargetManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "build_id": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Build Id"
+    },
+    "manifest": {
+      "$ref": "#/$defs/TargetManifest"
+    },
+    "source_repository": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Source Repository",
+      "type": "string"
+    },
+    "source_revision": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Source Revision",
+      "type": "string"
+    }
+  },
+  "required": [
+    "manifest",
+    "source_repository",
+    "source_revision"
+  ],
+  "title": "TargetAssociation",
+  "type": "object"
+}

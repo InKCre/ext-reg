@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "semver"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "operator",
+        "value"
+      ],
+      "title": "Condition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_format": {
+      "title": "Artifact Format",
+      "type": "string"
+    },
+    "conditions": {
+      "items": {
+        "$ref": "#/$defs/Condition"
+      },
+      "title": "Conditions",
+      "type": "array"
+    },
+    "coordinate": {
+      "title": "Coordinate",
+      "type": "string"
+    },
+    "entrypoint": {
+      "title": "Entrypoint",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "target_key": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Target Key",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "coordinate",
+    "version",
+    "target_key",
+    "artifact_format",
+    "entrypoint",
+    "conditions"
+  ],
+  "title": "TargetPublishConfig",
+  "type": "object"
+}

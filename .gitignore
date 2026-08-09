@@ -1,0 +1,27 @@
+# svc:begin local-config sha256=1c799ae619bf818114d80699d514f5e62f20f4082367cf70b8d0bb2936fdf0d3
+svc.local.json
+# svc:end local-config
+
+# Local Cloudflare state
+.wrangler/
+
+# Python
+.venv/
+.venv-workers/
+python_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+build/
+
+# Node and generated output
+node_modules/
+dist/
+coverage/
+
+# Local secrets
+.dev.vars
+.env

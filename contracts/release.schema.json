@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "semver"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "operator",
+        "value"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "TargetRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_format": {
+          "title": "Artifact Format",
+          "type": "string"
+        },
+        "build_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "title": "Conditions",
+          "type": "array"
+        },
+        "entrypoint": {
+          "title": "Entrypoint",
+          "type": "string"
+        },
+        "source_repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Repository"
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Revision"
+        },
+        "target_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Target Digest",
+          "type": "string"
+        },
+        "target_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Target Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_key",
+        "target_digest",
+        "artifact_format",
+        "entrypoint",
+        "conditions"
+      ],
+      "title": "TargetRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "namespace": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Namespace",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "preparing",
+        "published",
+        "yanked",
+        "blocked"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "targets": {
+      "items": {
+        "$ref": "#/$defs/TargetRecord"
+      },
+      "title": "Targets",
+      "type": "array"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "namespace",
+    "name",
+    "version",
+    "state",
+    "targets"
+  ],
+  "title": "ReleaseRecord",
+  "type": "object"
+}

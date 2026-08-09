@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "inkcre-extension-registry",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-08-08",
+  "compatibility_flags": ["python_workers", "python_dedicated_snapshot"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "inkcre-extension-registry-production",
+      "database_id": "7288f832-7def-4877-aef8-2e6f613458fe",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTIFACTS",
+      "bucket_name": "inkcre-extension-registry-production",
+    },
+  ],
+  "observability": { "enabled": true },
+}

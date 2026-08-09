@@ -1,0 +1,30 @@
+{
+  "name": "@inkcre/extension-registry-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "uv run python -m build && pnpm --recursive build",
+    "check": "pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm worker:build",
+    "contracts:check": "uv run python scripts/generate_contracts.py --check",
+    "contracts:generate": "uv run python scripts/generate_contracts.py",
+    "format": "uv run ruff format . && prettier --write .",
+    "format:check": "uv run ruff format --check . && prettier --check .",
+    "lint": "uv run ruff check . && eslint .",
+    "test": "uv run pytest && pnpm --recursive test",
+    "type-check": "uv run pyright && pnpm --recursive type-check",
+    "worker:build": "uv run pywrangler deploy --dry-run --outdir dist/worker"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.32.0",
+    "eslint": "9.32.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "16.3.0",
+    "prettier": "3.6.2",
+    "typescript-eslint": "8.39.0",
+    "wrangler": "4.120.0"
+  }
+}
