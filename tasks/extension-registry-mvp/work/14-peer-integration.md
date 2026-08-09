@@ -35,8 +35,11 @@ therefore:
   Python 3.13;
 - keeps Python and Web Runtime/API package versions coherent at `0.1.1`;
 - derives FastAPI/OpenAPI service version from the package `__version__`;
-- installs the built wheel into a real Python 3.12 environment and imports a
-  representative contract type in the required Registry CI job.
+- declares HTTP client dependencies behind the `client` extra so consumers can
+  install the stable Registry client without inflating the Worker bundle;
+- installs the built wheel with the `client` extra into a real Python 3.12
+  environment and constructs the Registry client in the required Registry CI
+  job.
 
 This is a package compatibility fix, not a change to Extension Version,
 Registry API semantics, or the lifecycle contract revision.

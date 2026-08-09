@@ -163,6 +163,9 @@ cli = [
     { name = "httpx" },
     { name = "typer" },
 ]
+client = [
+    { name = "httpx" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -181,11 +184,12 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141,<0.142" },
     { name = "httpx", marker = "extra == 'cli'", specifier = ">=0.28,<0.29" },
+    { name = "httpx", marker = "extra == 'client'", specifier = ">=0.28,<0.29" },
     { name = "pydantic", specifier = ">=2.10.6,<2.11" },
     { name = "semantic-version", specifier = ">=2.10,<3" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.21,<0.22" },
 ]
-provides-extras = ["cli"]
+provides-extras = ["client", "cli"]
 
 [package.metadata.requires-dev]
 dev = [

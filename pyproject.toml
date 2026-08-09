@@ -13,6 +13,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+client = [
+  "httpx>=0.28,<0.29",
+]
 cli = [
   "httpx>=0.28,<0.29",
   "typer>=0.21,<0.22",
