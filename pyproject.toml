@@ -1,14 +1,14 @@
 [project]
 name = "inkcre-extension-registry"
-version = "0.1.1"
+version = "0.1.2"
 description = "Public package registry and Runtime/API contracts for InKCre Extensions"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
-  "fastapi>=0.141,<0.142",
-  "pydantic>=2.10.6,<2.11",
+  "fastapi>=0.139.2,<0.142",
+  "pydantic>=2.10.6,<3",
   "semantic-version>=2.10,<3",
 ]
 
@@ -31,6 +31,9 @@ Repository = "https://github.com/InKCre/ext-reg"
 dev = [
   "build>=1.4,<2",
   "httpx>=0.28,<0.29",
+  # Keep the verified Cloudflare Worker dependency while the public wheel
+  # metadata remains compatible with peer runtimes on newer Pydantic minors.
+  "pydantic==2.10.6",
   "pyright>=1.1.405,<2",
   "pytest>=9,<10",
   "pytest-asyncio>=1.3,<2",

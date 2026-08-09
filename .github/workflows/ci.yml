@@ -73,7 +73,24 @@ jobs:
             --python /tmp/inkcre-extension-runtime-python312/bin/python \
             "${runtime_wheel}[client]"
           /tmp/inkcre-extension-runtime-python312/bin/python -c \
-            'from inkcre_extension_registry import PlatformProfile, __version__; from inkcre_extension_registry.client import RegistryClient; assert __version__ == "0.1.1"; PlatformProfile(capabilities={}); RegistryClient("https://registry.example")'
+            'from inkcre_extension_registry import PlatformProfile, __version__; from inkcre_extension_registry.client import RegistryClient; assert __version__ == "0.1.2"; PlatformProfile(capabilities={}); RegistryClient("https://registry.example")'
+
+          uv venv --python 3.12 /tmp/inkcre-extension-runtime-core-py
+          uv pip install \
+            --python /tmp/inkcre-extension-runtime-core-py/bin/python \
+            fastapi==0.139.2 pydantic==2.11.9
+          uv pip install \
+            --python /tmp/inkcre-extension-runtime-core-py/bin/python \
+            "${runtime_wheel}[client]"
+          /tmp/inkcre-extension-runtime-core-py/bin/python - <<'PY'
+          from importlib.metadata import version
+
+          from inkcre_extension_registry.client import RegistryClient
+
+          assert version("fastapi") == "0.139.2"
+          assert version("pydantic") == "2.11.9"
+          RegistryClient("https://registry.example")
+          PY
 
       - name: Initialize isolated local Registry
         run: |
