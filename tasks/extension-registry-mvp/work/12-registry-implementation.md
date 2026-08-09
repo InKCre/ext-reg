@@ -2,8 +2,9 @@
 
 ## Status
 
-**Current.** The local Registry vertical slice and executable project foundation
-are complete. Repository delivery and production deployment are next.
+**Complete.** The Registry vertical slice and executable project foundation are
+complete. Remote and production delivery evidence continues in
+[`13-production-delivery.md`](13-production-delivery.md).
 
 ## Implemented Surface
 
@@ -38,8 +39,11 @@ are complete. Repository delivery and production deployment are next.
 5. CLI-only HTTP/Typer dependencies were moved to an optional extra/dev group.
    The production Worker bundle fell from roughly 15 MiB uncompressed to 8.25
    MiB (2.12 MiB gzip).
-6. The Worker compatibility date is pinned to the newest date supported by the
-   checked-in Wrangler/workerd release, not the local calendar date.
+6. A Worker compatibility date is a production runtime dependency, not a
+   calendar freshness marker. Cloudflare's `2026-08-08` Pyodide runtime failed
+   even its official four-line Python sample with a dynamic Node `fs` require.
+   The project is pinned to the verified `2026-07-28` runtime and the sole
+   documented `python_workers` flag.
 7. The first remote CI black box correctly exposed that an immutable manifest's
    canonical condition order can differ from producer input order. The smoke
    now validates the parsed manifest digest and canonical bytes rather than
@@ -85,10 +89,8 @@ sha256:3d51fd949dacea5fcc9907328024eaeaf480b9d4ffd2b979857fb799d6a00f2a
 
 Local Wrangler state and fixture data are ignored and are not production data.
 
-## Remaining Slice
+## Handoff
 
-- Add repository CI, exact-main release, and exact-main production delivery.
-- Add concise repository architecture/filesystem/contribution/operations docs.
-- Create the public remote, push coherent commits, and prove CI.
-- Provision production D1/R2, seed raw tokens only into peer GitHub secrets,
-  deploy the Worker, and repeat the public black box before peer integration.
+Repository delivery, public infrastructure, and production runtime evidence are
+owned by [`13-production-delivery.md`](13-production-delivery.md). Peer
+publisher credentials and the public black box remain before peer integration.

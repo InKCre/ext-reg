@@ -2,8 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "inkcre-extension-registry",
   "main": "src/worker.py",
-  "compatibility_date": "2026-08-08",
-  "compatibility_flags": ["python_workers", "python_dedicated_snapshot"],
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["python_workers"],
   "d1_databases": [
     {
       "binding": "DB",

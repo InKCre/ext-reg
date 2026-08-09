@@ -29,6 +29,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
       - name: Reject a moved main branch
         env:
@@ -73,12 +74,32 @@ jobs:
           test "$python_version" = "$web_version"
           echo "version=$python_version" >> "$GITHUB_OUTPUT"
 
+      - name: Require a new version for changed package surfaces
+        id: release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+            if ! git diff --quiet "$tag^{commit}" HEAD -- \
+              .python-version package.json pnpm-lock.yaml pnpm-workspace.yaml \
+              pyproject.toml uv.lock pylock.toml scripts src packages/runtime-web; then
+              echo "Package surfaces changed after $tag; bump the coherent package version." >&2
+              exit 1
+            fi
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish Web Runtime/API to GitHub Packages
+        if: steps.release.outputs.publish == 'true'
         run: pnpm --filter @inkcre/extension-runtime publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create immutable source and Python package release
+        if: steps.release.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
