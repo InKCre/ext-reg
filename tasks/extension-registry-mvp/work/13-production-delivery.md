@@ -2,9 +2,9 @@
 
 ## Status
 
-**Complete for the Registry slice.** Public infrastructure, exact-main delivery,
-scoped peer credentials, and the production black box are verified. Peer
-integration is next.
+**Complete.** Public infrastructure, exact-main delivery, scoped peer credentials,
+the Registry black box, both peer target publications, and the final production
+lifecycle journey are verified.
 
 ## Repository And Release Identity
 
@@ -78,8 +78,10 @@ now carries the same pin and exact-main CD has replaced that diagnostic version.
   bytes; recomputing the contract identity corrected the assertion without a
   service change.
 
-## Handoff
+## Completion
 
-Open fresh feature worktrees from each peer's fetched `origin/main`. Implement
-the deployment lock/adapters before adding peer CD publication, and preserve
-core-py's no-runtime-download boundary.
+Both fresh peer worktrees completed their integrations and protected-main delivery.
+Core preserved its no-runtime-download boundary through exact embedded-target admission;
+Web loads digest-addressed Module Federation bytes. Final cross-peer evidence is owned by
+[`work/14-peer-integration.md`](14-peer-integration.md) and
+[`50-acceptance.md`](../50-acceptance.md).

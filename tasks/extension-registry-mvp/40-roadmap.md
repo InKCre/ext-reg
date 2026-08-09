@@ -32,19 +32,22 @@
 
 ## Phase 5 — Project Foundation And Registry
 
-- **Status**: Current.
+- **Status**: Complete.
 - Executable Python/TypeScript foundation, service, contracts, metadata migration, artifact flow, publisher CLI, Runtime/API package, focused checks, package builds, Pyodide build, and local Worker black box are complete.
-- Repository CI/CD, public remote, production resources, production deployment, and public smoke remain.
+- Repository CI/CD, public remote, production resources, production deployment, scoped publication, and public smoke are complete.
 
 ## Phase 6 — Peer Integration And Publisher CD
 
-- Migrate both peer adapters from fresh `origin/main` feature worktrees.
-- Add one first-party target publication workflow to each peer and preserve their existing application delivery flows.
-- Add the minimum deployment schema/API/UI necessary for exact install bindings and uninstall.
+- **Status**: Complete.
+- Both peer adapters were migrated from fresh `origin/main` worktrees.
+- Each peer owns its first-party target build/publication while preserving application delivery.
+- The shared installation and per-peer binding model, lifecycle APIs, UI, and uninstall guard are deployed.
 
 ## Phase 7 — Production Acceptance
 
-- Deploy the public Registry, publish both targets, provision production configuration, deploy both peers, and execute the real lifecycle journey in [`50-acceptance.md`](50-acceptance.md).
+- **Status**: Complete.
+- Public Registry and both peers are deployed; both targets are published under one Extension Version.
+- The real Chromium/shared-database lifecycle journey in [`50-acceptance.md`](50-acceptance.md) passed with zero final residue.
 
 ## Work File Convention
 

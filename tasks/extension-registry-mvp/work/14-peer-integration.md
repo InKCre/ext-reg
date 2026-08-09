@@ -2,10 +2,10 @@
 
 ## Status
 
-**Current.** Runtime/API `0.1.2` and both peer integrations are released. Real
-production Chromium acceptance exposed a browser-native fetch receiver bug in
-the public Web Runtime/API and the Host adapter. The Host correction is deployed;
-Runtime/API `0.1.3` owns the SDK correction.
+**Complete.** Runtime/API `0.1.3` and both peer integrations are released. The
+browser-native fetch receiver defect found by the first production Chromium run
+is fixed in both the public Web Runtime/API and the Host adapter. The complete
+production lifecycle journey passed with zero residue.
 
 ## Fresh Baselines
 
@@ -97,5 +97,31 @@ Version remain unchanged.
    admitted target, and publication CD.
 3. [complete] Regenerate the exact Web database contract, integrate the resolver,
    lifecycle, UI, Twitter target, and release-intent-aware CD.
-4. [in progress] Release Runtime/API `0.1.3`, update client-web's immutable
+4. [complete] Release Runtime/API `0.1.3`, update client-web's immutable
    Runtime/API tarball, and rerun the full production journey.
+
+## Production Acceptance
+
+- Registry PR [#3](https://github.com/InKCre/ext-reg/pull/3) merged as
+  `55b52eed130c07062c77c9cdc2dd2cbd0aed08af`; release run `31340825004`
+  published Runtime/API `0.1.3` and its immutable Web tarball.
+- Client PR [#61](https://github.com/InKCre/client-web/pull/61) merged as
+  `f29c98983a6fb29a5bb46e7b5cf3d4cd7ed1beb9`; exact-main checks
+  `31341300838` and Pages delivery `31341424369` passed. The delivery correctly
+  skipped Twitter target publication because that Host-only revision carried no release intent.
+- Client acceptance-record PR [#62](https://github.com/InKCre/client-web/pull/62) later merged as
+  docs-only main `4c391f64d8e416026272588a25cce955eaf8129f`; checks `31342369939` and
+  Pages delivery `31342493450` passed while leaving runtime identity and target publication intact.
+- Starting from zero rows/routes, the production UI installed one shared
+  `inkcre/twitter@0.1.0` record with no bindings. Web enable selected
+  `web-module-federation-v1@sha256:1cfb7744dcb97cecfe427b39f79994a3809f02a88be7ad67e2ef42f92d0a8220`;
+  reload cold-restored the same digest. Core enable selected
+  `python-core-v1@sha256:70d12049bd31c27e8bf024d26f9df91761a44fe4b58a7110681b171c50d1d679`
+  and published three dynamic routes.
+- Core disable removed its binding and routes. Web disable completed Module Federation lifecycle
+  cleanup and removed its binding. UI uninstall then left zero installations, zero bindings, and
+  zero Core Twitter routes after 22 successful Registry responses.
+- Chromium reports the successful cross-origin 204 uninstall as
+  `requestfailed(net::ERR_ABORTED)` after delivering the 204 response. A separate probe verified
+  correct CORS, resolved UI await, authoritative 404 afterward, and zero residue. Acceptance
+  excludes only that exact post-response observation and rejects all other browser failures.
