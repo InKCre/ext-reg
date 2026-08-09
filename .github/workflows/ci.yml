@@ -73,7 +73,7 @@ jobs:
             --python /tmp/inkcre-extension-runtime-python312/bin/python \
             "${runtime_wheel}[client]"
           /tmp/inkcre-extension-runtime-python312/bin/python -c \
-            'from inkcre_extension_registry import PlatformProfile, __version__; from inkcre_extension_registry.client import RegistryClient; assert __version__ == "0.1.2"; PlatformProfile(capabilities={}); RegistryClient("https://registry.example")'
+            'from inkcre_extension_registry import PlatformProfile, __version__; from inkcre_extension_registry.client import RegistryClient; assert __version__ == "0.1.3"; PlatformProfile(capabilities={}); RegistryClient("https://registry.example")'
 
           uv venv --python 3.12 /tmp/inkcre-extension-runtime-core-py
           uv pip install \

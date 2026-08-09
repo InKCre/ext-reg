@@ -24,4 +24,4 @@ __all__ = [
     "target_matches",
 ]
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"

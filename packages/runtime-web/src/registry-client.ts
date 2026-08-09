@@ -29,7 +29,7 @@ export class RegistryClient {
     }
 
     this.#origin = normalizedOrigin
-    this.#fetch = fetchImplementation
+    this.#fetch = fetchImplementation.bind(globalThis)
   }
 
   async getPublishedRelease(namespace: string, name: string, version: string): Promise<Release> {
