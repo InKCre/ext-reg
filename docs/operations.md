@@ -3,24 +3,21 @@
 ## Cutover Boundary
 
 The native schema is a clean initial schema, not an in-place migration from the
-rejected generic target database. The later authorized cutover must create a
-new D1 database and R2 bucket, seed a newly hashed namespace credential, update
-the Worker bindings, deploy, and smoke the native paths as one rollback unit.
-The currently configured remote identifiers remain unchanged until that
-separate Cloudflare-mutation authorization.
+rejected generic target database. The authorized cutover created fresh
+`inkcre-extension-registry-production-v2` D1 and R2 resources and froze their
+bindings in `wrangler.jsonc`. The pre-cutover same-named resources remain
+untouched as the bounded rollback data plane.
 
-The production workflow is temporarily a non-mutating handoff gate. It is
-manual, takes an exact current-main SHA, installs frozen dependencies, runs the
-full repository contract, and records that remote mutation is disabled. It has
-no Cloudflare credentials or migration/deploy steps. The protected
-`production` environment remains in place so the later delivery handshake can
-restore mutation only after exact new D1/R2 bindings have been frozen. Never
-place raw publisher tokens in logs, task evidence, D1, or workflow summaries.
+The production workflow is manual, takes an exact current-main SHA, rejects a
+moved branch or unexpected binding identity, installs frozen dependencies,
+runs the full repository contract, applies only checked-in D1 migrations,
+deploys the exact Worker, and smokes anonymous public reads. It never creates
+or deletes Cloudflare resources. The protected `production` environment owns
+the deploy credential boundary. Never place raw publisher tokens in logs, task
+evidence, D1, or workflow summaries.
 
-The frozen public origin and Worker Custom Domain are both
-`https://registry.inkcre.dev`. A later authorized deploy may create the Custom
-Domain and certificate; committing this configuration does not perform that
-remote mutation.
+The public origin and Worker Custom Domain are both
+`https://registry.inkcre.dev`.
 
 ## Pull Request Previews
 
@@ -80,8 +77,7 @@ conflict, yanking, bounds, and operator blocking.
 
 ## Authorized Provisioning Outline
 
-Resolve exact new resource names during the delivery handshake, then execute
-the equivalent of:
+The production delivery executes the equivalent of:
 
 ```text
 create new D1 + private R2
@@ -102,11 +98,10 @@ explicit authorization.
 ## Delivery, Failure, And Rollback
 
 CI builds and tests the Registry/Worker from frozen Python and Node dependency
-graphs. The current handoff workflow rechecks that the authorized SHA is still
-current `main` and runs the exact source contract, but cannot mutate remote
-state. A later separately reviewed workflow may restore migration and deploy
-only after the delivery handshake has frozen new resource bindings. Do not
-deploy from a controller checkout, moved branch, or mutable package artifact.
+graphs. The production workflow rechecks that the authorized SHA is still
+current `main`, verifies the frozen `-v2` bindings, and only then migrates and
+deploys. Do not deploy from a controller checkout, moved branch, or mutable
+package artifact.
 
 Rollback restores the old Worker bindings and verified Worker revision while
 the old D1/R2 resources still exist. New native D1/R2 resources stay intact for

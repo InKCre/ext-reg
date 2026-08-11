@@ -258,11 +258,19 @@ def test_module_federation_manifest_rejects_non_finite_json_numbers(constant: st
         )
 
 
-def test_production_handoff_contains_no_remote_mutation_command() -> None:
+def test_production_delivery_is_exact_and_does_not_provision_or_delete_resources() -> None:
     workflow = Path(".github/workflows/production.yml").read_text(encoding="utf-8")
-    assert "--remote" not in workflow
-    assert "pywrangler deploy" not in workflow
-    assert "CLOUDFLARE_API_TOKEN" not in workflow
+    assert "source_sha" in workflow
+    assert "git ls-remote origin refs/heads/main" in workflow
+    assert "CLOUDFLARE_API_TOKEN" in workflow
+    assert "wrangler d1 migrations apply DB --remote" in workflow
+    assert "pywrangler deploy" in workflow
+    assert "https://registry.inkcre.dev" in workflow
+    assert "wrangler d1 create" not in workflow
+    assert "wrangler d1 delete" not in workflow
+    assert "wrangler r2 bucket create" not in workflow
+    assert "wrangler r2 bucket delete" not in workflow
+    assert "inkcre-extension-registry-production-v2" in workflow
 
 
 def test_pr_preview_is_isolated_from_production_bindings() -> None:

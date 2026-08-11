@@ -1,10 +1,10 @@
-name: Native Registry cutover handoff (remote mutation disabled)
+name: Deploy Extension Registry production
 
 on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact verified main SHA authorized for native cutover
+        description: Exact verified main SHA authorized for production delivery
         required: true
         type: string
 
@@ -16,12 +16,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  handoff:
-    name: Verify exact main and record blocked delivery handoff
+  deploy:
+    name: Verify, migrate, deploy, and smoke exact main
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://registry.inkcre.dev
     env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REGISTRY_ORIGIN: https://registry.inkcre.dev
       SOURCE_SHA: ${{ inputs.source_sha }}
     steps:
       - name: Checkout verified source
@@ -29,10 +34,16 @@ jobs:
         with:
           ref: ${{ env.SOURCE_SHA }}
 
-      - name: Reject a moved main branch
+      - name: Reject a moved main branch or incomplete production contract
         run: |
           current_main=$(git ls-remote origin refs/heads/main | cut -f1)
           test "$current_main" = "$SOURCE_SHA"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          grep -F '"database_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
+          grep -F '"database_id": "af52114f-55b5-476f-b986-8ff8d8601d77"' wrangler.jsonc
+          grep -F '"bucket_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
+          grep -F '"pattern": "registry.inkcre.dev"' wrangler.jsonc
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -61,14 +72,37 @@ jobs:
       - name: Verify exact delivery source
         run: pnpm check
 
-      - name: Record non-mutating cutover handoff
+      - name: Apply native production schema
+        run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
+
+      - name: Deploy exact Worker and bindings
+        run: |
+          uv run pywrangler deploy \
+            --config wrangler.jsonc \
+            --message "Native Registry production at $SOURCE_SHA" \
+            --strict
+
+      - name: Smoke anonymous production reads
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/livez" | jq -e '.status == "ok"'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/" | grep -F 'Extension Registry'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/v1/extensions" | jq -e 'type == "array"'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            -H 'Accept: application/vnd.pypi.simple.v1+json' \
+            "$REGISTRY_ORIGIN/simple/" | jq -e '.meta["api-version"] == "1.1"'
+
+      - name: Record production evidence
         run: |
           {
-            echo '## Extension Registry cutover handoff'
+            echo '## Extension Registry production delivery'
             echo
             echo "- Source: \`$SOURCE_SHA\`"
-            echo '- Full repository contract: passed in this run'
-            echo '- Remote mutation: disabled'
-            echo '- Blocker: current Wrangler bindings identify the pre-cutover resources'
-            echo '- Next authority boundary: provision new D1/R2 and freeze exact bindings during the delivery handshake'
+            echo "- Origin: $REGISTRY_ORIGIN"
+            echo '- D1: inkcre-extension-registry-production-v2'
+            echo '- R2: inkcre-extension-registry-production-v2'
+            echo '- Full repository contract, migration, deploy, and anonymous smoke: passed'
+            echo '- Previous Worker Versions and pre-cutover D1/R2: retained for rollback'
           } >> "$GITHUB_STEP_SUMMARY"
