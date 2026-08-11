@@ -45,7 +45,7 @@ no route or production Custom Domain.
 
 Sir authorized the CI fixes, preview workflow, commits, pushes, and the isolated
 preview provisioning handshake. A dedicated account-owned Cloudflare token now
-has only `D1 Write` and `Workers Scripts Write`; it is stored as the existing
+has `D1 Write`, `Workers Scripts Write`, and `Workers R2 Storage Write`; it is stored as the existing
 GitHub organization Actions secret with selected-repository access that includes
 `ext-reg`. The preview resource pair is distinct from production:
 
@@ -75,5 +75,12 @@ data, releases, merges, and demo-database cutover remain unchanged.
   requires the dedicated Worker service to exist first.
 - The follow-up workflow probes and bootstraps only that dedicated preview
   Worker before uploading the exact checked PR Version.
+- Run `31460120485` proved D1 and R2 authorization. Its first bootstrap attempt
+  exposed that R2 Read can list buckets but the single-bucket metadata endpoint
+  used by Wrangler requires R2 Write. After that permission was substituted,
+  remote validation reached the Worker import and exposed a config-root defect:
+  the nested generated config omitted pywrangler's root `python_modules`.
+- The preview config now lives at the repository root, so the upload resolves
+  the same vendored Python dependency tree as the production dry build.
 - Preview SQL is idempotent and contains no credential or Distribution bytes.
 - Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.

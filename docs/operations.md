@@ -44,9 +44,11 @@ passes. Before enabling it, create the following repository variables:
 
 Store `CLOUDFLARE_API_TOKEN` as an organization Actions secret with selected
 repository access that includes `ext-reg`, and restrict it to the target account
-with only Workers Scripts Write and D1 Write. Runtime R2 access comes from the
-Worker binding; the deployment token does not need R2 object permissions. Until
-every variable exists, CI reports the missing preview contract and skips
+with Workers Scripts Write, D1 Write, and Workers R2 Storage Write. Wrangler's
+first Worker deploy validates the named R2 bucket through an endpoint that
+requires R2 Storage Write even though the workflow never creates, modifies, or
+deletes that bucket. Runtime object access still comes from the Worker binding.
+Until every variable exists, CI reports the missing preview contract and skips
 deployment without touching Cloudflare. The preview D1 and R2 are provisioned
 out of band. If the dedicated preview Worker service does not yet exist, the
 workflow bootstraps that service once from the fail-closed preview config; it

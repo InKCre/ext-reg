@@ -165,7 +165,7 @@ jobs:
       url: ${{ steps.upload.outputs.preview_url }}
     env:
       PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
-      PREVIEW_CONFIG: .wrangler/preview.json
+      PREVIEW_CONFIG: wrangler.preview.json
       PREVIEW_D1_DATABASE_ID: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_ID }}
       PREVIEW_D1_DATABASE_NAME: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_NAME }}
       PREVIEW_R2_BUCKET_NAME: ${{ vars.REGISTRY_PREVIEW_R2_BUCKET_NAME }}
@@ -210,16 +210,15 @@ jobs:
           test "$PREVIEW_R2_BUCKET_NAME" != 'inkcre-extension-registry-production'
           [[ "$PREVIEW_D1_DATABASE_ID" =~ ^[0-9a-f-]{36}$ ]]
           [[ "$PREVIEW_WORKERS_SUBDOMAIN" =~ ^[a-z0-9-]+$ ]]
-          mkdir -p .wrangler
           jq -n \
             --arg origin "$PREVIEW_ORIGIN" \
             --arg database_name "$PREVIEW_D1_DATABASE_NAME" \
             --arg database_id "$PREVIEW_D1_DATABASE_ID" \
             --arg bucket_name "$PREVIEW_R2_BUCKET_NAME" \
             '{
-              "$schema": "../node_modules/wrangler/config-schema.json",
+              "$schema": "./node_modules/wrangler/config-schema.json",
               "name": "inkcre-extension-registry-preview",
-              "main": "../src/worker.py",
+              "main": "src/worker.py",
               "compatibility_date": "2026-07-28",
               "compatibility_flags": ["python_workers"],
               "workers_dev": false,
@@ -229,7 +228,7 @@ jobs:
                 "binding": "DB",
                 "database_name": $database_name,
                 "database_id": $database_id,
-                "migrations_dir": "../migrations"
+                "migrations_dir": "migrations"
               }],
               "r2_buckets": [{
                 "binding": "ARTIFACTS",
