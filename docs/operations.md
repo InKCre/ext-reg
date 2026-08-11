@@ -22,6 +22,34 @@ The frozen public origin and Worker Custom Domain are both
 Domain and certificate; committing this configuration does not perform that
 remote mutation.
 
+## Pull Request Previews
+
+Registry checks can upload an exact, tested PR head as a Cloudflare Worker
+Version with the stable alias `pr-<number>`. The preview uses the separate
+Worker name `inkcre-extension-registry-preview`, explicit Preview URLs, and
+dedicated preview D1/R2 bindings. It never inherits the production binding
+names or the `registry.inkcre.dev` Custom Domain. The shared preview database
+contains only an idempotent `inkcre/preview` catalog fixture and no publisher
+credential.
+
+The deploy job runs only for same-repository PRs after the repository contract
+passes. Before enabling it, create the following repository variables:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `REGISTRY_PREVIEW_D1_DATABASE_ID`
+- `REGISTRY_PREVIEW_D1_DATABASE_NAME`
+- `REGISTRY_PREVIEW_R2_BUCKET_NAME`
+- `REGISTRY_PREVIEW_WORKERS_SUBDOMAIN` (the account subdomain without
+  `.workers.dev`)
+
+Store `CLOUDFLARE_API_TOKEN` as a repository secret and restrict it to the
+target account with only Workers Scripts Write and D1 Write. Runtime R2 access
+comes from the Worker binding; the deployment token does not need R2 object
+permissions. Until every variable exists, CI reports the missing preview
+contract and skips deployment without touching Cloudflare. The workflow never
+issues resource-creation commands: it applies migrations only to the explicit
+preview D1 and exposes the uploaded Version alias through the PR deployment.
+
 ## Local Worker Black Box
 
 Use an isolated local Wrangler state or a clean checkout:

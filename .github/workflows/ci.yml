@@ -15,6 +15,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preview-configuration:
+    name: Preview infrastructure contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.contract.outputs.ready }}
+    steps:
+      - name: Check isolated preview bindings
+        id: contract
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIEW_D1_DATABASE_ID: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_ID }}
+          PREVIEW_D1_DATABASE_NAME: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_NAME }}
+          PREVIEW_R2_BUCKET_NAME: ${{ vars.REGISTRY_PREVIEW_R2_BUCKET_NAME }}
+          PREVIEW_WORKERS_SUBDOMAIN: ${{ vars.REGISTRY_PREVIEW_WORKERS_SUBDOMAIN }}
+        run: |
+          missing=()
+          for variable in \
+            CLOUDFLARE_ACCOUNT_ID \
+            PREVIEW_D1_DATABASE_ID \
+            PREVIEW_D1_DATABASE_NAME \
+            PREVIEW_R2_BUCKET_NAME \
+            PREVIEW_WORKERS_SUBDOMAIN
+          do
+            if [ -z "${!variable}" ]; then
+              missing+=("$variable")
+            fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## Registry PR preview'
+              echo
+              echo "Preview deployment skipped: missing repository variables ${missing[*]}."
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ github.event.pull_request.head.repo.full_name }}" != "$GITHUB_REPOSITORY" ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## Registry PR preview'
+              echo
+              echo 'Preview deployment skipped for a fork pull request.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
@@ -97,3 +143,145 @@ jobs:
             dist/*.whl
           if-no-files-found: error
           retention-days: 7
+
+  preview:
+    name: Deploy isolated PR preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      needs.preview-configuration.outputs.ready == 'true'
+    needs:
+      - preview-configuration
+      - repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: registry-preview-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    environment:
+      name: registry-preview-pr-${{ github.event.pull_request.number }}
+      url: ${{ steps.upload.outputs.preview_url }}
+    env:
+      PREVIEW_ALIAS: pr-${{ github.event.pull_request.number }}
+      PREVIEW_CONFIG: .wrangler/preview.json
+      PREVIEW_D1_DATABASE_ID: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_ID }}
+      PREVIEW_D1_DATABASE_NAME: ${{ vars.REGISTRY_PREVIEW_D1_DATABASE_NAME }}
+      PREVIEW_R2_BUCKET_NAME: ${{ vars.REGISTRY_PREVIEW_R2_BUCKET_NAME }}
+      PREVIEW_WORKERS_SUBDOMAIN: ${{ vars.REGISTRY_PREVIEW_WORKERS_SUBDOMAIN }}
+      PREVIEW_WORKER_NAME: inkcre-extension-registry-preview
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        run: python -m pip install uv==0.12.3
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install frozen deployment dependencies
+        run: |
+          uv sync --frozen
+          pnpm install --frozen-lockfile
+
+      - name: Render fail-closed preview configuration
+        env:
+          PREVIEW_ORIGIN: >-
+            https://${{ env.PREVIEW_ALIAS }}-${{ env.PREVIEW_WORKER_NAME }}.${{ env.PREVIEW_WORKERS_SUBDOMAIN }}.workers.dev
+        run: |
+          test "$PREVIEW_D1_DATABASE_NAME" != 'inkcre-extension-registry-production'
+          test "$PREVIEW_R2_BUCKET_NAME" != 'inkcre-extension-registry-production'
+          [[ "$PREVIEW_D1_DATABASE_ID" =~ ^[0-9a-f-]{36}$ ]]
+          [[ "$PREVIEW_WORKERS_SUBDOMAIN" =~ ^[a-z0-9-]+$ ]]
+          mkdir -p .wrangler
+          jq -n \
+            --arg origin "$PREVIEW_ORIGIN" \
+            --arg database_name "$PREVIEW_D1_DATABASE_NAME" \
+            --arg database_id "$PREVIEW_D1_DATABASE_ID" \
+            --arg bucket_name "$PREVIEW_R2_BUCKET_NAME" \
+            '{
+              "$schema": "../node_modules/wrangler/config-schema.json",
+              "name": "inkcre-extension-registry-preview",
+              "main": "../src/worker.py",
+              "compatibility_date": "2026-07-28",
+              "compatibility_flags": ["python_workers"],
+              "workers_dev": false,
+              "preview_urls": true,
+              "vars": {"PUBLIC_ORIGIN": $origin},
+              "d1_databases": [{
+                "binding": "DB",
+                "database_name": $database_name,
+                "database_id": $database_id,
+                "migrations_dir": "../migrations"
+              }],
+              "r2_buckets": [{
+                "binding": "ARTIFACTS",
+                "bucket_name": $bucket_name
+              }],
+              "observability": {"enabled": false}
+            }' > "$PREVIEW_CONFIG"
+
+      - name: Apply preview schema and catalog fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm exec wrangler d1 migrations apply DB --remote --config "$PREVIEW_CONFIG"
+          pnpm exec wrangler d1 execute DB --remote --config "$PREVIEW_CONFIG" \
+            --file tests/fixtures/preview-seed.sql
+
+      - name: Upload exact checked Worker version
+        id: upload
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PREVIEW_ORIGIN: >-
+            https://${{ env.PREVIEW_ALIAS }}-${{ env.PREVIEW_WORKER_NAME }}.${{ env.PREVIEW_WORKERS_SUBDOMAIN }}.workers.dev
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.jsonl
+        run: |
+          uv run pywrangler versions upload \
+            --config "$PREVIEW_CONFIG" \
+            --preview-alias "$PREVIEW_ALIAS" \
+            --message "PR #${{ github.event.pull_request.number }} at ${{ github.event.pull_request.head.sha }}" \
+            --strict
+          preview_url=$(jq -r \
+            'select(.type == "version-upload") | .preview_alias_url // empty' \
+            "$WRANGLER_OUTPUT_FILE_PATH" | tail -n 1)
+          test "$preview_url" = "$PREVIEW_ORIGIN"
+          echo "preview_url=$preview_url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke public catalog preview
+        env:
+          PREVIEW_URL: ${{ steps.upload.outputs.preview_url }}
+        run: |
+          curl --fail --silent --show-error --retry 6 --retry-all-errors \
+            "$PREVIEW_URL/livez" | jq -e '.status == "ok"'
+          curl --fail --silent --show-error --retry 6 --retry-all-errors \
+            "$PREVIEW_URL/" | grep -F 'Preview Extension'
+          {
+            echo '## Registry PR preview'
+            echo
+            echo "- Source: \`${{ github.event.pull_request.head.sha }}\`"
+            echo "- Preview: $PREVIEW_URL"
+            echo '- Bindings: dedicated preview D1 and R2'
+            echo '- Production traffic and data: unchanged'
+          } >> "$GITHUB_STEP_SUMMARY"

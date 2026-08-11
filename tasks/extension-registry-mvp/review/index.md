@@ -33,6 +33,7 @@ All batches use the terms in [Vocabulary Alignment](00-vocabulary-alignment.md).
 | [03](03-artifact-contract-and-hosting.md) | Native Distribution surfaces and Registry hosting responsibility | Remediated and locally verified |
 | [04](04-legacy-and-implementation-simplification.md) | Legacy isolation, hard cutover, implementation depth, and CI/CD simplification | Remediated locally; remote cutover pending authorization |
 | [05](05-native-implementation-integrity.md) | Native admission, database authority, runtime teardown, and delivery race audit | Remediated and independently verified |
+| [06](06-ci-and-preview-delivery.md) | Locked Core CI parity and isolated Registry PR preview delivery | Locally verified; preview infrastructure configuration pending |
 
 ## Disposition Vocabulary
 

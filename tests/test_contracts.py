@@ -265,6 +265,19 @@ def test_production_handoff_contains_no_remote_mutation_command() -> None:
     assert "CLOUDFLARE_API_TOKEN" not in workflow
 
 
+def test_pr_preview_is_isolated_from_production_bindings() -> None:
+    workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert "pull_request_target" not in workflow
+    assert "inkcre-extension-registry-preview" in workflow
+    assert "REGISTRY_PREVIEW_D1_DATABASE_ID" in workflow
+    assert "REGISTRY_PREVIEW_R2_BUCKET_NAME" in workflow
+    assert "versions upload" in workflow
+    assert "--preview-alias" in workflow
+    assert "wrangler d1 create" not in workflow
+    assert "wrangler r2 bucket create" not in workflow
+    assert "tests/fixtures/preview-seed.sql" in workflow
+
+
 def test_simple_content_negotiation_is_v1_1_and_fail_closed() -> None:
     assert negotiate_simple(None) == SIMPLE_HTML
     assert negotiate_simple("application/vnd.pypi.simple.v1+json") == SIMPLE_JSON
