@@ -187,12 +187,12 @@ and path spelling belongs to HLD/API work:
       "project": "inkcre-ext-twitter",
       "index": "/simple/inkcre-ext-twitter/",
       "host_sdk": "core-py",
-      "host_sdk_version": ">=0.1.0,<0.2.0"
+      "host_sdk_version": ">=0.1.0 <0.2.0"
     },
     "module_federation": {
       "manifest": "/extensions/inkcre/twitter/0.1.0/module-federation/mf-manifest.json",
       "host_sdk": "@inkcre/core",
-      "host_sdk_version": ">=0.1.0,<0.2.0"
+      "host_sdk_version": ">=0.1.0 <0.2.0"
     }
   }
 }

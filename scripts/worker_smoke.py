@@ -87,7 +87,7 @@ def main() -> None:
             "python": {
                 "project": "inkcre-ext-blackbox",
                 "host_sdk": "core-py",
-                "host_sdk_version": ">=0.1.0,<0.2.0",
+                "host_sdk_version": ">=0.1.0 <0.2.0",
                 "entry_point": {
                     "group": "inkcre.core.extensions",
                     "name": "blackbox",
@@ -105,7 +105,7 @@ def main() -> None:
             "version": "0.2.0",
             "module_federation": {
                 "host_sdk": "@inkcre/core",
-                "host_sdk_version": ">=0.1.0,<0.2.0",
+                "host_sdk_version": ">=0.1.0 <0.2.0",
                 "source_repository": "https://github.com/InKCre/ext-reg",
                 "source_revision": "0" * 40,
                 "build_id": "worker-smoke",

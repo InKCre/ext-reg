@@ -104,9 +104,9 @@ def normalize_project_name(value: str) -> str:
 
 def validate_host_sdk_range(value: str) -> str:
     try:
-        # Producer metadata uses the compact comma-separated spelling shown in
-        # the public descriptor contract; semantic-version expects whitespace.
-        NpmSpec(value.replace(",", " "))
+        # Host SDK ranges are one language-neutral contract. Native package
+        # syntaxes such as PEP 440 comma conjunctions are deliberately rejected.
+        NpmSpec(value)
     except ValueError as error:
         raise ValueError("must be a valid SemVer range") from error
     return value
