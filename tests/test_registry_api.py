@@ -135,7 +135,7 @@ def _python_prepare(version: str = "0.1.1") -> dict[str, object]:
         "python": {
             "project": "inkcre-ext-twitter",
             "host_sdk": "core-py",
-            "host_sdk_version": ">=0.1.0,<0.2.0",
+            "host_sdk_version": ">=0.1.0 <0.2.0",
             "entry_point": {
                 "group": "inkcre.core.extensions",
                 "name": "twitter",
@@ -252,7 +252,7 @@ async def test_python_prepare_upload_publish_simple_yank_and_unyank(
             "project": "inkcre-ext-twitter",
             "simple_url": "/simple/inkcre-ext-twitter/",
             "host_sdk": "core-py",
-            "host_sdk_version": ">=0.1.0,<0.2.0",
+            "host_sdk_version": ">=0.1.0 <0.2.0",
             "entry_point": {
                 "group": "inkcre.core.extensions",
                 "name": "twitter",
@@ -321,7 +321,7 @@ async def test_python_prepare_upload_publish_simple_yank_and_unyank(
             "version": "0.1.1",
             "module_federation": {
                 "host_sdk": "@inkcre/core",
-                "host_sdk_version": ">=0.1.0,<0.2.0",
+                "host_sdk_version": ">=0.1.0 <0.2.0",
                 "source_repository": "https://github.com/InKCre/client-web",
                 "source_revision": "b" * 40,
                 "build_id": "web-build",
@@ -414,7 +414,7 @@ async def test_module_federation_snapshot_is_closed_absolute_and_immutable(
         "version": "0.2.0",
         "module_federation": {
             "host_sdk": "@inkcre/core",
-            "host_sdk_version": ">=0.1.0,<0.2.0",
+            "host_sdk_version": ">=0.1.0 <0.2.0",
             "source_repository": "https://github.com/InKCre/client-web",
             "source_revision": "b" * 40,
             "build_id": "web-build",
@@ -494,7 +494,7 @@ async def test_native_associations_own_independent_immutable_provenance(
         "version": "0.3.0",
         "module_federation": {
             "host_sdk": "@inkcre/core",
-            "host_sdk_version": ">=0.1.0,<0.2.0",
+            "host_sdk_version": ">=0.1.0 <0.2.0",
             "source_repository": "https://github.com/InKCre/client-web",
             "source_revision": "b" * 40,
             "build_id": "web-build",

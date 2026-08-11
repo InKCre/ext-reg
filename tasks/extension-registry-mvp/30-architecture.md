@@ -84,7 +84,7 @@ The public exact Release descriptor is the only small cross-format read model:
     "project": "inkcre-ext-twitter",
     "simple_url": "/simple/inkcre-ext-twitter/",
     "host_sdk": "core-py",
-    "host_sdk_version": ">=0.1.0,<0.2.0",
+    "host_sdk_version": ">=0.1.0 <0.2.0",
     "entry_point": {
       "group": "inkcre.core.extensions",
       "name": "twitter",
@@ -94,7 +94,7 @@ The public exact Release descriptor is the only small cross-format read model:
   "module_federation": {
     "manifest_url": "/extensions/inkcre/twitter/0.1.1/module-federation/mf-manifest.json",
     "host_sdk": "@inkcre/core",
-    "host_sdk_version": ">=0.1.0,<0.2.0"
+    "host_sdk_version": ">=0.1.0 <0.2.0"
   }
 }
 ```

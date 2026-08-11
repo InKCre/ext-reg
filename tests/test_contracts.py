@@ -51,7 +51,7 @@ def test_prepare_contract_is_typed_strict_and_lossless_for_python_prereleases() 
             "python": {
                 "project": "inkcre-ext-twitter",
                 "host_sdk": "core-py",
-                "host_sdk_version": ">=0.1.0,<0.2.0",
+                "host_sdk_version": ">=0.1.0 <0.2.0",
                 "entry_point": {
                     "group": "inkcre.core.extensions",
                     "name": "twitter",
@@ -73,6 +73,18 @@ def test_prepare_contract_is_typed_strict_and_lossless_for_python_prereleases() 
         PrepareReleaseRequest(nickname="Twitter", version="1.2.3")
     with pytest.raises(ValidationError):
         PrepareReleaseRequest.model_validate(payload.model_dump(mode="json") | {"unexpected": True})
+
+    assert payload.python is not None
+    with pytest.raises(ValidationError, match="valid SemVer range"):
+        PrepareReleaseRequest.model_validate(
+            {
+                **payload.model_dump(mode="json"),
+                "python": {
+                    **payload.python.model_dump(mode="json"),
+                    "host_sdk_version": ">=0.1.0,<0.2.0",
+                },
+            }
+        )
 
 
 def test_canonical_name_and_semver_constraints_are_published_in_contracts() -> None:
@@ -312,7 +324,7 @@ def test_native_client_accepts_exact_yanked_release_for_cold_restore() -> None:
                     "project": "inkcre-ext-twitter",
                     "simple_url": "/simple/inkcre-ext-twitter/",
                     "host_sdk": "core-py",
-                    "host_sdk_version": ">=0.1.0,<0.2.0",
+                    "host_sdk_version": ">=0.1.0 <0.2.0",
                     "entry_point": {
                         "group": "inkcre.core.extensions",
                         "name": "twitter",
