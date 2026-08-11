@@ -82,5 +82,9 @@ data, releases, merges, and demo-database cutover remain unchanged.
   the nested generated config omitted pywrangler's root `python_modules`.
 - The preview config now lives at the repository root, so the upload resolves
   the same vendored Python dependency tree as the production dry build.
+- Run `31460653863` at `dd6aa23` passed every Registry job. Deployment
+  `5844748260` published the exact checked Version and the public catalog smoke
+  passed at
+  `https://pr-5-inkcre-extension-registry-preview.lanzhijiang.workers.dev`.
 - Preview SQL is idempotent and contains no credential or Distribution bytes.
 - Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.
