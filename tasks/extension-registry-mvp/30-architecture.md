@@ -1,326 +1,380 @@
-# High-level Technical Design
+# High-level Technical Design — Native Distribution Cutover
 
 ## Status
 
-**Complete for MVP.** Product semantics come from
-[`15-product-design.md`](15-product-design.md). This document selects the MVP
-topology and contract boundaries. Exact code layout, SQL migrations, HTTP
-payload schemas, and peer file changes belong to the implementation plan.
+**Accepted destination; targeted PoCs are in progress.** This document
+supersedes the generic target, compatibility-condition, target-manifest,
+deployment-binding, embedded-Python-bundle, and shared Runtime/API design.
+Product decisions are owned by [`20-decisions.md`](20-decisions.md); executable
+PoC evidence is owned by [`work/16-native-distribution-pocs.md`](work/16-native-distribution-pocs.md).
 
-The two design-changing uncertainties were:
+The HLD deliberately uses native package ecosystems instead of rebuilding them
+inside InKCre:
 
-1. whether a Cloudflare Python Worker can run the selected thin FastAPI service
-   with D1 and R2 bindings reproducibly; and
-2. whether a Vite Module Federation remote built with a relative asset base can
-   load all of its chunks from an immutable Registry artifact prefix.
+- Python: Project/Distribution metadata, wheel tags, `Requires-Python`,
+  `Requires-Dist`, entry points, the Simple Repository API, and the legacy
+  upload protocol used by existing publishers;
+- Web: a native Module Federation `mf-manifest.json`, Remote entry, and the
+  complete referenced asset closure;
+- InKCre control plane: Extension Name/Nickname, one product Release version,
+  publisher authority, release lifecycle, and a typed association plus
+  association-local provenance for each native Distribution.
 
-Both PoCs passed; evidence is owned by
-[`work/09-hld-pocs.md`](work/09-hld-pocs.md). The Python Worker topology and
-relative Module Federation artifact prefix are therefore admitted. A future
-failure may still use the documented thin TypeScript edge fallback without
-changing the product or protocol.
+There is no public target key, capabilities digest, generic compatibility
+predicate, `artifact_format`, canonical cross-format artifact manifest, or
+persisted Distribution binding in the destination design.
 
-## System Topology
+## Topology And Authority
 
-```text
-publisher repository / peer repository
-  -> peer-owned build and tests
-  -> Python publisher CLI
-       -> authenticated blob upload ---------------------+
-       -> authenticated target association/publish ------+-- Registry API
-                                                             Python Worker
-anonymous consumer / deployment adapter -----------------+     |
-  <- package/version/target metadata                            +-- D1 metadata
-  <- immutable target files                                    +-- private R2 blobs
-
-shared deployment database
-  -> one installation: namespace/name@exact-version
-  -> zero or more peer bindings: peer -> target key + target digest
-
-client-web adapter -> Registry-hosted Module Federation files -> browser runtime
-core-py adapter    -> Registry metadata -> admitted bundle already in app image
+```mermaid
+flowchart LR
+  P["Peer-owned Extension source"] --> B["Peer CI: build and test"]
+  B --> U1["Python upload (uv/Twine-compatible)"]
+  B --> U2["MF Remote snapshot upload"]
+  U1 --> R["Extension Registry control plane"]
+  U2 --> R
+  R --> D1["D1: identity, release, native associations"]
+  R --> R2["R2: hosted Distribution bytes"]
+  C["Core Host SDK"] -->|"Release descriptor, Simple API, wheel"| R
+  W["Web Host SDK"] -->|"Release descriptor, MF manifest/assets"| R
+  DB["Shared deployment database: one extensions row"] --> C
+  DB --> W
 ```
 
-The Registry has one public origin. Metadata and artifact reads are anonymous.
-Publication is authenticated. D1 and R2 are never exposed as independent
-product authorities.
+Authority is intentionally split:
 
-## Selected Technology
+| Concern | Authority |
+| --- | --- |
+| Extension Name, Nickname, Release, publisher, lifecycle | Registry control plane |
+| Python package compatibility and dependency metadata | wheel/Core Metadata and Simple API |
+| Module Federation Remote structure and shared-module metadata | native `mf-manifest.json` |
+| Peer/Host SDK compatibility claim | producer-declared typed Registry association |
+| Source revision/build provenance | the corresponding native Distribution association |
+| Installed exact Release and per-Peer enabled intent | shared deployment `extensions` row |
+| Native acquisition, entry validation, lifecycle, runtime cleanup | platform Host SDK |
+| Actual running instance | Peer process/browser memory |
+| Distribution bytes and internal integrity hashes | Registry R2/storage implementation |
 
-### Service And Edge
+`pip` and the Module Federation Host are **native Distribution Consumers** used
+inside their platform Host SDK. They are implementation components, not another
+InKCre product authority and not Extension developer tooling.
 
-- A single Cloudflare Python Worker runs a thin FastAPI application.
-- Python 3.13 and Node 22 are the repository toolchain baselines; `uv` owns environments and
-  the lock; FastAPI/Pydantic own HTTP and validation; Typer owns the publisher
-  CLI; `httpx` owns its network client.
-- The Worker performs validation, authorization, small-file hashing, D1
-  coordination, and R2 reads/writes. It does not build Extensions or execute
-  Extension code.
-- Python Workers are currently a Pyodide/WASM open beta. The PoC proved FastAPI,
-  D1, and R2 locally and on the production runtime. `pywrangler` currently fails
-  under Node 26 because its Pyodide setup still passes a removed WASM flag, so
-  Node 22 is pinned. A thin TypeScript Worker remains the bounded fallback;
-  moving the whole service into a container is not the first fallback.
+## Product Identity And Release Descriptor
 
-### Metadata And Artifact Storage
+- **Extension Name** is the canonical namespaced name, for example
+  `inkcre/twitter`.
+- **Extension Nickname** is human-facing, for example `Twitter`.
+- **Extension Release** is `Extension Name + strict SemVer`.
+- Every associated native Distribution implements exactly that Release version.
+  Stable `X.Y.Z` is identical across formats. Only explicitly mapped,
+  lossless SemVer/PEP 440 pre-release spellings are admitted; epoch, post, dev,
+  local, and build-metadata versions are excluded from MVP.
+- A Python Project name and an MF container/build name are native identifiers,
+  not alternative Extension Names and not universal Distribution IDs.
 
-- D1 is the authoritative transactional metadata store. MVP uses the primary
-  database only; read replicas and Sessions are unnecessary.
-- Private R2 stores canonical target manifests and file blobs under SHA-256
-  content addresses. R2 keys never carry mutable package meaning.
-- Files are uploaded through the Worker. The Worker computes SHA-256 and rejects
-  a claimed digest mismatch before writing. MVP limits each file to 20 MiB;
-  large direct/multipart uploads are a later concern.
-- Public immutable artifact routes return permissive CORS and long-lived
-  immutable cache headers. Mutable package/version metadata uses short caching.
-- GHCR/OCI is not the canonical Registry artifact backend. It remains suitable
-  for the existing core application image, but using it for Web file bundles
-  would add registry auth/media-type/index behavior without improving MVP
-  semantics.
+The public exact Release descriptor is the only small cross-format read model:
 
-### Publisher Authentication
-
-- A Registry operator manually provisions a namespace and one or more random
-  namespace-scoped bearer credentials.
-- D1 stores only each credential's SHA-256 hash, namespace, label, creation time,
-  and disabled state. Raw credentials exist only in publisher secret stores.
-- The same HTTP publication protocol is used by first-party and third-party
-  publishers. `inkcre` differs only because its namespace is operator-reserved.
-- GitHub OIDC trusted publishing, Cloudflare Access, account/team management,
-  and self-service credential issuance are deferred. Static scoped credentials
-  are the smallest revocable mechanism sufficient for the two peer CDs.
-
-## Registry Data Model
-
-The logical schema has five records. Exact SQL names may vary without changing
-the model.
-
-| Record | Identity | Mutable fields | Authority |
-| --- | --- | --- | --- |
-| Namespace | `namespace` | display owner, status | Registry operator |
-| Credential | token hash | label, disabled | Registry operator |
-| Extension | `namespace/name` | public display metadata | namespace publisher |
-| Release | `namespace/name@version` | state until published; yank/block state | namespace publisher/operator |
-| Target | release + `target_key` | none after acceptance | namespace publisher |
-
-Target rows contain the canonical target-manifest digest, artifact format,
-entry point, compatibility contract, source repository/revision, and timestamps.
-The database enforces one release per coordinate/version and one immutable slot
-per release/target key.
-
-The first target upload creates a `preparing` release. Publication is one D1
-transaction that verifies at least one accepted target and changes the release
-to `published`. A published release accepts only previously unused target keys.
-Retrying the same key and digest is idempotent; a different digest conflicts.
-
-`yanked` remains readable by exact metadata lookup but is excluded from new
-selection. `blocked` denies new target-file reads. Ordinary APIs never delete a
-published release or its content-addressed blobs.
-
-## Target Artifact Contract
-
-### Canonical Target Manifest
-
-Every target is represented by one language-neutral canonical JSON document.
-Its SHA-256 is the **target digest** bound by deployments. It contains:
-
-- contract version;
-- artifact format and relative entry point;
-- the Target Compatibility Contract;
-- an ordered map of safe relative file paths to SHA-256, byte size, and media
-  type; and
-- no mutable or non-executable provenance fields.
-
-Canonical serialization is deterministic and owned by `ext-reg`. Paths must be
-relative, normalized, unique, and traversal-free. The manifest may describe one
-archive file or a multi-file Web bundle. Each listed file is separately stored
-by its content digest in R2.
-
-Source repository, source revision, workflow/run identity, and publisher are
-stored on the immutable target association outside the target digest. This lets
-an unchanged artifact retry idempotently from a later application build while
-preserving the first accepted provenance; non-executable metadata cannot change
-executable identity.
-
-The immutable public prefix is conceptually:
-
-```text
-/v1/artifacts/{target-digest}/manifest
-/v1/artifacts/{target-digest}/files/{relative-path}
+```json
+{
+  "name": "inkcre/twitter",
+  "nickname": "Twitter",
+  "version": "0.1.1",
+  "state": "published",
+  "python": {
+    "project": "inkcre-ext-twitter",
+    "simple_url": "/simple/inkcre-ext-twitter/",
+    "host_sdk": "core-py",
+    "host_sdk_version": ">=0.1.0,<0.2.0",
+    "entry_point": {
+      "group": "inkcre.core.extensions",
+      "name": "twitter",
+      "object": "extensions.twitter:Extension"
+    }
+  },
+  "module_federation": {
+    "manifest_url": "/extensions/inkcre/twitter/0.1.1/module-federation/mf-manifest.json",
+    "host_sdk": "@inkcre/core",
+    "host_sdk_version": ">=0.1.0,<0.2.0"
+  }
+}
 ```
 
-The file endpoint resolves the path through the already-hashed manifest and then
-reads the referenced content-addressed blob. Clients never follow mutable tags.
+Each native association is optional. A Release may be published once at least
+one association is ready, and a previously absent native format may be appended
+later. Consumers—not publishers—decide whether a deployment has every format it
+needs. Existing associations and native filenames are immutable; identical
+retry is idempotent, conflicting bytes or metadata require a new Release.
 
-### Compatibility Contract
+Internal content hashes remain mandatory for upload validation, immutable file
+addressing, and audit. They are not exposed as a universal Distribution identity
+and are not persisted by deployments. Consequently a cold load may resolve a
+different still-valid native file for the same immutable Release; InKCre does
+not promise a permanent lock to an earlier wheel filename or cached Web byte
+copy.
 
-A target manifest contains one conjunction of conditions:
+## Registry APIs
 
-```text
-condition = vocabulary-key + operator + expected-value
-operator  = equals | semver
+### Common control plane
+
+Canonical names occupy two route segments:
+
+- `GET /v1/extensions`
+- `GET /v1/extensions/{namespace}/{name}`
+- `GET /v1/extensions/{namespace}/{name}/releases/{version}`
+- `POST /v1/extensions/{namespace}/{name}/releases` — prepare a Release and
+  declare typed native associations;
+- `POST .../releases/{version}/publish`
+- `POST .../releases/{version}/yank` and `POST .../unyank`.
+
+`preparing` is not visible through public install/Remote routes. Publication
+atomically changes the D1-visible Release state after every referenced R2 object
+has been validated. `published ↔ yanked` preserves bytes; Python Simple links
+carry the native yank reason. An operator-only block may stop reads for an
+incident without becoming a package lifecycle state.
+
+### Python-native surface
+
+The Registry implements:
+
+- PEP 503/691 Simple root and normalized Project pages in HTML and JSON;
+- PEP 658/714 Core Metadata sidecars;
+- SHA-256 file hashes, `Requires-Python`, size, upload time, and yank markers;
+- `POST /legacy/` multipart upload compatible with current uv/Twine behavior;
+- immutable wheel file URLs under `/packages/...`.
+
+The MVP honestly advertises Simple API `1.1`; it does not claim the later
+provenance/project-status fields. HTML/JSON negotiation returns the exact media
+type and `Vary: Accept`; the Cloudflare cache must either vary on normalized
+Accept or bypass caching for Simple metadata.
+
+Before admission the Registry safely inspects the wheel and verifies:
+
+- normalized Project Name and PEP 440 version;
+- version congruence with the parent Extension Release;
+- exactly one relevant `.dist-info/METADATA` and `entry_points.txt`;
+- the declared entry-point group/name/object;
+- safe, non-duplicated archive paths and bounded decompression;
+- form metadata and claimed digest against archive truth.
+
+The custom producer table is source/publish input, not runtime authority:
+
+```toml
+[tool.inkcre-extension]
+name = "inkcre/twitter"
+nickname = "Twitter"
+host-sdk = "core-py"
+host-sdk-version = ">=0.1.0,<0.2.0"
+
+[project.entry-points."inkcre.core.extensions"]
+twitter = "extensions.twitter:Extension"
 ```
 
-- `equals` compares controlled opaque values.
-- `semver` asks whether the consumer's exact SemVer capability satisfies the
-  producer's range.
-- Every condition is mandatory. Unknown keys, missing consumer values, invalid
-  values, or unsupported operators fail compatibility.
-- There is no Boolean expression language, optional condition, or target
-  priority in MVP.
+The publisher first prepares the typed association, then uv/Twine uploads the
+native Project file. Namespace credentials and the unique prepared
+Project/version association connect `/legacy/` to the Extension Release.
+Project/version/filename plus identical SHA-256 and size is an idempotent retry;
+same filename with different bytes is `409`. This stronger retry behavior is an
+InKCre policy, not a claim about PyPI's own duplicate-upload behavior.
 
-The vocabulary is versioned with the Runtime/API contract. Initial dimensions
-cover only facts required by the two acceptance adapters:
+### Module Federation-native surface
 
-- accepted integration format (`module-federation-esm` or `python-bundle`);
-- InKCre Extension lifecycle API version;
-- Module Federation runtime and share scope;
-- versions of shared Vue and `@inkcre/core` contracts;
-- ECMAScript execution baseline when emitted code requires it; and
-- Python interpreter version.
-
-`client-web`, `core-py`, browser brands, repository names, and target labels are
-display information, not compatibility inputs. A peer adapter constructs its
-Platform Profile from its actual build/runtime contract, filters targets, then
-uses its own deterministic preference and stable target-key tie-break. It binds
-the selected target key and target digest before declaring enablement.
-
-## Public And Publisher API Boundary
-
-The versioned HTTP API exposes these resource families; exact path spelling and
-payloads are fixed in the implementation contract after the PoCs.
-
-### Anonymous read
-
-- list/search published Extensions;
-- get one Extension and its versions;
-- get one exact release and all public target declarations;
-- get a target manifest by digest; and
-- get a target file by digest and safe relative path.
-
-### Scoped publication
-
-- upload one content-addressed blob with a claimed SHA-256;
-- associate one canonical target manifest with a target key;
-- explicitly publish a preparing release; and
-- yank a published release.
-
-Blob upload is idempotent by digest. Target association is committed only after
-all referenced blobs exist and the canonical manifest digest has been verified.
-No endpoint accepts a target archive and implicitly guesses metadata.
-
-The repository publishes language-neutral JSON Schemas and OpenAPI as generated
-contract artifacts. A Python CLI is the reference producer. Peer adapters may be
-native Python or TypeScript, but must pass the same small conformance fixtures.
-
-## Deployment Installation Model
-
-The existing shared `extensions` row conflates artifact-local catalog data with
-installation and cannot hold namespace or per-peer digest bindings. MVP adds a
-clean deployment-owned model rather than overloading that row:
+The Registry accepts one multipart archive/directory snapshot for a Release's
+MF association and publishes:
 
 ```text
-extension_installation
-  namespace, name, exact version, shared config/config schema
-  primary key(namespace, name)
-
-extension_peer_binding
-  namespace, name, peer UUID, target key, target digest
-  primary key(namespace, name, peer UUID)
-  foreign key -> installation
+/extensions/{namespace}/{name}/{version}/module-federation/mf-manifest.json
+/extensions/{namespace}/{name}/{version}/module-federation/{relative-asset}
 ```
 
-- Installation existence means installed and starts with no bindings.
-- Binding existence means enabled for that peer and records the exact admitted
-  target. `running` remains process/browser memory state.
-- Install validates that the exact release is published, then inserts only the
-  installation record.
-- An adapter resolves and admits a target, starts it, then persists its binding.
-  Any failure cleans up transient runtime effects and leaves the peer disabled.
-- Disable stops runtime effects before deleting only that peer's binding.
-- Uninstall is one transaction that requires no bindings, then removes shared
-  configuration and the installation.
+The producer-generated `mf-manifest.json` remains the native public descriptor;
+the Registry does not generate another public snapshot schema. The Registry
+validates the required shape and proves that the Remote entry plus every
+referenced shared/exposed JS/CSS asset is relative, traversal-free, present, and
+contained under the immutable Release prefix. `base: './'` is required for the
+current Vite producer. At admission it materializes the public native manifest
+with `metaData.publicPath` set to that Release's absolute immutable Registry
+prefix. This narrow native-field normalization is required because the pinned
+MF Host resolves a raw `"./"` public path against the Host page origin rather
+than the manifest origin.
 
-`core-py` owns the database migration and deployment-level install/uninstall
-coordination. Peer-local adapters own enable/disable because only the peer can
-admit and operate its runtime. The ext-reg Runtime/API contract specifies these
-state transitions and request/response/error semantics; peer repositories only
-implement host-specific loading hooks.
+Published MF files return `Access-Control-Allow-Origin: *` without credentials,
+an ETag, and `Cache-Control: public, max-age=31536000, immutable`. Mutable
+control/Simple responses use short or bypassed caching. Public routes always
+check a published D1 association before reading R2 so guessed preparing keys
+cannot leak.
 
-The legacy `extensions` table remains migration input until its existing data
-has been deliberately handled. Startup scanning must no longer recreate deleted
-Registry installations. Exact migration and compatibility behavior is fixed in
-the cross-repository implementation plan.
+## Registry Persistence And Publication
 
-## Peer Admission And Runtime Paths
+D1 uses strict tables with foreign keys:
 
-### `client-web`
+```text
+namespaces(name, status)
+credentials(token_hash, namespace, label, disabled)
+extensions(name, nickname, publisher metadata)
+releases(extension_name, version, state, yank_reason, timestamps)
+python_distributions(release, normalized_project, project_version,
+                     host_sdk, host_sdk_range, entry_group/name/object)
+python_files(project, version, filename, sha256, size, filetype,
+             requires_python, core_metadata_sha256, r2_key, uploaded_at)
+module_federation_distributions(release, host_sdk, host_sdk_range,
+                                manifest_r2_key, internal_snapshot_hash)
+```
 
-1. Build the existing first-party Extension as a Module Federation ESM remote
-   with a relative asset base.
-2. Peer CD publishes the complete output file set and target manifest.
-3. The browser adapter reads the installed release, builds its Platform Profile,
-   resolves a compatible target, and binds its exact digest.
-4. It loads the remote entry from the immutable artifact prefix, calls the
-   Extension lifecycle hooks, and only then persists the peer binding.
-5. Disable calls deactivate/dispose, unregisters the remote where supported, and
-   removes the binding.
+There is no `targets` table. Upload bytes first enter private staging/content-
+addressed R2 keys. After validation, a D1 transaction inserts the immutable
+native association and/or flips the Release to `published`. D1 cannot roll back
+R2 writes, so validation failures can leave only non-public staging garbage,
+removed by a bounded janitor/lifecycle rule.
 
-The Registry serves coherent remote entry and chunks from one target manifest.
-The remote executes with host-page privilege; the contract makes no isolation
-claim.
+Python Worker uploads are deliberately bounded to 20 MiB and require
+`Content-Length`. Python Workers cannot use Starlette's thread-backed temporary
+file spill; the form parser therefore keeps the bounded file in memory and
+rejects the request before parsing when its declared length is too large.
+Chunked upload receives `411` in MVP. This works with the tested `uv publish`
+client and prevents an oversized chunked request from spilling or exhausting an
+isolate; direct/multipart R2 upload is a later large-file path.
 
-### `core-py`
+The public-demo cutover creates a new D1 database and R2 bucket with this schema,
+deploys and smokes them, switches Worker bindings, and retains the old resources
+only for a short rollback window before deletion. No old target rows, blackbox
+release, old Twitter `0.1.0`, credentials, or blobs are migrated.
 
-1. Peer CD creates a deterministic Python target bundle, publishes it, and also
-   embeds that exact bundle plus target manifest in the core application image.
-2. At enable, the adapter may read Registry metadata but accepts a target only
-   when its target digest exists in the image's admitted-bundle catalog.
-3. It extracts/imports the embedded bundle, instantiates the Runtime/API hooks,
-   starts them, and persists the binding.
-4. Disable closes hooks and removes the binding; uninstall removes only database
-   state, not inert bytes in the immutable application image.
+## Deployment State
 
-No Registry response can cause arbitrary live-downloaded Python to execute.
-Artifact presence is not installation: the current startup `sync()` behavior
-must stop turning every embedded bundle into an installed database row.
+All Peers connected to a deployment share one canonical relation:
 
-## Failure And Consistency Semantics
+```text
+extensions
+  name          text primary key       -- e.g. inkcre/twitter
+  version       text not null           -- exact Extension Release
+  enabled       uuid[] not null default '{}'
+  nickname      text null
+  config        jsonb not null default '{}'
+  config_schema jsonb null
+```
 
-- D1 publication transactions prevent a target association or state change from
-  becoming partially visible. R2 orphan blobs are harmless content-addressed
-  data and may be collected after MVP.
-- Concurrent identical uploads converge; a target-key digest conflict returns a
-  conflict without mutation.
-- Registry unavailability or missing/mismatched bytes fails publish, install,
-  enable, or cold load without changing durable deployment state.
-- A running peer is not stopped because the Registry becomes unavailable.
-- Peer enable is compensating rather than globally transactional: failed loading
-  removes transient hooks and does not create a binding.
-- Disable that unloads successfully but cannot delete its binding leaves a
-  durable enabled/not-running state that startup can retry; running is never
-  inferred solely from HTTP success.
-- Published target append never changes an existing binding. Re-resolution is
-  explicit and outside the MVP lifecycle journey.
+There is no installation/binding split:
 
-## Production And Operational Boundary
+- row presence means installed;
+- the one row version is the version seen by every Peer;
+- membership in `enabled[]` is that Peer's enabled intent;
+- running state remains in process/browser memory;
+- native Project/manifest, filename, object key, and digest are never stored in
+  deployment state.
 
-- One Worker production deployment, one D1 production database, and one private
-  R2 production bucket are sufficient.
-- Secrets are the Worker secret/config and two peer repository publisher tokens.
-  No production database or R2 credential is exposed to publishers or browsers.
-- Registry delivery follows protected-main exact-revision deployment. Peer target
-  publication follows each peer's existing protected-main artifact/CD authority.
-- Minimum observability is structured request/error logging plus release target,
-  source revision, and digest audit fields. Dashboards, SLO machinery, mirrors,
-  malware scanning, and advanced abuse/rate systems are deferred.
-- Rollback deploys an earlier Worker revision without rewriting Registry release
-  records. D1 migration changes must be forward-compatible and backed up before
-  production application.
+The Host SDK sees a semantic state port, not SQL/PostgREST/table types. Its Peer
+integration implements list/install/uninstall/config/enable operations against
+the relation. Install inserts one exact Release with `enabled=[]`. Enable adds a
+Peer UUID only after preflight, native acquisition/loading, entry validation,
+and lifecycle start succeed. Disable removes it only after lifecycle cleanup.
+MVP upgrade/rollback rejects the version write while `enabled[]` is non-empty.
+The user explicitly disables Peers, changes the one shared version, then each
+Peer re-enables through its own native preflight. This avoids a cross-Peer
+orchestrator while keeping version changes fail-closed.
 
-## HLD Exit
+The public-demo hard cut adds a new append-only Core migration that drops only
+`extensions`, `extension_installations`, and `extension_peer_bindings`, then
+creates the empty canonical relation. It does not edit protected migration
+history and does not touch other application tables. Core's catalog/readiness
+must stop seeding or requiring first-party Extension rows.
 
-Both named risks passed their smallest experiments. HLD is complete. The next
-gate is a cross-repository implementation plan mapping this design to exact
-files, migrations, workflows, secrets, deployment order, rollback, and
-black-box verification in all three repositories.
+## Platform Host SDKs
+
+The Host SDK is Peer-led and profile-specific. There is no universal lifecycle,
+registration model, `ExtensionScope`, or shared Runtime/API package.
+
+### Core Python Host SDK
+
+- `ExtensionBase` is the Extension-facing model and owns validated read-only
+  config access; concrete SQLModel rows remain private.
+- A wheel entry point yields the `ExtensionBase` subclass.
+- Core preserves explicit `on_start` and `on_close`, dynamic route/source/
+  resolver publication, rollback, and cleanup.
+- Extension code may import arbitrary `app`, `libs`, `utils`, or other Core
+  internals. The producer narrows its `core-py` range when those imports are not
+  compatible.
+- The native consumer checks the Release association against the running
+  Core/Host SDK version before requesting bytes, then lets packaging metadata
+  and wheel tags perform Python/ABI/platform/dependency selection.
+- All six first-party wheels use the PEP 420 `extensions.<id>` namespace so
+  existing Source/Resolver identifiers remain stable. The image contains no
+  checked-in Extension source, custom target ZIP, or admitted-target catalog.
+- Initial acquisition may install into the running Core environment only when
+  the installer plan does not replace already-loaded Core-owned distributions.
+  Upgrading an already-imported Extension is restart-required; cold restore
+  re-acquires the exact Release and preserves enabled intent on failure.
+
+### Web Host SDK
+
+- The MF exposed default module keeps Web's existing
+  `initialize → activate → deactivate → dispose` lifecycle.
+- The Host reads the exact Release descriptor and checks the producer-declared
+  `@inkcre/core` range before asking the MF Host to fetch executable bytes.
+- It registers the immutable native manifest URL directly with the MF Host;
+  manifest/shared/Remote semantics are not reimplemented by InKCre.
+- Extension code continues importing `@inkcre/core` and registering Peer
+  contributions directly. The Host SDK does not proxy Core APIs.
+- Startup resolves only rows whose `enabled[]` contains the current Peer UUID;
+  Registry outage or incompatibility leaves durable enabled intent unchanged
+  and reports a runtime error.
+
+## Failure And Operational Semantics
+
+- Unknown/missing native association: the current Peer cannot enable or
+  preflight that Release; the Registry never infers a producer-required format.
+- Host SDK range mismatch: reject before executable bytes are requested.
+- `Requires-Python`, wheel tag, dependency, or MF shared mismatch: native
+  consumer failure before Extension lifecycle starts.
+- Entry-point/archive or manifest-closure mismatch: Registry admission fails;
+  the format is never publicly installable.
+- Registry unavailable: existing running instances continue; new install,
+  enable, upgrade, and cold restore fail without rewriting installed version,
+  config, or enabled intent.
+- Yank: normal discovery/selection excludes the Release; exact installed intent
+  remains visible, while native consumer behavior follows its yank policy and
+  operator block may deny new reads.
+- Same-version bytes are never replaced. Repair publishes a new Extension
+  Release.
+
+Registry delivery retains protected-main, exact source SHA, frozen dependencies,
+same-run checked artifacts, immutable provenance, and read-after-write smoke.
+It deletes CI/CD stages whose only purpose was generic target matching,
+cross-language Runtime/API publication, canonical target-manifest rebuilding,
+embedded Core catalogs, or deployment bindings.
+
+## Targeted PoC Gates Before Implementation
+
+1. **Six native wheels** — build all first-party Extensions as normal wheels,
+   preserve `extensions.<id>` imports/Source/Resolver identities, inspect native
+   metadata and entry points, install from a local Simple index in Python 3.12,
+   and load each entry-point class against Core.
+2. **Installer behavior** — prove `pip`/uv exact-version selection,
+   `Requires-Python`, wheel tags, dependency-plan conflict handling, identical
+   retry, Registry outage, and initial-load versus restart-required upgrade.
+3. **Native MF manifest** — generate `mf-manifest.json` with the pinned Vite
+   plugin, validate its complete relative asset closure, and load the manifest
+   URL with the pinned MF Host/runtime from an arbitrary cross-origin prefix.
+4. **Python Worker uploads** — exercise real multipart wheel and MF archives,
+   1/20 MiB and oversize/chunked bodies, archive hardening, R2 checksum/staging,
+   D1 rollback, and Python Worker memory behavior. If ASGI buffering cannot fit
+   the 20 MiB cap safely, route uploads through a native Worker streaming seam
+   while keeping the Python control plane.
+5. **Destructive rehearsal** — on disposable PostgreSQL, prove the hard-cut
+   migration affects exactly three relations, preserves unrelated data, leaves
+   zero Extension rows, regenerates the protocol artifact, and reaches ready.
+6. **End-to-end native publication** — prepare, upload, publish, anonymous
+   Simple/MF reads, idempotent retry/conflict, yank/unyank, CORS/cache behavior,
+   and both Host SDK lifecycle journeys without target/binding artifacts.
+
+## Primary Standards
+
+- [Simple Repository API](https://packaging.python.org/en/latest/specifications/simple-repository-api/)
+- [PyPI Upload API](https://docs.pypi.org/api/upload/)
+- [Core Metadata](https://packaging.python.org/en/latest/specifications/core-metadata/)
+- [Entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
+- [Wheel format](https://packaging.python.org/en/latest/specifications/binary-distribution-format/)
+- [File yanking](https://packaging.python.org/en/latest/specifications/file-yanking/)
+- [Module Federation manifest fields](https://module-federation.io/guide/advanced/manifest-fields.html)
+- [Module Federation manifest and Snapshot](https://module-federation.io/guide/basic/manifest-snapshot/)
+- [Cloudflare Worker limits](https://developers.cloudflare.com/workers/platform/limits/)
+- [R2 Worker API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)

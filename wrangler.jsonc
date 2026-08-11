@@ -4,6 +4,16 @@
   "main": "src/worker.py",
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["python_workers"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "registry.inkcre.dev",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://registry.inkcre.dev",
+  },
   "d1_databases": [
     {
       "binding": "DB",

@@ -2,29 +2,29 @@
 
 ```text
 .
-├── contracts/                  generated JSON Schema, OpenAPI, revision
+├── contracts/                  generated native JSON Schema, OpenAPI, revision
 ├── docs/                       durable navigation and operations
-├── migrations/                 append-only D1 migrations
-├── packages/runtime-web/       @inkcre/extension-runtime
+├── migrations/                 native D1 initial schema
 ├── scripts/                    contract generator and Worker smoke client
 ├── src/
 │   ├── worker.py               Cloudflare top-level entry shim
 │   └── inkcre_extension_registry/
-│       ├── contracts/          canonical Python models/matcher/lifecycle
-│       ├── service/            FastAPI plus D1/R2 adapter
-│       ├── cli.py              target build/publish CLI
-│       ├── client.py           typed Registry HTTP client
-│       └── worker.py           Worker routing/ASGI bridge
+│       ├── contracts/          common Release and typed association models
+│       ├── service/            catalog UI, admission, Simple/MF, D1/R2 adapter
+│       ├── cli.py              native association/lifecycle publisher CLI
+│       ├── client.py           small Release control-plane HTTP client
+│       └── worker.py           R2 raw-byte routing and ASGI bridge
 ├── tasks/                      active disposable delivery control surface
-├── tests/                      focused contracts, service, and smoke fixtures
+├── tests/                      contract, archive, service, and lifecycle tests
 ├── pyproject.toml / uv.lock    Python package and frozen environment
 ├── package.json / pnpm-lock.yaml
-│                               root checks and Web workspace
-└── wrangler.jsonc              Worker/D1/R2 production bindings
+│                               root checks and pinned Wrangler tooling
+└── wrangler.jsonc              Worker/D1/R2 binding configuration
 ```
 
 Generated files under `contracts/` are never hand-edited. Change Pydantic
-models or FastAPI routes, run `pnpm contracts:generate`, and commit the source
-and generated diff together. D1 migrations are append-only after reaching
-`main`. Local `.wrangler/`, virtual environments, vendored `python_modules/`,
-build output, and secrets are ignored.
+models or FastAPI routes, run `pnpm contracts:generate`, and keep the source and
+generated diff together. The clean native cutover treats `0001_registry.sql` as
+a new database's initial schema; it is not applied as an in-place transform of
+the rejected generic schema. Local `.wrangler/`, virtual environments, vendored
+`python_modules/`, build output, and secrets are ignored.

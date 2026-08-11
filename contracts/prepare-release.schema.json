@@ -1,33 +1,72 @@
 {
   "$defs": {
-    "ModuleFederationDistribution": {
+    "ModuleFederationAssociationInput": {
       "additionalProperties": false,
       "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
         "host_sdk": {
           "const": "@inkcre/core",
           "title": "Host Sdk",
           "type": "string"
         },
         "host_sdk_version": {
+          "maxLength": 256,
+          "minLength": 1,
           "title": "Host Sdk Version",
           "type": "string"
         },
-        "manifest_url": {
-          "title": "Manifest Url",
+        "source_repository": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Revision",
           "type": "string"
         }
       },
       "required": [
-        "manifest_url",
         "host_sdk",
-        "host_sdk_version"
+        "host_sdk_version",
+        "source_repository",
+        "source_revision"
       ],
-      "title": "ModuleFederationDistribution",
+      "title": "ModuleFederationAssociationInput",
       "type": "object"
     },
-    "PythonDistribution": {
+    "PythonAssociationInput": {
       "additionalProperties": false,
       "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
         "entry_point": {
           "$ref": "#/$defs/PythonEntryPoint"
         },
@@ -37,26 +76,39 @@
           "type": "string"
         },
         "host_sdk_version": {
+          "maxLength": 256,
+          "minLength": 1,
           "title": "Host Sdk Version",
           "type": "string"
         },
         "project": {
+          "maxLength": 200,
+          "minLength": 1,
           "title": "Project",
           "type": "string"
         },
-        "simple_url": {
-          "title": "Simple Url",
+        "source_repository": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Revision",
           "type": "string"
         }
       },
       "required": [
         "project",
-        "simple_url",
         "host_sdk",
         "host_sdk_version",
-        "entry_point"
+        "entry_point",
+        "source_repository",
+        "source_revision"
       ],
-      "title": "PythonDistribution",
+      "title": "PythonAssociationInput",
       "type": "object"
     },
     "PythonEntryPoint": {
@@ -95,7 +147,7 @@
     "module_federation": {
       "anyOf": [
         {
-          "$ref": "#/$defs/ModuleFederationDistribution"
+          "$ref": "#/$defs/ModuleFederationAssociationInput"
         },
         {
           "type": "null"
@@ -103,37 +155,22 @@
       ],
       "default": null
     },
-    "name": {
-      "maxLength": 129,
-      "minLength": 3,
-      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-      "title": "Name",
-      "type": "string"
-    },
     "nickname": {
+      "maxLength": 128,
+      "minLength": 1,
       "title": "Nickname",
       "type": "string"
     },
     "python": {
       "anyOf": [
         {
-          "$ref": "#/$defs/PythonDistribution"
+          "$ref": "#/$defs/PythonAssociationInput"
         },
         {
           "type": "null"
         }
       ],
       "default": null
-    },
-    "state": {
-      "enum": [
-        "preparing",
-        "published",
-        "yanked",
-        "blocked"
-      ],
-      "title": "State",
-      "type": "string"
     },
     "version": {
       "maxLength": 128,
@@ -144,11 +181,9 @@
     }
   },
   "required": [
-    "name",
     "nickname",
-    "version",
-    "state"
+    "version"
   ],
-  "title": "ReleaseRecord",
+  "title": "PrepareReleaseRequest",
   "type": "object"
 }
