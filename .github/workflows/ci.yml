@@ -258,6 +258,14 @@ jobs:
             https://${{ env.PREVIEW_ALIAS }}-${{ env.PREVIEW_WORKER_NAME }}.${{ env.PREVIEW_WORKERS_SUBDOMAIN }}.workers.dev
           WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.jsonl
         run: |
+          if ! pnpm exec wrangler versions list \
+            --config "$PREVIEW_CONFIG" \
+            --json >/dev/null 2>&1; then
+            uv run pywrangler deploy \
+              --config "$PREVIEW_CONFIG" \
+              --message "Bootstrap isolated preview Worker" \
+              --strict
+          fi
           uv run pywrangler versions upload \
             --config "$PREVIEW_CONFIG" \
             --preview-alias "$PREVIEW_ALIAS" \

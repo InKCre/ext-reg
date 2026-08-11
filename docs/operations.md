@@ -42,13 +42,17 @@ passes. Before enabling it, create the following repository variables:
 - `REGISTRY_PREVIEW_WORKERS_SUBDOMAIN` (the account subdomain without
   `.workers.dev`)
 
-Store `CLOUDFLARE_API_TOKEN` as a repository secret and restrict it to the
-target account with only Workers Scripts Write and D1 Write. Runtime R2 access
-comes from the Worker binding; the deployment token does not need R2 object
-permissions. Until every variable exists, CI reports the missing preview
-contract and skips deployment without touching Cloudflare. The workflow never
-issues resource-creation commands: it applies migrations only to the explicit
-preview D1 and exposes the uploaded Version alias through the PR deployment.
+Store `CLOUDFLARE_API_TOKEN` as an organization Actions secret with selected
+repository access that includes `ext-reg`, and restrict it to the target account
+with only Workers Scripts Write and D1 Write. Runtime R2 access comes from the
+Worker binding; the deployment token does not need R2 object permissions. Until
+every variable exists, CI reports the missing preview contract and skips
+deployment without touching Cloudflare. The preview D1 and R2 are provisioned
+out of band. If the dedicated preview Worker service does not yet exist, the
+workflow bootstraps that service once from the fail-closed preview config; it
+then applies migrations only to the explicit preview D1 and exposes each exact
+checked Worker Version through its PR alias. The preview config contains no
+production route or Custom Domain.
 
 ## Local Worker Black Box
 

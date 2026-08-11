@@ -30,9 +30,16 @@ rejected for this MVP: it would turn a read-only catalog preview into a resource
 orchestration and cleanup system. The accepted topology is one dedicated preview
 D1/R2 pair plus one dedicated preview Worker. Each same-repository PR receives
 an immutable Worker Version and stable `pr-<number>` alias after the full Registry
-contract passes. The workflow contains no resource-creation command, no
-production Custom Domain, no production binding name, and no publisher
-credential. An idempotent `inkcre/preview` fixture makes the catalog non-empty.
+contract passes. The workflow contains no D1/R2 creation command, production
+Custom Domain, production binding name, or publisher credential. An idempotent
+`inkcre/preview` fixture makes the catalog non-empty.
+
+Cloudflare does not allow `versions upload` to create a Worker service. The
+workflow therefore probes the dedicated preview service and performs one
+idempotent bootstrap deploy only when that isolated service is absent. D1 and
+R2 remain out-of-band resources; normal PR runs upload Versions and move only
+their `pr-<number>` Preview URL aliases. The rendered preview configuration has
+no route or production Custom Domain.
 
 ## Authorization And Remote Boundary
 
@@ -47,11 +54,14 @@ GitHub organization Actions secret with selected-repository access that includes
 - R2 `inkcre-extension-registry-preview`
 
 The account ID is an organization variable; the preview D1/R2 names, D1 ID, and
-Workers subdomain are repository variables. The first rerun proved those plain
-variables reached the job but retained the original event's empty secret
-snapshot, so the next pushed PR head is the activation proof. Production
-resources, `registry.inkcre.dev`, publisher data, releases, merges, and
-demo-database cutover remain unchanged.
+Workers subdomain are repository variables. Two initial attempts received an
+empty token because the browser and host clipboards are separate. The token was
+then transferred directly from the authenticated browser into a mode-0600
+temporary input, the organization secret was updated, and the temporary file
+was removed. The subsequent rerun applied the isolated D1 migration and seed,
+then exposed the missing first-Worker bootstrap requirement before any Worker
+Version became public. Production resources, `registry.inkcre.dev`, publisher
+data, releases, merges, and demo-database cutover remain unchanged.
 
 ## Verification
 
@@ -60,9 +70,10 @@ demo-database cutover remain unchanged.
 - Registry full contract: 31 tests, generated contracts, package build, and Worker dry build.
 - GitHub workflow validation: actionlint 1.7.12 and repository isolation assertions pass.
 - Registry GitHub checks pass; the original unconfigured run skipped preview.
-- Rerun `31458261892` reached the preview job with the isolated bindings but
-  failed closed before D1 mutation because its original event snapshot had no
-  token. A fresh pull-request event is required to read the new organization
-  secret.
+- Run `31459662553`, rerun job `93681056309`, applied the isolated D1 migration
+  and idempotent seed, then failed at `versions upload` because Cloudflare
+  requires the dedicated Worker service to exist first.
+- The follow-up workflow probes and bootstraps only that dedicated preview
+  Worker before uploading the exact checked PR Version.
 - Preview SQL is idempotent and contains no credential or Distribution bytes.
 - Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.

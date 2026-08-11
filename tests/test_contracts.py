@@ -271,6 +271,8 @@ def test_pr_preview_is_isolated_from_production_bindings() -> None:
     assert "inkcre-extension-registry-preview" in workflow
     assert "REGISTRY_PREVIEW_D1_DATABASE_ID" in workflow
     assert "REGISTRY_PREVIEW_R2_BUCKET_NAME" in workflow
+    assert "wrangler versions list" in workflow
+    assert "pywrangler deploy" in workflow
     assert "versions upload" in workflow
     assert "--preview-alias" in workflow
     assert "wrangler d1 create" not in workflow
