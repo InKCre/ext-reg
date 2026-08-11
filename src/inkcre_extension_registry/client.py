@@ -1,30 +1,25 @@
 from __future__ import annotations
 
-from pathlib import PurePosixPath
 from urllib.parse import quote
 
 import httpx
 
-from .contracts.models import ReleaseRecord, TargetAssociation, TargetRecord, validate_relative_path
+from .contracts.models import PrepareReleaseRequest, ReleaseRecord
 
 
 class RegistryHTTPError(RuntimeError):
     def __init__(self, response: httpx.Response) -> None:
         try:
             detail = response.json().get("detail", response.text)
-        except ValueError:
+        except (AttributeError, ValueError):
             detail = response.text
         super().__init__(f"Registry HTTP {response.status_code}: {detail}")
         self.status_code = response.status_code
         self.response = response
 
 
-class RegistryReleaseStateError(RuntimeError):
-    pass
-
-
 class RegistryClient:
-    """Small synchronous client for public resolution and publisher operations."""
+    """Synchronous client for the small Extension Release control plane."""
 
     def __init__(
         self,
@@ -57,57 +52,56 @@ class RegistryClient:
             raise RegistryHTTPError(response)
         return response
 
+    @staticmethod
+    def _release_path(namespace: str, name: str, version: str) -> str:
+        return f"/v1/extensions/{namespace}/{name}/releases/{version}"
+
     def get_release(self, namespace: str, name: str, version: str) -> ReleaseRecord:
         response = self._require_success(
-            self._client.get(f"/v1/extensions/{namespace}/{name}/versions/{version}")
+            self._client.get(self._release_path(namespace, name, version))
         )
-        release = ReleaseRecord.model_validate(response.json())
-        if release.state != "published":
-            raise RegistryReleaseStateError(
-                f"Registry release is not installable (state: {release.state})"
-            )
-        return release
+        return ReleaseRecord.model_validate(response.json())
 
-    def put_blob(self, digest: str, content: bytes, media_type: str) -> None:
-        response = self._client.put(
-            f"/v1/blobs/{quote(digest, safe=':')}",
-            content=content,
-            headers={"Content-Type": media_type},
-        )
-        self._require_success(response)
-
-    def put_target(
-        self,
-        namespace: str,
-        name: str,
-        version: str,
-        target_key: str,
-        association: TargetAssociation,
-    ) -> TargetRecord:
+    def prepare(self, namespace: str, name: str, payload: PrepareReleaseRequest) -> ReleaseRecord:
         response = self._require_success(
-            self._client.put(
-                f"/v1/extensions/{namespace}/{name}/versions/{version}/targets/{target_key}",
-                json=association.model_dump(mode="json"),
+            self._client.post(
+                f"/v1/extensions/{namespace}/{name}/releases",
+                json=payload.model_dump(mode="json", exclude_none=True),
             )
         )
-        return TargetRecord.model_validate(response.json())
+        return ReleaseRecord.model_validate(response.json())
+
+    def upload_module_federation(
+        self, namespace: str, name: str, version: str, archive: bytes
+    ) -> ReleaseRecord:
+        response = self._require_success(
+            self._client.post(
+                self._release_path(namespace, name, version) + "/module-federation",
+                files={"content": ("module-federation.zip", archive, "application/zip")},
+            )
+        )
+        return ReleaseRecord.model_validate(response.json())
 
     def publish(self, namespace: str, name: str, version: str) -> ReleaseRecord:
         response = self._require_success(
-            self._client.post(f"/v1/extensions/{namespace}/{name}/versions/{version}/publish")
+            self._client.post(self._release_path(namespace, name, version) + "/publish")
         )
         return ReleaseRecord.model_validate(response.json())
 
-    def yank(self, namespace: str, name: str, version: str) -> ReleaseRecord:
+    def yank(self, namespace: str, name: str, version: str, reason: str) -> ReleaseRecord:
         response = self._require_success(
-            self._client.post(f"/v1/extensions/{namespace}/{name}/versions/{version}/yank")
+            self._client.post(
+                self._release_path(namespace, name, version) + "/yank",
+                json={"reason": reason},
+            )
         )
         return ReleaseRecord.model_validate(response.json())
 
-    def artifact_manifest_url(self, target_digest: str) -> str:
-        return f"{self.base_url}/v1/artifacts/{quote(target_digest, safe=':')}/manifest"
+    def unyank(self, namespace: str, name: str, version: str) -> ReleaseRecord:
+        response = self._require_success(
+            self._client.post(self._release_path(namespace, name, version) + "/unyank")
+        )
+        return ReleaseRecord.model_validate(response.json())
 
-    def artifact_file_url(self, target_digest: str, relative_path: str) -> str:
-        path = PurePosixPath(validate_relative_path(relative_path)).as_posix()
-        encoded = quote(path, safe="/")
-        return f"{self.base_url}/v1/artifacts/{quote(target_digest, safe=':')}/files/{encoded}"
+    def simple_project_url(self, project: str) -> str:
+        return f"{self.base_url}/simple/{quote(project, safe='-')}/"

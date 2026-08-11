@@ -1,56 +1,110 @@
-# Roadmap And Work Structure
+# Roadmap And Review Work Structure
 
-## Phase 0 — Task Control Surface
+## Operating Mode
 
-- **Status**: Complete.
-- Git, SVC, instructions, docs navigation, and this poly-file packet exist. This is not the executable project foundation.
+The original generic-target MVP reached functional production acceptance. That
+fact remains historical evidence, but the current task is a reviewed
+architecture replacement rather than an incremental feature phase.
 
-## Phase 1 — Product Design
+Work now advances through adjacent review/remediation batches:
 
-- **Status**: Complete.
-- [`15-product-design.md`](15-product-design.md) defines the admitted public Registry, publisher, release, compatibility, deployment lifecycle, trust promise, MVP workflows, and non-goals.
+```text
+reported issue -> evidence -> diagnosis -> coherent replacement design
+-> Sir review -> HLD/PoC -> local remediation -> verification
+-> exact delivery authorization -> public-demo cutover
+```
 
-## Phase 2 — High-level Technical Design
+`review/` owns issue diagnosis and accepted dispositions. `work/` owns bounded
+design/PoC/execution evidence. The numbered canonical files own current product,
+decision, architecture, roadmap, and acceptance truth. An accepted review is
+not marked remediated until code/schema/tests/automation and the local journey
+have changed.
 
-- **Status**: Complete.
-- Choose the smallest production topology, authoritative data model, Registry API, artifact representation, publisher auth, Runtime/API package boundary, deployment install lock, peer admission paths, and operational flow.
-- Compare Cloudflare and GitHub primitives using official evidence and name only design-changing technical risks.
+## Native Cutover Phases
 
-## Phase 3 — Targeted Risk PoC
-
-- **Status**: Complete.
-- Cloudflare Python Worker + FastAPI + D1 + R2 passed locally and remotely.
-- A relative-base Module Federation remote passed a cross-origin immutable-prefix browser load and full lifecycle call.
-- Evidence is in [`work/09-hld-pocs.md`](work/09-hld-pocs.md).
-
-## Phase 4 — Implementation Plan And Preflight
-
-- **Status**: Complete.
-
-- Map exact files and owners across `ext-reg`, fresh `core-py origin/main`, and fresh `client-web origin/main` worktrees.
-- Rehearse publish, install, enable, disable, uninstall, deployment ordering, data migration, credentials, failure rollback, and verification before code mutation.
-
-## Phase 5 — Project Foundation And Registry
+### Phase N0 — Review Alignment
 
 - **Status**: Complete.
-- Executable Python/TypeScript foundation, service, contracts, metadata migration, artifact flow, publisher CLI, Runtime/API package, focused checks, package builds, Pyodide build, and local Worker black box are complete.
-- Repository CI/CD, public remote, production resources, production deployment, scoped publication, and public smoke are complete.
+- Vocabulary, direct shared deployment state, platform-specific Host SDKs,
+  native Distribution surfaces, legacy diagnosis, and implementation-depth
+  findings are accepted in Review Batches 00–04.
 
-## Phase 6 — Peer Integration And Publisher CD
-
-- **Status**: Complete.
-- Both peer adapters were migrated from fresh `origin/main` worktrees.
-- Each peer owns its first-party target build/publication while preserving application delivery.
-- The shared installation and per-peer binding model, lifecycle APIs, UI, and uninstall guard are deployed.
-
-## Phase 7 — Production Acceptance
+### Phase N1 — Native HLD And Architecture-changing PoCs
 
 - **Status**: Complete.
-- Public Registry and both peers are deployed; both targets are published under one Extension Version.
-- The real Chromium/shared-database lifecycle journey in [`50-acceptance.md`](50-acceptance.md) passed with zero final residue.
+- [`30-architecture.md`](30-architecture.md) is the native destination HLD.
+- [`work/16-native-distribution-pocs.md`](work/16-native-distribution-pocs.md)
+  proves six PEP 420 wheels/Simple selection, the native MF manifest/publicPath
+  behavior, and the bounded Python Worker multipart lane.
 
-## Work File Convention
+### Phase N2 — Registry Remediation
 
-- `packet.md` is the current status/next-action surface.
-- Files `10` through `50` own evidence, product, decisions, HLD, roadmap, and acceptance.
-- A bounded design, PoC, or execution slice receives one file under `work/`; it closes when its facts move to the appropriate owner.
+- **Status**: Locally complete; independent diff review and remediation complete.
+- Replace generic target/blob contracts with Extension/Release plus Python
+  Simple/Upload and native MF surfaces.
+- Recreate the D1 model without targets, host all native bytes in R2, remove the
+  shared Web Runtime/API package, and replace target-oriented tests/workflows.
+- Exit gate: local prepare/upload/publish/read/yank/idempotency/invalid-archive/
+  CORS/cache black-box tests pass with no target vocabulary in production code.
+
+### Phase N3 — Core Host And Six Wheels
+
+- **Status**: Locally complete in the isolated `core-py` worktree.
+- Add one canonical Extension relation via append-only hard-cut migration,
+  remove binding/install tables and built-in seeding, implement one Python Host
+  SDK over native acquisition/entry points, and package all six Extensions.
+- Exit gate: local Simple install, contribution registration, lifecycle,
+  config, cold restore, failure retention, migration/readiness/PostgREST, image,
+  and full Core checks pass without checked-in production Extension bytes.
+- The local exit gate is satisfied by the real six-wheel same-interpreter
+  lifecycle probe, disposable PostgreSQL authority/concurrency tests, 217-test
+  pinned repository contract, and Review Batch 05 wheel/Source/CD remediation.
+
+### Phase N4 — Web Host And Native Remote
+
+- **Status**: Locally complete except exact generated database contract synchronization.
+- Implement one Web Host SDK over a semantic state port and native MF Host,
+  remove binding/matcher/shared Runtime paths, emit the Twitter native manifest,
+  and simplify UI and delivery.
+- Exit gate: range precheck, cross-origin manifest load, lifecycle/state
+  compensation, UI, generated database contract, checked artifact delivery,
+  browser tests, and full Web checks pass.
+- All source-owned Web gates pass. The generated contract gate remains blocked on
+  an exact post-cutover Core image; a narrow type-only adapter seam makes this
+  residual explicit and must be deleted immediately after `contract:sync`.
+
+### Phase N5 — Local Cutover Rehearsal
+
+- **Status**: Complete except the exact-image-dependent Web contract step.
+- Exercise fresh Registry D1/R2 equivalents, the exact three-relation
+  PostgreSQL reset, six wheel plus Twitter publication, Core/Web install-enable-
+  disable-restart-uninstall, outage/yank/conflict behavior, and rollback.
+- Prove unrelated deployment data is unchanged and no generic target/binding
+  residue remains.
+
+### Phase N6 — Delivery Handshake
+
+- **Status**: Pending.
+- Present exact repository branches/diffs/checks, commits to create, release
+  versions, Cloudflare resources/bindings, GitHub secrets, maintenance effects,
+  commands, expected observations, and rollback unit.
+- Git commits, pushes, PRs, releases/publication, secret writes, Cloudflare
+  mutation, deployment DB mutation, and live cutover remain stopped until Sir
+  authorizes these exact objects.
+
+### Phase N7 — Public-demo Cutover And Acceptance
+
+- **Status**: Pending authorization.
+- Publish native Distributions, cut over clean Registry resources, apply the
+  bounded deployment hard cut, deploy both Host SDKs, run read-only and
+  lifecycle acceptance, then delete old demo resources only after the rollback
+  window closes.
+
+## Current Work Files
+
+- [`work/15-native-cutover.md`](work/15-native-cutover.md) is the execution
+  control surface and authorization boundary.
+- [`work/16-native-distribution-pocs.md`](work/16-native-distribution-pocs.md)
+  owns the native PoC evidence and decisions induced by it.
+- Earlier `work/09`–`work/14` files remain historical evidence for the rejected
+  architecture; they are not current implementation instructions.

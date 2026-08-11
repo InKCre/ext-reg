@@ -10,7 +10,7 @@ pnpm check
 ```
 
 `pnpm check` verifies generated contracts, formatting, lint, types, focused
-tests, both packages, and the real Pyodide Worker build. To update an executable
+tests, the Registry package, and the real Pyodide Worker build. To update an executable
 contract intentionally:
 
 ```bash
@@ -25,6 +25,8 @@ from an exact successful current-`main` revision. Do not commit credentials,
 local Wrangler state, generated dependency directories, or unrelated changes.
 
 Registry publication and Cloudflare production changes are separate privileged
-operations. Extension publishers should use the `inkcre-ext publish-target`
-CLI from their own repository CD and record source revision, target key, and
-digest.
+operations. Extension publishers prepare typed associations with
+`inkcre-ext prepare-release`, use `uv publish`/Twine for wheels or
+`inkcre-ext upload-module-federation` for a native Remote snapshot, and publish
+the Release explicitly. Source revision and build identity should accompany the
+prepare request.

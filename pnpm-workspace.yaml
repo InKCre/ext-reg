@@ -1,5 +1,5 @@
-packages:
-  - packages/*
+# Root-only tool installation; there are no application packages or shared Runtime/API workspace.
+packages: []
 
 allowBuilds:
   esbuild: true

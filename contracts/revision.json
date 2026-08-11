@@ -1,24 +1,19 @@
 {
-  "artifact_formats": [
-    "module-federation-esm-v1",
-    "python-bundle-v1"
+  "contract_revision": 2,
+  "distribution_kinds": [
+    "module_federation",
+    "python"
   ],
-  "condition_keys": [
-    "inkcre.extension-api",
-    "inkcre.integration",
-    "module-federation.runtime",
-    "module-federation.share-scope",
-    "python",
-    "shared.@inkcre/core",
-    "shared.vue",
-    "web.ecmascript"
-  ],
-  "contract_revision": 1,
   "extension_version": "strict-semver-without-build-metadata",
+  "python_upload_filetypes": [
+    "bdist_wheel"
+  ],
   "release_states": [
     "preparing",
     "published",
     "yanked",
     "blocked"
-  ]
+  ],
+  "simple_api_version": "1.1",
+  "upload_limit_bytes": 20971520
 }

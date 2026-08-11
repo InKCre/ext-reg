@@ -4,17 +4,28 @@
   "main": "src/worker.py",
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["python_workers"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "registry.inkcre.dev",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    "PUBLIC_ORIGIN": "https://registry.inkcre.dev",
+  },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "inkcre-extension-registry-production",
-      "database_id": "7288f832-7def-4877-aef8-2e6f613458fe",
+      "database_name": "inkcre-extension-registry-production-v2",
+      "database_id": "af52114f-55b5-476f-b986-8ff8d8601d77",
+      "migrations_dir": "migrations",
     },
   ],
   "r2_buckets": [
     {
       "binding": "ARTIFACTS",
-      "bucket_name": "inkcre-extension-registry-production",
+      "bucket_name": "inkcre-extension-registry-production-v2",
     },
   ],
   "observability": { "enabled": true },

@@ -1,12 +1,12 @@
-name: Production Registry delivery
+name: Deploy Extension Registry production
 
 on:
-  workflow_run:
-    workflows:
-      - Registry checks
-    types:
-      - completed
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact verified main SHA authorized for production delivery
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,29 +17,33 @@ concurrency:
 
 jobs:
   deploy:
-    name: Migrate and deploy exact current main
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main')
+    name: Verify, migrate, deploy, and smoke exact main
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://registry.inkcre.dev
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      REGISTRY_ORIGIN: https://registry.inkcre.dev
+      SOURCE_SHA: ${{ inputs.source_sha }}
     steps:
       - name: Checkout verified source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.SOURCE_SHA }}
 
-      - name: Reject a moved main branch
+      - name: Reject a moved main branch or incomplete production contract
         run: |
           current_main=$(git ls-remote origin refs/heads/main | cut -f1)
           test "$current_main" = "$SOURCE_SHA"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          grep -F '"database_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
+          grep -F '"database_id": "af52114f-55b5-476f-b986-8ff8d8601d77"' wrangler.jsonc
+          grep -F '"bucket_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
+          grep -F '"pattern": "registry.inkcre.dev"' wrangler.jsonc
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -65,28 +69,40 @@ jobs:
           uv sync --frozen
           pnpm install --frozen-lockfile
 
-      - name: Apply forward D1 migrations
+      - name: Verify exact delivery source
+        run: pnpm check
+
+      - name: Apply native production schema
         run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 
-      - name: Deploy exact Worker source
-        run: uv run pywrangler deploy
-
-      - name: Smoke configured public origin
-        if: vars.INKCRE_EXTENSION_REGISTRY_URL != ''
-        env:
-          REGISTRY_URL: ${{ vars.INKCRE_EXTENSION_REGISTRY_URL }}
+      - name: Deploy exact Worker and bindings
         run: |
-          curl --fail --show-error --silent "$REGISTRY_URL/livez"
-          curl --fail --show-error --silent "$REGISTRY_URL/v1/extensions"
+          uv run pywrangler deploy \
+            --config wrangler.jsonc \
+            --message "Native Registry production at $SOURCE_SHA" \
+            --strict
 
-      - name: Record delivery identity
-        env:
-          REGISTRY_URL: ${{ vars.INKCRE_EXTENSION_REGISTRY_URL }}
+      - name: Smoke anonymous production reads
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/livez" | jq -e '.status == "ok"'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/" | grep -F 'Extension Registry'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            "$REGISTRY_ORIGIN/v1/extensions" | jq -e 'type == "array"'
+          curl --fail --silent --show-error --retry 12 --retry-all-errors \
+            -H 'Accept: application/vnd.pypi.simple.v1+json' \
+            "$REGISTRY_ORIGIN/simple/" | jq -e '.meta["api-version"] == "1.1"'
+
+      - name: Record production evidence
         run: |
           {
-            echo '## Extension Registry production'
+            echo '## Extension Registry production delivery'
             echo
             echo "- Source: \`$SOURCE_SHA\`"
-            echo "- Worker: \`inkcre-extension-registry\`"
-            echo "- Origin: \`${REGISTRY_URL:-record-after-first-deploy}\`"
+            echo "- Origin: $REGISTRY_ORIGIN"
+            echo '- D1: inkcre-extension-registry-production-v2'
+            echo '- R2: inkcre-extension-registry-production-v2'
+            echo '- Full repository contract, migration, deploy, and anonymous smoke: passed'
+            echo '- Previous Worker Versions and pre-cutover D1/R2: retained for rollback'
           } >> "$GITHUB_STEP_SUMMARY"

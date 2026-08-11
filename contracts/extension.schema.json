@@ -1,51 +1,129 @@
 {
   "$defs": {
-    "Condition": {
+    "ModuleFederationDistribution": {
       "additionalProperties": false,
       "properties": {
-        "key": {
-          "maxLength": 128,
-          "minLength": 1,
-          "title": "Key",
+        "host_sdk": {
+          "const": "@inkcre/core",
+          "title": "Host Sdk",
           "type": "string"
         },
-        "operator": {
-          "enum": [
-            "equals",
-            "semver"
-          ],
-          "title": "Operator",
+        "host_sdk_version": {
+          "title": "Host Sdk Version",
           "type": "string"
         },
-        "value": {
-          "maxLength": 256,
-          "minLength": 1,
-          "title": "Value",
+        "manifest_url": {
+          "title": "Manifest Url",
           "type": "string"
         }
       },
       "required": [
-        "key",
-        "operator",
-        "value"
+        "manifest_url",
+        "host_sdk",
+        "host_sdk_version"
       ],
-      "title": "Condition",
+      "title": "ModuleFederationDistribution",
+      "type": "object"
+    },
+    "PythonDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_point": {
+          "$ref": "#/$defs/PythonEntryPoint"
+        },
+        "host_sdk": {
+          "const": "core-py",
+          "title": "Host Sdk",
+          "type": "string"
+        },
+        "host_sdk_version": {
+          "title": "Host Sdk Version",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "simple_url": {
+          "title": "Simple Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "simple_url",
+        "host_sdk",
+        "host_sdk_version",
+        "entry_point"
+      ],
+      "title": "PythonDistribution",
+      "type": "object"
+    },
+    "PythonEntryPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Group",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "object": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group",
+        "name",
+        "object"
+      ],
+      "title": "PythonEntryPoint",
       "type": "object"
     },
     "ReleaseRecord": {
       "additionalProperties": false,
       "properties": {
+        "module_federation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModuleFederationDistribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "name": {
-          "maxLength": 64,
-          "minLength": 1,
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
           "title": "Name",
           "type": "string"
         },
-        "namespace": {
-          "maxLength": 64,
-          "minLength": 1,
-          "title": "Namespace",
+        "nickname": {
+          "title": "Nickname",
           "type": "string"
+        },
+        "python": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PythonDistribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "state": {
           "enum": [
@@ -57,131 +135,49 @@
           "title": "State",
           "type": "string"
         },
-        "targets": {
-          "items": {
-            "$ref": "#/$defs/TargetRecord"
-          },
-          "title": "Targets",
-          "type": "array"
-        },
         "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
           "title": "Version",
           "type": "string"
         }
       },
       "required": [
-        "namespace",
         "name",
+        "nickname",
         "version",
-        "state",
-        "targets"
+        "state"
       ],
       "title": "ReleaseRecord",
-      "type": "object"
-    },
-    "TargetRecord": {
-      "additionalProperties": false,
-      "properties": {
-        "artifact_format": {
-          "title": "Artifact Format",
-          "type": "string"
-        },
-        "build_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Build Id"
-        },
-        "conditions": {
-          "items": {
-            "$ref": "#/$defs/Condition"
-          },
-          "title": "Conditions",
-          "type": "array"
-        },
-        "entrypoint": {
-          "title": "Entrypoint",
-          "type": "string"
-        },
-        "source_repository": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Source Repository"
-        },
-        "source_revision": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Source Revision"
-        },
-        "target_digest": {
-          "pattern": "^sha256:[0-9a-f]{64}$",
-          "title": "Target Digest",
-          "type": "string"
-        },
-        "target_key": {
-          "maxLength": 128,
-          "minLength": 1,
-          "title": "Target Key",
-          "type": "string"
-        }
-      },
-      "required": [
-        "target_key",
-        "target_digest",
-        "artifact_format",
-        "entrypoint",
-        "conditions"
-      ],
-      "title": "TargetRecord",
       "type": "object"
     }
   },
   "additionalProperties": false,
   "properties": {
     "name": {
-      "maxLength": 64,
-      "minLength": 1,
+      "maxLength": 129,
+      "minLength": 3,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
       "title": "Name",
       "type": "string"
     },
-    "namespace": {
-      "maxLength": 64,
-      "minLength": 1,
-      "title": "Namespace",
+    "nickname": {
+      "title": "Nickname",
       "type": "string"
     },
-    "versions": {
+    "releases": {
       "default": [],
       "items": {
         "$ref": "#/$defs/ReleaseRecord"
       },
-      "title": "Versions",
+      "title": "Releases",
       "type": "array"
     }
   },
   "required": [
-    "namespace",
-    "name"
+    "name",
+    "nickname"
   ],
   "title": "ExtensionRecord",
   "type": "object"

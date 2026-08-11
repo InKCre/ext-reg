@@ -1,0 +1,90 @@
+# Review Batch 06 — CI And Preview Delivery
+
+## Scope
+
+Repair the first Core Draft PR checks against the actual frozen environment and
+add a cognitively small Registry catalog preview path without weakening the
+production cutover boundary.
+
+## Diagnosis And Disposition
+
+Core's local virtual environment predated its regenerated lock. GitHub therefore
+ran Ruff 0.16.2 while the earlier local proof ran Ruff 0.14.10. The new formatter
+required one expression rewrite and made one `S603` suppression obsolete. The
+portable database job also revealed that readiness treated the new
+`set_extension_peer_enabled` RPC as the only protocol function, even though the
+protected history intentionally moves `update_updated_at_column` into the same
+schema. The fix changes only the expected inventory and formatting; it does not
+alter migration or runtime database behavior. Pinned PDM 2.27.0 now completes
+the full Core contract with 217 tests and zero type diagnostics.
+
+The next Portable run reached a second pre-existing probe mismatch: the database
+guard intentionally raises SQLSTATE `23514`, which PostgREST maps to HTTP 400,
+while the black-box script expected 409 and exited before disabling its probe
+Extension. The transport assertion now expects 400; Core's own semantic conflict
+responses remain 409. GitHub then completed PostgREST read/write, deterministic
+reset, web artifact, schema export, and fresh restore successfully.
+
+The first preview design considered per-PR Cloudflare resource creation. That is
+rejected for this MVP: it would turn a read-only catalog preview into a resource
+orchestration and cleanup system. The accepted topology is one dedicated preview
+D1/R2 pair plus one dedicated preview Worker. Each same-repository PR receives
+an immutable Worker Version and stable `pr-<number>` alias after the full Registry
+contract passes. The workflow contains no D1/R2 creation command, production
+Custom Domain, production binding name, or publisher credential. An idempotent
+`inkcre/preview` fixture makes the catalog non-empty.
+
+Cloudflare does not allow `versions upload` to create a Worker service. The
+workflow therefore probes the dedicated preview service and performs one
+idempotent bootstrap deploy only when that isolated service is absent. D1 and
+R2 remain out-of-band resources; normal PR runs upload Versions and move only
+their `pr-<number>` Preview URL aliases. The rendered preview configuration has
+no route or production Custom Domain.
+
+## Authorization And Remote Boundary
+
+Sir authorized the CI fixes, preview workflow, commits, pushes, and the isolated
+preview provisioning handshake. A dedicated account-owned Cloudflare token now
+has `D1 Write`, `Workers Scripts Write`, and `Workers R2 Storage Write`; it is stored as the existing
+GitHub organization Actions secret with selected-repository access that includes
+`ext-reg`. The preview resource pair is distinct from production:
+
+- D1 `inkcre-extension-registry-preview`
+  (`0af2f7f1-df27-4bde-bcac-fe50e717a0ae`)
+- R2 `inkcre-extension-registry-preview`
+
+The account ID is an organization variable; the preview D1/R2 names, D1 ID, and
+Workers subdomain are repository variables. Two initial attempts received an
+empty token because the browser and host clipboards are separate. The token was
+then transferred directly from the authenticated browser into a mode-0600
+temporary input, the organization secret was updated, and the temporary file
+was removed. The subsequent rerun applied the isolated D1 migration and seed,
+then exposed the missing first-Worker bootstrap requirement before any Worker
+Version became public. Production resources, `registry.inkcre.dev`, publisher
+data, releases, merges, and demo-database cutover remain unchanged.
+
+## Verification
+
+- Core pinned PDM 2.27.0 full contract: 217 tests, Ruff/format clean, Pyrefly zero diagnostics.
+- Core GitHub checks: Hermetic repository contract and Portable peer database runtime pass at `5812589`.
+- Registry full contract: 31 tests, generated contracts, package build, and Worker dry build.
+- GitHub workflow validation: actionlint 1.7.12 and repository isolation assertions pass.
+- Registry GitHub checks pass; the original unconfigured run skipped preview.
+- Run `31459662553`, rerun job `93681056309`, applied the isolated D1 migration
+  and idempotent seed, then failed at `versions upload` because Cloudflare
+  requires the dedicated Worker service to exist first.
+- The follow-up workflow probes and bootstraps only that dedicated preview
+  Worker before uploading the exact checked PR Version.
+- Run `31460120485` proved D1 and R2 authorization. Its first bootstrap attempt
+  exposed that R2 Read can list buckets but the single-bucket metadata endpoint
+  used by Wrangler requires R2 Write. After that permission was substituted,
+  remote validation reached the Worker import and exposed a config-root defect:
+  the nested generated config omitted pywrangler's root `python_modules`.
+- The preview config now lives at the repository root, so the upload resolves
+  the same vendored Python dependency tree as the production dry build.
+- Run `31460653863` at `dd6aa23` passed every Registry job. Deployment
+  `5844748260` published the exact checked Version and the public catalog smoke
+  passed at
+  `https://pr-5-inkcre-extension-registry-preview.lanzhijiang.workers.dev`.
+- Preview SQL is idempotent and contains no credential or Distribution bytes.
+- Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.
