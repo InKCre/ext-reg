@@ -18,6 +18,13 @@ schema. The fix changes only the expected inventory and formatting; it does not
 alter migration or runtime database behavior. Pinned PDM 2.27.0 now completes
 the full Core contract with 217 tests and zero type diagnostics.
 
+The next Portable run reached a second pre-existing probe mismatch: the database
+guard intentionally raises SQLSTATE `23514`, which PostgREST maps to HTTP 400,
+while the black-box script expected 409 and exited before disabling its probe
+Extension. The transport assertion now expects 400; Core's own semantic conflict
+responses remain 409. GitHub then completed PostgREST read/write, deterministic
+reset, web artifact, schema export, and fresh restore successfully.
+
 The first preview design considered per-PR Cloudflare resource creation. That is
 rejected for this MVP: it would turn a read-only catalog preview into a resource
 orchestration and cleanup system. The accepted topology is one dedicated preview
@@ -40,7 +47,9 @@ publisher data, releases, merges, and demo-database cutover remain unchanged.
 ## Verification
 
 - Core pinned PDM 2.27.0 full contract: 217 tests, Ruff/format clean, Pyrefly zero diagnostics.
+- Core GitHub checks: Hermetic repository contract and Portable peer database runtime pass at `5812589`.
 - Registry full contract: 31 tests, generated contracts, package build, and Worker dry build.
 - GitHub workflow validation: actionlint 1.7.12 and repository isolation assertions pass.
+- Registry GitHub checks pass; the unconfigured remote preview job is explicitly skipped.
 - Preview SQL is idempotent and contains no credential or Distribution bytes.
 - Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.
