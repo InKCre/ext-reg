@@ -36,13 +36,22 @@ credential. An idempotent `inkcre/preview` fixture makes the catalog non-empty.
 
 ## Authorization And Remote Boundary
 
-Sir authorized the CI fixes, preview workflow, commits, and pushes. The workflow
-definition is safe to merge while infrastructure is absent: a configuration job
-reports missing repository variables and skips deployment. Activating it later
-requires a dedicated preview D1/R2 pair, account/subdomain variables, and a
-least-privilege Cloudflare token. Those provisioning and secret-writing actions
-have not occurred in this batch. Production resources, `registry.inkcre.dev`,
-publisher data, releases, merges, and demo-database cutover remain unchanged.
+Sir authorized the CI fixes, preview workflow, commits, pushes, and the isolated
+preview provisioning handshake. A dedicated account-owned Cloudflare token now
+has only `D1 Write` and `Workers Scripts Write`; it is stored as the existing
+GitHub organization Actions secret with selected-repository access that includes
+`ext-reg`. The preview resource pair is distinct from production:
+
+- D1 `inkcre-extension-registry-preview`
+  (`0af2f7f1-df27-4bde-bcac-fe50e717a0ae`)
+- R2 `inkcre-extension-registry-preview`
+
+The account ID is an organization variable; the preview D1/R2 names, D1 ID, and
+Workers subdomain are repository variables. The first rerun proved those plain
+variables reached the job but retained the original event's empty secret
+snapshot, so the next pushed PR head is the activation proof. Production
+resources, `registry.inkcre.dev`, publisher data, releases, merges, and
+demo-database cutover remain unchanged.
 
 ## Verification
 
@@ -50,6 +59,10 @@ publisher data, releases, merges, and demo-database cutover remain unchanged.
 - Core GitHub checks: Hermetic repository contract and Portable peer database runtime pass at `5812589`.
 - Registry full contract: 31 tests, generated contracts, package build, and Worker dry build.
 - GitHub workflow validation: actionlint 1.7.12 and repository isolation assertions pass.
-- Registry GitHub checks pass; the unconfigured remote preview job is explicitly skipped.
+- Registry GitHub checks pass; the original unconfigured run skipped preview.
+- Rerun `31458261892` reached the preview job with the isolated bindings but
+  failed closed before D1 mutation because its original event snapshot had no
+  token. A fresh pull-request event is required to read the new organization
+  secret.
 - Preview SQL is idempotent and contains no credential or Distribution bytes.
 - Git diffs pass whitespace checks; unrelated Core `uv.lock` remains untracked and uncommitted.
