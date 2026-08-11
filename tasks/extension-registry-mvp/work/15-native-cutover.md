@@ -51,7 +51,7 @@ accepted native Python and Module Federation Registry model across `ext-reg`,
 7. **Public-demo cutover** — after authorization, publish, reset, deploy, run the
    lifecycle acceptance, and retain machine-readable evidence.
 
-## Current State
+## Pre-delivery Readiness State
 
 - Product/review Batches 01–04 are accepted.
 - Disposable PoCs proved native wheel/Simple, MF manifest, and Worker multipart
@@ -102,18 +102,12 @@ accepted native Python and Module Federation Registry model across `ext-reg`,
 - Existing production implementation and acceptance evidence remain the baseline
   against which deletions and retained lifecycle behavior are verified.
 
-## Immediate Next Step
+## Executed Delivery Sequence
 
-Execute the authorized delivery handshake and cutover in dependency order.
-Because the
-Web contract generator consumes an exact Core image whose source revision is
-part of generated truth, final Web contract synchronization belongs after
-Core merge/image delivery and before the final Web delivery. Likewise, create
-fresh Registry D1/R2 resources and write their exact bindings before deploying
-the Registry revision; never deploy the native schema against the deliberately
-stale bindings. Preserve the Web typed adapter seam until `contract:sync`; do
-not fabricate a local image identity to make the generated files appear
-current. Stop at any failed gate rather than advancing the downstream merge.
+The authorized dependency order below was executed. Each downstream mutation
+waited for its upstream repository and deployment gate; failed observations
+stopped the sequence until their causes were corrected. The final public-demo
+evidence is recorded at the end of this file.
 
 ## Authorized Execution Batch — 2026-08-11
 
@@ -195,3 +189,79 @@ current. Stop at any failed gate rather than advancing the downstream merge.
 - Local contract after this change: 31 tests, formatting, lint, Pyright, package
   builds, and Worker dry build all pass; the dry build reports only the new D1,
   new R2, and `https://registry.inkcre.dev` bindings.
+
+## Final Public-demo Acceptance — 2026-08-11
+
+### Merged and delivered authorities
+
+- Registry PRs `InKCre/ext-reg#5` and `#6` merged. Exact production run
+  `31476604702` applied the native D1 schema, deployed the Worker and bindings,
+  attached `registry.inkcre.dev`, and passed anonymous production smoke. Its
+  first attempt proved the organization token lacked Custom Domain authority;
+  the existing token was extended, without rotation, with all-zone
+  `Workers Routes Write` and `Zone Read`, after which the same run passed.
+- Core PRs `InKCre/core-py#50` and `#51` merged. Main repository contract run
+  `31479404417`, immutable runtime publication `31479536451`, and production
+  delivery `31479682452` all passed for main revision
+  `63f57b26ed8685fa34a74516ade39e2af72218d9`.
+- Client Web PR `InKCre/client-web#63` and follow-up fixes `#65`–`#67` merged.
+  Re-run `31476573642` reused the exact checked Pages and Twitter artifacts,
+  recovered the deliberately reset MF association, verified every public
+  manifest asset, deployed Pages, and passed both Pages-origin and
+  `app.inkcre.dev` smoke.
+
+### Clean Registry re-publication
+
+- The first post-merge wheel publication correctly failed with
+  `409 Python association is immutable`: the previous demo rows still carried
+  older source provenance after an interim metadata repair. Per the authorized
+  clean cutover, only native publication rows were cleared from D1 v2, in
+  foreign-key order. Counts changed from six Extensions, six Releases, six
+  Python associations/files, and one MF association to zero; the single
+  `inkcre` namespace and scoped credential remained intact. The old v1 D1/R2
+  resources were not touched.
+- Re-run `31479536513` built, verified, uploaded through the native PyPI
+  protocol, published, and anonymously read back all six first-party wheels.
+  Re-run `31476573642` then restored the checked Twitter MF Remote association.
+- Public `/v1/extensions` returns exactly six names. Exact
+  `inkcre/twitter@0.1.1` is `published` and carries both `python` and
+  `module_federation` associations with canonical Host SDK ranges
+  `>=0.1.0 <0.2.0`. Simple JSON advertises API `1.1`, the Twitter wheel
+  SHA-256, and `Requires-Python: <3.13,>=3.12`.
+
+### Cross-Peer lifecycle black box
+
+- Core `/livez` and `/readyz` returned `200`; readiness named database contract
+  `peer-database-runtime-v2`, migration `b8c1d2e3f4a5`, and no role, privilege,
+  or catalog problems.
+- A pre-fix Core enable exposed a real Heroku H12: the request attempted to
+  resolve an unbounded third-party dependency closure. PR `core-py#51` moved the
+  supported first-party dependency baseline into the Core image while retaining
+  standard Registry wheel acquisition and fail-closed installed-dependency
+  validation. Its pinned repository contract passed 220 tests before merge.
+- The corrected Core flow installed `inkcre/twitter@0.1.1`, enabled it within
+  the 30-second request boundary, persisted only Core Peer
+  `063cd1df-c495-5006-a119-67aa633b26be`, and published the three dynamic
+  `/twitter` API paths. Disable removed that UUID and all three paths. Uninstall
+  returned `204`, and a fresh install returned the same exact version with
+  `enabled=[]`.
+- At `app.inkcre.dev`, the settings recovery page restored the PostgREST URL,
+  browser-local JWT secret, and Web Peer ID. The Extensions UI listed the shared
+  row, loaded the native MF manifest and assets, and changed `OFF` to `ON` only
+  after runtime success. With Core enabled at the same time, the single row
+  contained both Core and Web Peer
+  `1eaaadc6-2c1d-4515-ad06-22905dc890a9`; the UI reported
+  `Enabled on 2 Peer(s)` while preserving version `0.1.1`.
+- Web disable, UI uninstall, and UI reinstall all succeeded. Final cleanup
+  disabled Web and Core, removed the dynamic Core paths, and intentionally left
+  one stable demo row: `inkcre/twitter@0.1.1`, nickname `Twitter`,
+  `enabled=[]`.
+
+### Result
+
+The accepted MVP topology is now exercised in the public demo: one Registry
+Release and one deployment installation version, native Python and MF
+Distributions hosted by the Registry, and Peer-local runtime enablement carried
+only by the shared row's UUID set. No target key, target digest, peer-binding
+relation, generic compatibility matcher, or Core-embedded Extension bundle is
+part of the accepted path.
