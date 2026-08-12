@@ -24,30 +24,24 @@
   retirement without production mutation or residue; independent automated
   black-box checks continue to prove Registry API and native distribution
   behavior.
-- **Current Truth**: The protected-main baseline is mostly present, but `ext-reg`
-  is absent from the formal organization enforcement scope. Live settings still
-  allow merge commits, grant write-by-default Actions tokens, allow Actions to
-  approve PRs, and leave `production` unrestricted. The default-branch Preview
-  lane still runs candidate workflow code with the production-capable
-  Cloudflare token and mutates one shared preview D1 until a reviewed change is
-  merged. Sir accepted one fixed preview-only Pages Direct Upload project with
-  deterministic same-repository PR branches and artifact-only evidence for
-  forks. GitHub's maintainer-approval policy, not a custom HTML/CSS validator,
-  is the untrusted-code gate. After the simplified plan passed independent
-  review, Sir explicitly authorized the ext-reg-local implementation. The
-  worktree now replaces the abandoned per-PR Worker/data-plane draft with a
-  secret-free candidate artifact, trusted default-branch Pages controller,
-  protected Preview Environment, exact-head checks, deterministic tombstone,
-  and exact-branch Pages cleanup. The implementation deliberately uses
-  Pydantic, official GitHub Actions, GitHub approval/Environment controls, and
-  Wrangler only on their documented happy paths. Local focused and full
-  contracts pass. No Git branch/commit/push/PR, organization `.github` change,
-  repository setting, Environment, secret, Cloudflare resource, production,
-  or destructive remote mutation has been performed.
-- **Next Step**: Review the local diff and implementation evidence. Git/PR,
-  cross-repository organization policy, repository settings/Environments,
-  GitHub/Cloudflare credentials/resources, canary, destructive old-preview
-  cleanup, and merge each retain their separate authorization gates.
+- **Current Truth**: The governance and static-Preview cutover is accepted and
+  live. `InKCre/.github` formally covers `ext-reg`; protected `main`, Actions
+  defaults, external-contributor approval, merge policy, and protected Preview
+  and production Environments match the accepted profile. Candidate PR code is
+  secret-free. One fixed Pages Direct Upload project receives only the bounded
+  UI artifact through trusted default-branch controllers and dedicated
+  Pages-only authority. The two-head canary proved exact-head replacement,
+  stale-head rejection, close tombstones, and deletion of older exact-branch
+  deployments. A separate least-privilege production token passed the read-only
+  production verify, after which `ext-reg` was removed from the shared
+  organization Cloudflare secret. The obsolete shared Preview D1/R2 resources
+  and variables were deleted after the rollback window. `registry.inkcre.dev`
+  continues to serve the Web UI, six Extension releases, Simple API 1.1, and
+  native distribution paths. Full local contracts and the final live-settings
+  audit pass. Detailed evidence is recorded in the black-box acceptance report.
+- **Next Step**: No implementation or control-plane work remains in this task.
+  Preserve the latest PR tombstones as policy-owned audit records and follow the
+  normal governance workflow for future changes.
 
 ## Supporting Material
 
@@ -65,3 +59,4 @@
 - [Independent overdesign review](96-overdesign-review.md)
 - [Simplified-plan independent review](97-simplified-plan-review.md)
 - [Local implementation evidence](98-local-implementation-evidence.md)
+- [Black-box acceptance and cleanup evidence](99-black-box-acceptance.md)
