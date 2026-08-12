@@ -71,6 +71,27 @@ removed from the selected repositories of the shared organization
 `CLOUDFLARE_API_TOKEN`; the remaining selected repositories are client-web,
 docs, and ui.
 
+## Post-acceptance Cleanup Hardening
+
+Merging the evidence-only PR #10 exposed two provider edge cases that the
+unmerged canary could not exercise:
+
+1. GitHub rejected the cleanup before runner allocation after the merged PR's
+   head branch had already been deleted. Its protected-branch inference used
+   the stale pull-request head while labelling the deployment `main`.
+2. After that gate was corrected, Cloudflare briefly returned the previous 200
+   page immediately after the tombstone deployment. Curl's HTTP retry behavior
+   did not retry a successful response whose body was stale.
+
+The Preview Environment now uses GitHub's native custom branch policy with the
+single exact branch `main`. Candidate and fork branches remain ineligible while
+merged/closed controller events no longer depend on deleted-head protection
+inference. PR #11, merge `8d4465cc58a0769a75e234440bba4f82bb783fb8`,
+added a bounded 24-second body-and-header convergence check. Its automatic
+cleanup run `31571673262` passed. The same fixed main then replayed PR #10
+cleanup in run `31571727015`; tombstone verification and exact-branch deletion
+both passed.
+
 ## Live Governance Read-back
 
 - merge commits disabled; squash and rebase enabled;
@@ -79,7 +100,9 @@ docs, and ui.
 - protected `main`: admins enforced, linear history, strict checks, resolved
   conversations, no force push, no deletion;
 - required check: `ext-reg checks`, app id `15368`;
-- Preview and production Environments: protected branches only;
+- Preview Environment: custom deployment branch policy with the single exact
+  branch `main`;
+- production Environment: protected branches only;
 - Preview secret: `CLOUDFLARE_PAGES_API_TOKEN`;
 - production secret: `CLOUDFLARE_API_TOKEN`;
 - repository variables reduced to `CLOUDFLARE_ACCOUNT_ID`,
