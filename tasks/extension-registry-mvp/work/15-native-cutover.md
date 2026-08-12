@@ -265,3 +265,38 @@ Distributions hosted by the Registry, and Peer-local runtime enablement carried
 only by the shared row's UUID set. No target key, target digest, peer-binding
 relation, generic compatibility matcher, or Core-embedded Extension bundle is
 part of the accepted path.
+
+## Rollback Closure And Preview Cleanup
+
+On 2026-08-11 Sir explicitly ended the rollback window after the native
+production and cross-Peer black-box acceptance had passed. The legacy
+`inkcre-extension-registry-production` D1 database was permanently deleted.
+The same-named legacy R2 bucket was emptied through a bounded remote-development
+binding and then permanently deleted. The active `-v2` production pair and the
+dedicated preview pair were reverified and left intact.
+
+The cleanup audit also found that closed PR aliases survive deletion of their
+Cloudflare Worker Versions and that GitHub retained their per-PR Environments.
+PR #5, #6, and #7 deployment records and Environments were removed, their five
+aliased Versions were deleted, and the obsolete shared preview Worker was
+retired. A subsequent governance review rejected the namespaced per-PR Worker
+experiment as the future topology: it still required a shared Preview data plane
+and broader Cloudflare authority than human review of the Extension-list UI
+needs. The follow-up in `tasks/github-governance-alignment/` replaces it with one
+fixed static Pages project, a trusted controller, a dedicated Preview
+Environment/token, one-day artifact fallback, and tombstone cleanup.
+
+The rejected Worker lifecycle was exercised against Cloudflare with the bounded
+name `inkcre-extension-registry-preview-pr-999999`: deployment over the shared
+preview bindings returned a healthy public response, the same force-delete API
+used by CI retired the Worker, and its URL immediately returned `404`. No test
+Worker or temporary config remained after the probe. This remains historical
+cleanup evidence, not authority to recreate that Preview topology.
+
+Local cleanup removed five completed Core/Web worktrees, their merged branches,
+the two remaining merged remote branches, and bounded task-owned temporary
+artifacts. The only untracked worktree file was moved to the system Trash before
+the worktree was removed. Rebuildable Registry caches, package outputs, temporary
+Worker modules, task-specific `/private/tmp` captures, and Wrangler diagnostic
+logs were also moved to Trash. GitHub retained only the latest current-main
+package-evidence artifact; 26 superseded artifacts were deleted.

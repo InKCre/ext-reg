@@ -1,0 +1,209 @@
+name: Pages preview
+
+on:
+  workflow_run:
+    workflows:
+      - Registry checks
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  identity:
+    name: Resolve trusted preview identity
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.identity.outputs.branch }}
+      head_sha: ${{ steps.identity.outputs.head_sha }}
+      pull_number: ${{ steps.identity.outputs.pull_number }}
+      run_id: ${{ steps.identity.outputs.run_id }}
+    steps:
+      - name: Resolve exact internal pull request
+        id: identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            })
+            if (run.name !== 'Registry checks' || run.path !== '.github/workflows/ci.yml') {
+              core.setFailed('Preview artifact must come from the trusted Registry checks workflow.')
+              return
+            }
+            if (run.conclusion !== 'success' || run.event !== 'pull_request') {
+              core.setFailed('Preview delivery requires a successful pull-request check run.')
+              return
+            }
+            if (run.head_repository?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed('Fork pull requests are not eligible for preview delivery.')
+              return
+            }
+
+            const pulls = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: run.head_sha,
+            })
+            const eligible = pulls.data.filter((pull) =>
+              pull.state === 'open' &&
+              pull.base.ref === 'main' &&
+              pull.head.sha === run.head_sha &&
+              pull.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`
+            )
+            if (eligible.length !== 1) {
+              core.setFailed('Run must be the exact head of one eligible internal pull request.')
+              return
+            }
+
+            const pull = eligible[0]
+            core.setOutput('branch', `preview/ext-reg/pr-${pull.number}`)
+            core.setOutput('head_sha', run.head_sha)
+            core.setOutput('pull_number', String(pull.number))
+            core.setOutput('run_id', String(runId))
+
+  deploy:
+    name: ext-reg preview
+    needs: identity
+    concurrency:
+      group: pages-preview-ext-reg-${{ needs.identity.outputs.pull_number }}
+      cancel-in-progress: true
+    permissions:
+      actions: read
+      contents: read
+      deployments: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: preview
+      url: ${{ steps.pages.outputs.pages-deployment-alias-url }}
+    steps:
+      - name: Checkout the trusted preview controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: controller/package.json
+
+      - name: Download the exact checked artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ext-reg-ui-preview-${{ needs.identity.outputs.head_sha }}
+          path: .pages-preview/candidate
+          run-id: ${{ needs.identity.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare the bounded static deployment
+        env:
+          PREVIEW_HEAD_SHA: ${{ needs.identity.outputs.head_sha }}
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+        run: |
+          test "$(find .pages-preview/candidate -mindepth 1 | wc -l | tr -d ' ')" = 1
+          test -f .pages-preview/candidate/index.html
+          test ! -L .pages-preview/candidate/index.html
+          test ! -x .pages-preview/candidate/index.html
+          test "$(wc -c < .pages-preview/candidate/index.html | tr -d ' ')" -le 65536
+          mkdir .pages-preview/dist
+          cp .pages-preview/candidate/index.html .pages-preview/dist/index.html
+          cp controller/.github/pages-preview/_headers .pages-preview/dist/_headers
+          jq -n \
+            --argjson pull_request "$PULL_NUMBER" \
+            --arg source_sha "$PREVIEW_HEAD_SHA" \
+            '{schema_version: 1, pull_request: $pull_request, source_sha: $source_sha}' \
+            > .pages-preview/dist/preview.json
+
+      - name: Reverify pull-request identity before delivery
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PREVIEW_BRANCH: ${{ needs.identity.outputs.branch }}
+          PREVIEW_HEAD_SHA: ${{ needs.identity.outputs.head_sha }}
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+        with:
+          script: |
+            const expectedBranch = `preview/ext-reg/pr-${process.env.PULL_NUMBER}`
+            if (process.env.PREVIEW_BRANCH !== expectedBranch) {
+              core.setFailed(`Unexpected Pages preview branch: ${process.env.PREVIEW_BRANCH}`)
+              return
+            }
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PULL_NUMBER),
+            })
+            if (
+              pull.state !== 'open' ||
+              pull.base.ref !== 'main' ||
+              pull.head.sha !== process.env.PREVIEW_HEAD_SHA ||
+              pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`
+            ) {
+              core.setFailed('Pull-request identity changed after artifact selection.')
+            }
+
+      - name: Deploy to the isolated Pages preview branch
+        id: pages
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.120.0
+          workingDirectory: .pages-preview
+          command: >-
+            pages deploy dist
+            --project-name=${{ vars.REGISTRY_UI_PREVIEW_PAGES_PROJECT }}
+            --branch=${{ needs.identity.outputs.branch }}
+            --commit-hash=${{ needs.identity.outputs.head_sha }}
+            --commit-dirty=false
+
+      - name: Smoke exact and stable Preview URLs
+        env:
+          ALIAS_URL: ${{ steps.pages.outputs.pages-deployment-alias-url }}
+          DEPLOYMENT_URL: ${{ steps.pages.outputs.deployment-url }}
+          PREVIEW_HEAD_SHA: ${{ needs.identity.outputs.head_sha }}
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+        run: |
+          for preview_url in "$DEPLOYMENT_URL" "$ALIAS_URL"; do
+            test -n "$preview_url"
+            curl --fail --silent --show-error --retry 6 --retry-all-errors \
+              "$preview_url/preview.json" | \
+              jq -e \
+                --arg source_sha "$PREVIEW_HEAD_SHA" \
+                --argjson pull_request "$PULL_NUMBER" \
+                '.schema_version == 1 and .source_sha == $source_sha and .pull_request == $pull_request'
+            curl --fail --silent --show-error --retry 6 --retry-all-errors \
+              --dump-header .pages-preview/headers \
+              --output .pages-preview/index.html \
+              "$preview_url/"
+            grep -i '^content-type: text/html' .pages-preview/headers
+            grep -i '^x-robots-tag: noindex, nofollow' .pages-preview/headers
+            grep -i '^content-security-policy:' .pages-preview/headers
+          done
+
+      - name: Record Preview evidence
+        env:
+          PREVIEW_URL: ${{ steps.pages.outputs.pages-deployment-alias-url }}
+        run: |
+          {
+            echo '## Extension Registry PR Preview'
+            echo
+            echo "- Source: \`${{ needs.identity.outputs.head_sha }}\`"
+            echo "- Preview: $PREVIEW_URL"
+            echo '- Surface: static Extension list only'
+            echo '- Registry API and production data: unchanged'
+          } >> "$GITHUB_STEP_SUMMARY"
