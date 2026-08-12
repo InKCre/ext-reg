@@ -2,14 +2,36 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from html import escape
+from urllib.parse import urlsplit
 
 from ..contracts.models import ExtensionSummary
 
 
-def extension_catalog_html(extensions: Sequence[ExtensionSummary]) -> str:
+def _canonical_api_origin(value: str) -> str:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("api_origin must be a canonical absolute HTTPS origin")
+    return value
+
+
+def extension_catalog_html(
+    extensions: Sequence[ExtensionSummary],
+    *,
+    api_origin: str | None = None,
+    noindex: bool = False,
+) -> str:
+    origin = _canonical_api_origin(api_origin) if api_origin is not None else ""
     cards = "".join(
         (
-            '<li><a class="extension" href="/v1/extensions/'
+            f'<li><a class="extension" href="{escape(origin, quote=True)}/v1/extensions/'
             f'{escape(extension.name, quote=True)}">'
             f'<span class="nickname">{escape(extension.nickname)}</span>'
             f'<span class="name">{escape(extension.name)}</span>'
@@ -27,12 +49,13 @@ def extension_catalog_html(extensions: Sequence[ExtensionSummary]) -> str:
             "</div>"
         )
     )
+    robots = '\n  <meta name="robots" content="noindex,nofollow">' if noindex else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Public InKCre Extension catalog">
+  <meta name="description" content="Public InKCre Extension catalog">{robots}
   <title>InKCre Extension Registry</title>
   <style>
     :root {{ color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }}
@@ -93,7 +116,9 @@ def extension_catalog_html(extensions: Sequence[ExtensionSummary]) -> str:
       <h2 id="catalog-heading">Available now</h2>
       {catalog}
     </section>
-    <footer>Machine-readable catalog: <a href="/v1/extensions">/v1/extensions</a></footer>
+    <footer>Machine-readable catalog:
+      <a href="{escape(origin, quote=True)}/v1/extensions">/v1/extensions</a>
+    </footer>
   </main>
 </body>
 </html>

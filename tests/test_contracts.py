@@ -273,8 +273,13 @@ def test_module_federation_manifest_rejects_non_finite_json_numbers(constant: st
 def test_production_delivery_is_exact_and_does_not_provision_or_delete_resources() -> None:
     workflow = Path(".github/workflows/production.yml").read_text(encoding="utf-8")
     assert "source_sha" in workflow
+    assert "operation:" in workflow
+    assert "- verify" in workflow
+    assert "- deploy" in workflow
     assert "git ls-remote origin refs/heads/main" in workflow
     assert "CLOUDFLARE_API_TOKEN" in workflow
+    assert "Verify Cloudflare production authority and resource identity" in workflow
+    assert "if: inputs.operation == 'deploy'" in workflow
     assert "wrangler d1 migrations apply DB --remote" in workflow
     assert "pywrangler deploy" in workflow
     assert "https://registry.inkcre.dev" in workflow
@@ -285,22 +290,60 @@ def test_production_delivery_is_exact_and_does_not_provision_or_delete_resources
     assert "inkcre-extension-registry-production-v2" in workflow
 
 
-def test_pr_preview_is_isolated_from_production_bindings() -> None:
+def test_pr_candidate_checks_are_secret_free_and_publish_one_static_document() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
-    assert "pull_request_target" not in workflow
-    assert "inkcre-extension-registry-preview" in workflow
-    assert "REGISTRY_PREVIEW_D1_DATABASE_ID" in workflow
-    assert "REGISTRY_PREVIEW_R2_BUCKET_NAME" in workflow
-    assert "PREVIEW_CONFIG: wrangler.preview.json" in workflow
-    assert '"main": "src/worker.py"' in workflow
-    assert '"main": "../src/worker.py"' not in workflow
-    assert "wrangler versions list" in workflow
-    assert "pywrangler deploy" in workflow
-    assert "versions upload" in workflow
-    assert "--preview-alias" in workflow
-    assert "wrangler d1 create" not in workflow
-    assert "wrangler r2 bucket create" not in workflow
-    assert "tests/fixtures/preview-seed.sql" in workflow
+
+    assert "name: ext-reg checks" in workflow
+    assert "pull_request_target:" not in workflow
+    assert "CLOUDFLARE_API_TOKEN" not in workflow
+    assert "REGISTRY_PREVIEW_D1" not in workflow
+    assert "REGISTRY_PREVIEW_R2" not in workflow
+    assert "scripts/build_ui_preview.py" in workflow
+    assert "ext-reg-ui-preview-${{ github.event.pull_request.head.sha }}" in workflow
+    assert "retention-days: 1" in workflow
+    assert "tests/fixtures/preview-seed.sql" not in workflow
+
+
+def test_pages_preview_uses_the_trusted_controller_and_dedicated_authority() -> None:
+    workflow = Path(".github/workflows/pages-preview.yml").read_text(encoding="utf-8")
+
+    assert "workflow_run:" in workflow
+    assert "run.path !== '.github/workflows/ci.yml'" in workflow
+    assert "run.head_repository?.full_name" in workflow
+    assert "eligible.length !== 1" in workflow
+    assert "pull.head.sha !== process.env.PREVIEW_HEAD_SHA" in workflow
+    assert "ref: ${{ github.workflow_sha }}" in workflow
+    assert "environment:" in workflow
+    assert "name: preview" in workflow
+    assert "CLOUDFLARE_PAGES_API_TOKEN" in workflow
+    assert "REGISTRY_UI_PREVIEW_PAGES_PROJECT" in workflow
+    assert "pages-preview-ext-reg-${{ needs.identity.outputs.pull_number }}" in workflow
+    assert "index.html" in workflow
+    assert "preview.json" in workflow
+    assert "_headers" in workflow
+    assert "parse HTML" not in workflow
+    assert "createDeployment" not in workflow
+    assert "pywrangler deploy" not in workflow
+    assert "wrangler d1" not in workflow
+    assert "wrangler r2" not in workflow
+
+
+def test_pages_preview_cleanup_is_trusted_exact_and_tombstoned() -> None:
+    workflow = Path(".github/workflows/pages-preview-cleanup.yml").read_text(encoding="utf-8")
+
+    assert "pull_request_target:" in workflow
+    assert "pull.state !== 'closed'" in workflow
+    assert "pull.head.repo?.full_name" in workflow
+    assert "ref: ${{ github.workflow_sha }}" in workflow
+    assert "pages-preview-ext-reg-${{" in workflow
+    assert "pages-preview-closed" in workflow
+    assert "pages deployment list" in workflow
+    assert ".Branch == $branch" in workflow
+    assert ".Id != $keep" in workflow
+    assert "pages deployment delete" in workflow
+    assert "actions/checkout" in workflow
+    assert "github.event.pull_request.head.sha" not in workflow
+    assert "createDeployment" not in workflow
 
 
 def test_simple_content_negotiation_is_v1_1_and_fail_closed() -> None:

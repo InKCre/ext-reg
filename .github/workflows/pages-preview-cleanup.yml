@@ -1,0 +1,150 @@
+name: Pages preview cleanup
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Closed pull request whose preview should be retired
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  cleanup:
+    name: ext-reg preview cleanup
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    concurrency:
+      group: pages-preview-ext-reg-${{ github.event.pull_request.number || inputs.pull_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: preview
+      url: ${{ steps.tombstone.outputs.pages-deployment-alias-url }}
+    steps:
+      - name: Resolve the closed pull request
+        id: identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REQUESTED_PULL_NUMBER: ${{ github.event.pull_request.number || inputs.pull_number }}
+        with:
+          script: |
+            const pullNumber = Number(process.env.REQUESTED_PULL_NUMBER)
+            if (!Number.isInteger(pullNumber) || pullNumber < 1) {
+              core.setFailed('A positive pull-request number is required.')
+              return
+            }
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            })
+            if (
+              pull.state !== 'closed' ||
+              pull.base.ref !== 'main' ||
+              pull.base.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` ||
+              pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`
+            ) {
+              core.setFailed('Cleanup only accepts a closed same-repository pull request targeting main.')
+              return
+            }
+            core.setOutput('branch', `preview/ext-reg/pr-${pullNumber}`)
+
+      - name: Checkout the trusted cleanup controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: controller/package.json
+          cache: pnpm
+          cache-dependency-path: controller/pnpm-lock.yaml
+
+      - name: Install frozen Wrangler
+        run: pnpm --dir controller install --frozen-lockfile
+
+      - name: Replace the stable alias with the trusted tombstone
+        id: tombstone
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          packageManager: npm
+          wranglerVersion: 4.120.0
+          workingDirectory: controller/.github/pages-preview-closed
+          command: >-
+            pages deploy .
+            --project-name=${{ vars.REGISTRY_UI_PREVIEW_PAGES_PROJECT }}
+            --branch=${{ steps.identity.outputs.branch }}
+            --commit-hash=${{ github.workflow_sha }}
+            --commit-dirty=false
+
+      - name: Verify the closed Preview alias
+        env:
+          PREVIEW_URL: ${{ steps.tombstone.outputs.pages-deployment-alias-url }}
+        run: |
+          test -n "$PREVIEW_URL"
+          curl --fail --silent --show-error --retry 6 --retry-all-errors \
+            --dump-header .pages-preview-closed-headers \
+            "$PREVIEW_URL/" | grep -F 'This pull-request preview is no longer active.'
+          grep -i '^x-robots-tag: noindex, nofollow' .pages-preview-closed-headers
+          grep -i '^cache-control: no-store' .pages-preview-closed-headers
+
+      - name: Delete older exact-branch deployments
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}
+          KEEP_DEPLOYMENT_ID: ${{ steps.tombstone.outputs.pages-deployment-id }}
+          PAGES_BRANCH: ${{ steps.identity.outputs.branch }}
+          PAGES_PROJECT: ${{ vars.REGISTRY_UI_PREVIEW_PAGES_PROJECT }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$KEEP_DEPLOYMENT_ID"
+          test -n "$PAGES_PROJECT"
+          pnpm --dir controller exec wrangler pages deployment list \
+            --project-name "$PAGES_PROJECT" \
+            --environment preview \
+            --json > .pages-preview-deployments.json
+          jq -e \
+            --arg branch "$PAGES_BRANCH" \
+            --arg keep "$KEEP_DEPLOYMENT_ID" \
+            'any(.[]; .Branch == $branch and .Id == $keep)' \
+            .pages-preview-deployments.json
+          jq -r \
+            --arg branch "$PAGES_BRANCH" \
+            --arg keep "$KEEP_DEPLOYMENT_ID" \
+            '.[] | select(.Branch == $branch and .Id != $keep) | .Id' \
+            .pages-preview-deployments.json | \
+          while IFS= read -r deployment_id; do
+            test -n "$deployment_id"
+            pnpm --dir controller exec wrangler pages deployment delete \
+              "$deployment_id" \
+              --project-name "$PAGES_PROJECT" \
+              --force
+          done

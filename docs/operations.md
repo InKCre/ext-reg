@@ -5,8 +5,9 @@
 The native schema is a clean initial schema, not an in-place migration from the
 rejected generic target database. The authorized cutover created fresh
 `inkcre-extension-registry-production-v2` D1 and R2 resources and froze their
-bindings in `wrangler.jsonc`. The pre-cutover same-named resources remain
-untouched as the bounded rollback data plane.
+bindings in `wrangler.jsonc`. After production and cross-Peer acceptance, the
+explicitly authorized rollback window ended and the pre-cutover
+`inkcre-extension-registry-production` D1/R2 pair was permanently removed.
 
 The production workflow is manual, takes an exact current-main SHA, rejects a
 moved branch or unexpected binding identity, installs frozen dependencies,
@@ -21,37 +22,57 @@ The public origin and Worker Custom Domain are both
 
 ## Pull Request Previews
 
-Registry checks can upload an exact, tested PR head as a Cloudflare Worker
-Version with the stable alias `pr-<number>`. The preview uses the separate
-Worker name `inkcre-extension-registry-preview`, explicit Preview URLs, and
-dedicated preview D1/R2 bindings. It never inherits the production binding
-names or the `registry.inkcre.dev` Custom Domain. The shared preview database
-contains only an idempotent `inkcre/preview` catalog fixture and no publisher
-credential.
+The human Preview covers only the read-only Extension-list page. Registry APIs,
+publisher flows, Python Simple, Module Federation, installation, and runtime
+behavior remain the local real-Worker black-box contract.
 
-The deploy job runs only for same-repository PRs after the repository contract
-passes. Before enabling it, create the following repository variables:
+Every pull request runs secret-free checks and produces a one-day Actions
+artifact containing one bounded `index.html` rendered from the checked review
+fixture. GitHub requires maintainer approval before any external fork
+contributor's workflows start. Approval does not grant credentials: fork PRs
+stop after checks and artifact evidence and never receive a remote Preview.
 
-- `CLOUDFLARE_ACCOUNT_ID`
-- `REGISTRY_PREVIEW_D1_DATABASE_ID`
-- `REGISTRY_PREVIEW_D1_DATABASE_NAME`
-- `REGISTRY_PREVIEW_R2_BUCKET_NAME`
-- `REGISTRY_PREVIEW_WORKERS_SUBDOMAIN` (the account subdomain without
-  `.workers.dev`)
+For a same-repository PR, `.github/workflows/pages-preview.yml` runs as a
+trusted `workflow_run` controller selected from protected `main`. It verifies
+the successful `Registry checks` run, one open PR targeting `main`, same-repo
+origin, and exact current head SHA before entering the protected `preview`
+Environment. The controller uses official GitHub artifact transfer, accepts
+only the single regular document within its size bound, and copies it into a
+fresh deploy directory. It does not parse or sanitize candidate HTML/CSS.
 
-Store `CLOUDFLARE_API_TOKEN` as an organization Actions secret with selected
-repository access that includes `ext-reg`, and restrict it to the target account
-with Workers Scripts Write, D1 Write, and Workers R2 Storage Write. Wrangler's
-first Worker deploy validates the named R2 bucket through an endpoint that
-requires R2 Storage Write even though the workflow never creates, modifies, or
-deletes that bucket. Runtime object access still comes from the Worker binding.
-Until every variable exists, CI reports the missing preview contract and skips
-deployment without touching Cloudflare. The preview D1 and R2 are provisioned
-out of band. If the dedicated preview Worker service does not yet exist, the
-workflow bootstraps that service once from the fail-closed preview config; it
-then applies migrations only to the explicit preview D1 and exposes each exact
-checked Worker Version through its PR alias. The preview config contains no
-production route or Custom Domain.
+Protected-main code adds `preview.json` with the PR/source identity and
+`_headers` with noindex, no-store, CSP, nosniff, and no-referrer. Wrangler Direct
+Upload publishes that directory to the single project
+`inkcre-extension-registry-ui-preview` on branch
+`preview/ext-reg/pr-<number>`. Links in the static document point to public
+production reads at `https://registry.inkcre.dev`; the Pages origin never
+pretends to host candidate Registry APIs.
+
+Preview authority is deliberately narrow:
+
+- repository variable `CLOUDFLARE_ACCOUNT_ID` identifies the account;
+- repository variable `REGISTRY_UI_PREVIEW_PAGES_PROJECT` must equal
+  `inkcre-extension-registry-ui-preview`;
+- the protected `preview` Environment owns
+  `CLOUDFLARE_PAGES_API_TOKEN`, scoped only to account-level Pages Write;
+- the project has no Git provider, custom domain, Functions, Worker, D1, R2, or
+  other binding;
+- production uses a separate Environment and token.
+
+Closing an internal PR runs the trusted default-branch cleanup without checking
+out candidate code. It deploys the checked-in tombstone to the same branch,
+verifies the stable alias, and uses Wrangler's Pages deployment commands to
+delete older deployments for only that exact project/branch. Cloudflare retains
+the latest tombstone because the latest branch deployment cannot be deleted.
+The one-day Actions artifact expires through GitHub's normal retention policy.
+
+The workflow that introduces the trusted controller cannot preview itself;
+`workflow_run` must already exist on the default branch. After merge, use one
+bounded internal canary to prove the Preview Environment branch rule, exact-head
+update, close cleanup, and actual Free-plan usage. If Direct Upload consumes an
+unexpected paid/build quota or the Environment/controller boundary fails, turn
+off remote delivery and retain the one-day artifact. Do not create another
+Preview topology.
 
 ## Local Worker Black Box
 
@@ -89,10 +110,11 @@ create new D1 + private R2
   -> read-after-write Python and MF smoke
   -> switch/verify public origin
   -> retain old resources for the bounded rollback window
+  -> after explicit acceptance, empty and permanently delete the old D1/R2 pair
 ```
 
 No old target rows, generic blobs, credentials, or demo Releases are migrated.
-Deleting old resources occurs only after the rollback window and needs its own
+The old resources were deleted only after the rollback window ended with
 explicit authorization.
 
 ## Delivery, Failure, And Rollback
@@ -103,10 +125,12 @@ current `main`, verifies the frozen `-v2` bindings, and only then migrates and
 deploys. Do not deploy from a controller checkout, moved branch, or mutable
 package artifact.
 
-Rollback restores the old Worker bindings and verified Worker revision while
-the old D1/R2 resources still exist. New native D1/R2 resources stay intact for
-diagnosis. R2 staging garbage is never public without D1 authority and may be
-removed later by a bounded lifecycle rule.
+During the bounded cutover window, rollback restored the old Worker bindings and
+verified Worker revision while the old D1/R2 resources existed. That window is
+now closed: rollback remains available only within the native-v2 data plane by
+deploying a previously verified compatible Worker Version. The deleted generic
+target data plane cannot be restored. R2 staging garbage is never public without
+D1 authority and may be removed later by a bounded lifecycle rule.
 
 After cutover verify `/livez`, exact Release descriptors, Simple 1.1 HTML/JSON,
 wheel plus `.metadata`, MF manifest/assets, CORS/cache/ETag, identical retry,

@@ -7,6 +7,14 @@ on:
         description: Exact verified main SHA authorized for production delivery
         required: true
         type: string
+      operation:
+        description: Verify production authority without mutation, or deploy exact main
+        required: true
+        default: verify
+        type: choice
+        options:
+          - verify
+          - deploy
 
 permissions:
   contents: read
@@ -17,7 +25,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Verify, migrate, deploy, and smoke exact main
+    name: ext-reg deployment
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -33,6 +41,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
 
       - name: Reject a moved main branch or incomplete production contract
         run: |
@@ -72,10 +81,24 @@ jobs:
       - name: Verify exact delivery source
         run: pnpm check
 
+      - name: Verify Cloudflare production authority and resource identity
+        run: |
+          pnpm exec wrangler whoami --json | jq -e '.accounts | length > 0'
+          pnpm exec wrangler d1 info inkcre-extension-registry-production-v2 \
+            --config wrangler.jsonc \
+            --json | jq -e '.uuid == "af52114f-55b5-476f-b986-8ff8d8601d77"'
+          pnpm exec wrangler r2 bucket info inkcre-extension-registry-production-v2 \
+            --json | jq -e '.name == "inkcre-extension-registry-production-v2"'
+          pnpm exec wrangler deployments list \
+            --config wrangler.jsonc \
+            --json | jq -e 'type == "array"'
+
       - name: Apply native production schema
+        if: inputs.operation == 'deploy'
         run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 
       - name: Deploy exact Worker and bindings
+        if: inputs.operation == 'deploy'
         run: |
           uv run pywrangler deploy \
             --config wrangler.jsonc \
@@ -97,12 +120,18 @@ jobs:
       - name: Record production evidence
         run: |
           {
-            echo '## Extension Registry production delivery'
+            echo '## Extension Registry production authority'
             echo
             echo "- Source: \`$SOURCE_SHA\`"
+            echo "- Operation: \`${{ inputs.operation }}\`"
             echo "- Origin: $REGISTRY_ORIGIN"
             echo '- D1: inkcre-extension-registry-production-v2'
             echo '- R2: inkcre-extension-registry-production-v2'
-            echo '- Full repository contract, migration, deploy, and anonymous smoke: passed'
-            echo '- Previous Worker Versions and pre-cutover D1/R2: retained for rollback'
+            echo '- Full repository contract, authority verification, and anonymous smoke: passed'
+            if [ "${{ inputs.operation }}" = 'deploy' ]; then
+              echo '- Checked migration and exact Worker deployment: passed'
+            else
+              echo '- Remote mutation: none (verification only)'
+            fi
+            echo '- Rollback: previously verified compatible native-v2 Worker Version'
           } >> "$GITHUB_STEP_SUMMARY"
