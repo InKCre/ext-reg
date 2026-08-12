@@ -341,6 +341,9 @@ def test_pages_preview_cleanup_is_trusted_exact_and_tombstoned() -> None:
     assert ".Branch == $branch" in workflow
     assert ".Id != $keep" in workflow
     assert "pages deployment delete" in workflow
+    assert "for attempt in {1..12}" in workflow
+    assert "This pull-request preview is no longer active." in workflow
+    assert 'test "$verified" -eq 1' in workflow
     assert "actions/checkout" in workflow
     assert "github.event.pull_request.head.sha" not in workflow
     assert "createDeployment" not in workflow
