@@ -109,11 +109,26 @@ jobs:
           PREVIEW_URL: ${{ steps.tombstone.outputs.pages-deployment-alias-url }}
         run: |
           test -n "$PREVIEW_URL"
-          curl --fail --silent --show-error --retry 6 --retry-all-errors \
-            --dump-header .pages-preview-closed-headers \
-            "$PREVIEW_URL/" | grep -F 'This pull-request preview is no longer active.'
-          grep -i '^x-robots-tag: noindex, nofollow' .pages-preview-closed-headers
-          grep -i '^cache-control: no-store' .pages-preview-closed-headers
+          verified=0
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error \
+              --connect-timeout 5 \
+              --max-time 10 \
+              --dump-header .pages-preview-closed-headers \
+              --output .pages-preview-closed-body \
+              "$PREVIEW_URL/" &&
+              grep -Fq 'This pull-request preview is no longer active.' \
+                .pages-preview-closed-body &&
+              grep -iq '^x-robots-tag: noindex, nofollow' \
+                .pages-preview-closed-headers &&
+              grep -iq '^cache-control: no-store' \
+                .pages-preview-closed-headers; then
+              verified=1
+              break
+            fi
+            sleep 2
+          done
+          test "$verified" -eq 1
 
       - name: Delete older exact-branch deployments
         env:
