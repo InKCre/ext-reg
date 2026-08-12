@@ -6,6 +6,6 @@
     { "name": "inkcre/mail", "nickname": "Mail" },
     { "name": "inkcre/rss", "nickname": "RSS/Atom Feeds" },
     { "name": "inkcre/telegram", "nickname": "Telegram" },
-    { "name": "inkcre/twitter", "nickname": "Twitter" }
+    { "name": "inkcre/twitter", "nickname": "Twitter · Preview canary" }
   ]
 }
