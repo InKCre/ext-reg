@@ -2,13 +2,22 @@
 
 ## Outcome
 
-The setup-wizard source implementation is complete in two uncommitted task
-worktrees:
+The setup-wizard source implementation is complete in two task worktrees and
+published for review as Draft PRs:
 
 - Core: `feat/extension-setup-wizard-core` from
   `63f57b26ed8685fa34a74516ade39e2af72218d9`;
 - Client: `feat/extension-setup-wizard-web` from
   `4fdc0832316d4489b9204b321cbe65b2c5ccb2e8`.
+
+Review heads:
+
+- Core commit `e9bec66f8e42e19c8310cf7623bc17fbbcb2132f`,
+  https://github.com/InKCre/core-py/pull/52;
+- Client commit `5cde5f0685873d63d897299febe6f7c2b66a970f`,
+  https://github.com/InKCre/client-web/pull/68;
+- task packet initial commit `3fbb867aa6bdd00600bb811a97e22495b915707a`,
+  https://github.com/InKCre/ext-reg/pull/13.
 
 No ext-reg service source change was necessary. The Registry continues to own
 the Python wheel and Module Federation Distribution associations only.
@@ -124,10 +133,11 @@ temporary Registry response were removed. The source-revision Docker image was
 left as a normal reusable build cache, following the implementation plan; no
 broad Docker prune was run.
 
-Remaining actions require separate authority:
+Remaining actions:
 
-1. commit the Core and Client task diffs;
-2. push the two branches and open new PRs, with the Client PR depending on Core;
+1. let the three Draft PR check suites finish and address attributable failures;
+2. obtain Sir's review; do not mark ready, merge, publish or deploy merely
+   because checks pass;
 3. after Core admission, regenerate Client evidence against admitted Core before
    making Client merge-ready;
 4. run real-X/black-box acceptance only when Sir resumes that deferred gate;

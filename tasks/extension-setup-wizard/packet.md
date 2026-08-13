@@ -37,13 +37,18 @@
   final Core image through the configured SSH Docker provider. The public
   Registry still returns `404` for `inkcre/twitter@0.2.0`. The task-owned runtime,
   tunnel, volume, generated contract staging files and read-only probe output
-  were removed. No source was committed, pushed, published, deployed or merged.
+  were removed. The reviewed changes are committed and pushed in Draft Core
+  [PR #52](https://github.com/InKCre/core-py/pull/52), dependent Client
+  [PR #68](https://github.com/InKCre/client-web/pull/68), and this packet's
+  [ext-reg PR #13](https://github.com/InKCre/ext-reg/pull/13). Nothing was
+  published, deployed or merged.
 - **Delivery Boundary**: Black-box acceptance is deferred to Sir. Eventual
   implementation in this task stops when relevant PRs are ready for review; no
   merge, Release publication, deployment or black-box run is implied.
-- **Next Step**: Wait for Sir's
-  separate commit/push/PR authorization. Black-box provider acceptance remains
-  explicitly deferred to Sir; it is not silently converted into a local mock.
+- **Next Step**: Let repository checks finish and hand all three Draft PRs to
+  Sir for review. Client remains merge-blocked on Core admission and an exact
+  admitted-contract refresh. Black-box provider acceptance remains explicitly
+  deferred to Sir; it is not silently converted into a local mock.
 
 ## Supporting Material
 
