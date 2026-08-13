@@ -41,14 +41,22 @@
   [PR #52](https://github.com/InKCre/core-py/pull/52), dependent Client
   [PR #68](https://github.com/InKCre/client-web/pull/68), and this packet's
   [ext-reg PR #13](https://github.com/InKCre/ext-reg/pull/13). Nothing was
-  published, deployed or merged.
+  published, deployed or merged. Client #68 exposed a workflow-topology defect:
+  its intentional v3/stable-v2 Database contract failure also prevented the
+  otherwise-valid Web artifact and PR preview. Independent Client
+  [PR #69](https://github.com/InKCre/client-web/pull/69) splits `Database
+  contract` from `Workspace contract`; the trusted preview controller will
+  accept only a successful same-run Workspace job and exact live artifact,
+  while merge and production delivery retain the stronger full-check gates.
 - **Delivery Boundary**: Black-box acceptance is deferred to Sir. Eventual
   implementation in this task stops when relevant PRs are ready for review; no
   merge, Release publication, deployment or black-box run is implied.
-- **Next Step**: Let repository checks finish and hand all three Draft PRs to
-  Sir for review. Client remains merge-blocked on Core admission and an exact
-  admitted-contract refresh. Black-box provider acceptance remains explicitly
-  deferred to Sir; it is not silently converted into a local mock.
+- **Next Step**: Admit workflow PR #69 first and add `Database contract` to
+  Client `main` branch protection; then sync Client #68 with `main` so its
+  Workspace artifact can deploy a preview even while its Database check remains
+  merge-blocking. Client still needs Core admission and an exact admitted-
+  contract refresh before merge. Black-box provider acceptance remains
+  explicitly deferred to Sir; it is not silently converted into a local mock.
 
 ## Supporting Material
 

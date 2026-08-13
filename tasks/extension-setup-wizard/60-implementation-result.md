@@ -19,6 +19,13 @@ Review heads:
 - task packet initial commit `3fbb867aa6bdd00600bb811a97e22495b915707a`,
   https://github.com/InKCre/ext-reg/pull/13.
 
+Follow-up delivery correction:
+
+- Client workflow commit `07ec71b` is under review at
+  https://github.com/InKCre/client-web/pull/69. It separates the stable-Core
+  `Database contract` check from the preview-producing `Workspace contract`
+  without weakening production delivery or the intended merge gate.
+
 No ext-reg service source change was necessary. The Registry continues to own
 the Python wheel and Module Federation Distribution associations only.
 
@@ -135,11 +142,13 @@ broad Docker prune was run.
 
 Remaining actions:
 
-1. let the three Draft PR check suites finish and address attributable failures;
-2. obtain Sir's review; do not mark ready, merge, publish or deploy merely
+1. admit Client workflow PR #69, updating branch protection to require the new
+   `Database contract` context, then sync Client #68 with `main`;
+2. let the Draft PR check suites finish and address attributable failures;
+3. obtain Sir's review; do not mark ready, merge, publish or deploy merely
    because checks pass;
-3. after Core admission, regenerate Client evidence against admitted Core before
+4. after Core admission, regenerate Client evidence against admitted Core before
    making Client merge-ready;
-4. run real-X/black-box acceptance only when Sir resumes that deferred gate;
-5. publish `inkcre/twitter@0.2.0`, deploy or merge only under explicit later
+5. run real-X/black-box acceptance only when Sir resumes that deferred gate;
+6. publish `inkcre/twitter@0.2.0`, deploy or merge only under explicit later
    authorization.
