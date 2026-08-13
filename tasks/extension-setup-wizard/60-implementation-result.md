@@ -12,19 +12,24 @@ published for review as Draft PRs:
 
 Review heads:
 
-- Core commit `e9bec66f8e42e19c8310cf7623bc17fbbcb2132f`,
+- Core commit `9f779b2`,
   https://github.com/InKCre/core-py/pull/52;
-- Client commit `5cde5f0685873d63d897299febe6f7c2b66a970f`,
+- Client commit `f25e684`,
   https://github.com/InKCre/client-web/pull/68;
 - task packet initial commit `3fbb867aa6bdd00600bb811a97e22495b915707a`,
   https://github.com/InKCre/ext-reg/pull/13.
 
-Follow-up delivery correction:
+Admitted preview-controller corrections:
 
-- Client workflow commit `07ec71b` is under review at
-  https://github.com/InKCre/client-web/pull/69. It separates the stable-Core
+- Client [PR #69](https://github.com/InKCre/client-web/pull/69) was merged as
+  `be2198f`. It separates the stable-Core
   `Database contract` check from the preview-producing `Workspace contract`
-  without weakening production delivery or the intended merge gate.
+  without weakening production delivery or the intended merge gate, and it
+  serves the exact checked Twitter Module Federation snapshot plus a read-only
+  exact Release descriptor from the same PR preview origin.
+- Core [PR #53](https://github.com/InKCre/core-py/pull/53) was merged as
+  `22f3f40`. A Core PR preview now includes both Core API and PostgREST apps on
+  the same isolated Neon branch and JWT trust boundary.
 
 No ext-reg service source change was necessary. The Registry continues to own
 the Python wheel and Module Federation Distribution associations only.
@@ -101,7 +106,7 @@ Client:
 ```text
 pnpm check
   format/lint/type checks: passed
-  Vitest: 21 files, 88 tests passed
+  Vitest: 21 files, 90 tests passed
   all workspace builds and package contract: passed
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
   passed
@@ -132,6 +137,35 @@ GET https://registry.inkcre.dev/v1/extensions/inkcre/twitter/releases/0.2.0
 404 {"detail":"public Release does not exist"}
 ```
 
+## Preview Acceptance Evidence
+
+The bounded black-box gate requested after implementation is now complete:
+
+- Client PR #68 preview:
+  `https://preview-client-web-pr-68.inkcre-client-web.pages.dev`;
+- Core PR #52 API preview:
+  `https://inkcre-core-py-pr-52-5989d607b441.herokuapp.com`;
+- Core PR #52 PostgREST preview:
+  `https://inkcre-postgrest-pr-52-0c434df03cac.herokuapp.com`;
+- the isolated preview database contains `inkcre/twitter@0.2.0`, enabled for
+  the preview Web Peer;
+- the Client preview's same-origin exact Release and native
+  `mf-manifest.json` both return successfully;
+- a cold browser load restores and activates the Twitter Remote, renders the
+  card action as `Set Up`, and opens `Set Up Twitter` with the four steps
+  `Prepare`, `Connect account`, `Bookmark Source`, and `Review and start`.
+
+The final cold-start defect was a UI/runtime ordering race: the Extensions view
+could render before the app shell completed the initial Web Extension Host
+restore. Client commit `f25e684` makes both callers share one startup Promise
+and waits for that restore before listing cards. The full Client contract and
+the live PR preview both passed after the correction.
+
+The Client PR's independent `Database contract` check still fails against the
+admitted stable Core v2 contract. That is intentional evidence that #68 cannot
+merge before Core #52 is admitted and the generated Client contract is
+refreshed; it no longer prevents the review Preview from deploying.
+
 ## Cleanup and Handoff
 
 The task-owned Core Compose project, PostgreSQL volume, SSH tunnel/control
@@ -142,13 +176,10 @@ broad Docker prune was run.
 
 Remaining actions:
 
-1. admit Client workflow PR #69, updating branch protection to require the new
-   `Database contract` context, then sync Client #68 with `main`;
-2. let the Draft PR check suites finish and address attributable failures;
-3. obtain Sir's review; do not mark ready, merge, publish or deploy merely
-   because checks pass;
-4. after Core admission, regenerate Client evidence against admitted Core before
-   making Client merge-ready;
-5. run real-X/black-box acceptance only when Sir resumes that deferred gate;
-6. publish `inkcre/twitter@0.2.0`, deploy or merge only under explicit later
-   authorization.
+1. Sir continues the wizard/provider acceptance from the live PR preview;
+2. obtain Sir's review; do not merge Core #52 or Client #68 merely because the
+   bounded entry-point acceptance passed;
+3. after Core admission, regenerate Client evidence against admitted Core and
+   satisfy the independent `Database contract` gate before Client admission;
+4. publish `inkcre/twitter@0.2.0` and perform final delivery only under explicit
+   later authorization.

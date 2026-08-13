@@ -32,31 +32,33 @@
   Python `0.2.0`. The Client branch now carries Web Host setup contribution,
   popup teardown, abort-safe Peer requests, the four-step Twitter wizard, synced
   v3 generated contract, `@inkcre/core` `0.1.1` and Twitter Web `0.2.0`. Core's
-  full contract is green with 241 tests; Client's full contract is green with 88
-  tests and all builds. Client contract sync/check passed against a task-built
+  full contract is green; Client's full contract is green with 90 tests and all
+  builds. Client contract sync/check passed against a task-built
   final Core image through the configured SSH Docker provider. The public
   Registry still returns `404` for `inkcre/twitter@0.2.0`. The task-owned runtime,
   tunnel, volume, generated contract staging files and read-only probe output
   were removed. The reviewed changes are committed and pushed in Draft Core
   [PR #52](https://github.com/InKCre/core-py/pull/52), dependent Client
   [PR #68](https://github.com/InKCre/client-web/pull/68), and this packet's
-  [ext-reg PR #13](https://github.com/InKCre/ext-reg/pull/13). Nothing was
-  published, deployed or merged. Client #68 exposed a workflow-topology defect:
-  its intentional v3/stable-v2 Database contract failure also prevented the
-  otherwise-valid Web artifact and PR preview. Independent Client
-  [PR #69](https://github.com/InKCre/client-web/pull/69) splits `Database
-  contract` from `Workspace contract`; the trusted preview controller will
-  accept only a successful same-run Workspace job and exact live artifact,
-  while merge and production delivery retain the stronger full-check gates.
-- **Delivery Boundary**: Black-box acceptance is deferred to Sir. Eventual
-  implementation in this task stops when relevant PRs are ready for review; no
-  merge, Release publication, deployment or black-box run is implied.
-- **Next Step**: Admit workflow PR #69 first and add `Database contract` to
-  Client `main` branch protection; then sync Client #68 with `main` so its
-  Workspace artifact can deploy a preview even while its Database check remains
-  merge-blocking. Client still needs Core admission and an exact admitted-
-  contract refresh before merge. Black-box provider acceptance remains
-  explicitly deferred to Sir; it is not silently converted into a local mock.
+  [ext-reg PR #13](https://github.com/InKCre/ext-reg/pull/13). Preview-controller
+  Client [PR #69](https://github.com/InKCre/client-web/pull/69) and Core
+  [PR #53](https://github.com/InKCre/core-py/pull/53) were admitted. Their
+  resulting topology gives Client #68 an exact checked-artifact Pages preview
+  and Core #52 isolated Core/PostgREST preview apps. The preview database is
+  seeded with enabled `inkcre/twitter@0.2.0`; a cold browser load restores the
+  Twitter Remote, renders `Set Up`, and opens the four-step `Set Up Twitter`
+  dialog. Client commit `f25e684` fixed the discovered startup/list ordering
+  race. The independent v3/stable-v2 `Database contract` failure remains a
+  deliberate merge blocker but no longer blocks Preview deployment.
+- **Delivery Boundary**: The bounded black-box gate through visible Setup Wizard
+  entry is complete. Provider OAuth and subsequent wizard acceptance now pass
+  to Sir. Core #52 and Client #68 remain unmerged; no public Twitter Release or
+  production delivery is implied by the preview.
+- **Next Step**: Sir continues the setup/provider acceptance from
+  `https://preview-client-web-pr-68.inkcre-client-web.pages.dev/extensions`.
+  After review, admit Core #52 before refreshing Client #68's generated database
+  contract; only then can the independent Database contract gate become green
+  and Client admission proceed.
 
 ## Supporting Material
 
