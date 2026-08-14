@@ -14,7 +14,8 @@ Review heads:
 
 - Core commit `9f779b2`,
   https://github.com/InKCre/core-py/pull/52;
-- Client commit `f25e684`,
+- Client implementation commit `f25e684` plus the Client-management follow-up
+  commit `e1ee0e3`,
   https://github.com/InKCre/client-web/pull/68;
 - task packet initial commit `3fbb867aa6bdd00600bb811a97e22495b915707a`,
   https://github.com/InKCre/ext-reg/pull/13.
@@ -165,6 +166,39 @@ The Client PR's independent `Database contract` check still fails against the
 admitted stable Core v2 contract. That is intentional evidence that #68 cannot
 merge before Core #52 is admitted and the generated Client contract is
 refreshed; it no longer prevents the review Preview from deploying.
+
+The Client-management follow-up was accepted against the same preview on
+2026-08-14:
+
+- Client checks run `31786048471` consumed exact head
+  `e1ee0e3102c308ad4a93b7211f870f123d406f5c`; `Workspace contract`, action
+  syntax, dependency review, TypeScript shadow checks and client-webext E2E
+  passed;
+- Pages preview run `31786198325` resolved that exact internal PR head,
+  downloaded its checked Web and Twitter artifacts, reverified the PR identity
+  before delivery and deployed Cloudflare Pages deployment
+  `5dd8bc7e-4019-49a4-8050-ceca424368e3`;
+- the stable preview alias and its read-only `inkcre/twitter@0.2.0` exact
+  Release and native `mf-manifest.json` all returned `200`; the Release declared
+  `@inkcre/core >=0.1.1 <0.2.0`, while the manifest used the same-origin
+  immutable preview asset prefix and exposed two modules;
+- the restored Settings page showed both this-browser configuration (including
+  Extension Registry URL) and all deployment Clients;
+- the Extensions selector listed every registered Client, defaulted to this
+  browser and projected another unaddressable Web Client as `OFF` with the
+  explicit desired-state warning;
+- through the UI, the sole enabled current Web Client was disabled,
+  `inkcre/twitter` was changed from `0.1.1` to `0.2.0`, and the current Web
+  Client was enabled again against the read-only preview Release;
+- a subsequent cold reload restored `twitter@0.2.0`, rendered `Set Up`, and
+  opened the four-step `Set Up Twitter` dialog; selecting the disabled remote
+  Web Client changed its switch projection to `OFF` without hiding `Set Up`.
+
+The `client-web E2E` failure in the same source workflow is the same admitted
+baseline split as the independent database-contract failure: those tests ask
+the stable Core image for the former `clients` relation and receive `404`, while
+this PR intentionally remains on the pre-Peer Client contract until Core #52 is
+admitted. It did not weaken or bypass the preview artifact gate.
 
 ## Cleanup and Handoff
 

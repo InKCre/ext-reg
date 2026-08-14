@@ -2,9 +2,10 @@
 
 ## Status
 
-Source implementation is complete and locally verified on the Client PR #68
-branch. Core, Registry, database-contract, commit, push and remote delivery
-remain out of scope.
+Implementation, review fixes, commit, push and bounded PR-preview acceptance are
+complete on Client PR #68. The exact source head is `e1ee0e3`; no Core,
+Registry-service or database-contract source changed in this follow-up, and no
+PR was merged.
 
 ## Acceptance Finding
 
@@ -188,3 +189,19 @@ Verification:
 - `pnpm lint:type-aware` still reports only pre-existing diagnostics in unchanged
   generated/core/runtime files; none is in this follow-up's source;
 - `git diff --check`: passed.
+
+Preview acceptance:
+
+- Pages preview workflow run `31786198325`: passed, using the exact checked
+  artifact from Client workflow run `31786048471` at `e1ee0e3`;
+- stable preview URL:
+  `https://preview-client-web-pr-68.inkcre-client-web.pages.dev`;
+- Settings exposed this-browser Registry configuration and the restored
+  deployment-wide Client list;
+- the selector exposed every registered Client and the no-endpoint Web Client
+  displayed desired-state semantics;
+- UI migration `twitter@0.1.1 ON -> OFF -> 0.2.0 -> ON` completed against the
+  preview's read-only native Release;
+- cold restore rendered `Set Up`; the four-step wizard opened; selecting the
+  disabled remote Web Client retained the setup entry while projecting that
+  selected Client as `OFF`.
