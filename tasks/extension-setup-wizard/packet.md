@@ -49,16 +49,27 @@
   Twitter Remote, renders `Set Up`, and opens the four-step `Set Up Twitter`
   dialog. Client commit `f25e684` fixed the discovered startup/list ordering
   race. The independent v3/stable-v2 `Database contract` failure remains a
-  deliberate merge blocker but no longer blocks Preview deployment.
+  deliberate merge blocker but no longer blocks Preview deployment. Continued
+  acceptance exposed two older Client regressions: the Extensions page no
+  longer selects and controls a specific Client, and Settings no longer renders
+  its existing all-Client management list. The current acceptance database
+  reports an Extension enabled on one Client; the UI does not identify it, and
+  the current Web Client was previously enabled during acceptance, so it must
+  not be assumed to be Core. The authorized follow-up implementation is now
+  complete locally: Client selection and three-path enablement dispatch are
+  restored, setup remains current-Web-runtime scoped, and Settings again manages
+  all registered Clients. The final full repository gate is green.
 - **Delivery Boundary**: The bounded black-box gate through visible Setup Wizard
-  entry is complete. Provider OAuth and subsequent wizard acceptance now pass
-  to Sir. Core #52 and Client #68 remain unmerged; no public Twitter Release or
-  production delivery is implied by the preview.
-- **Next Step**: Sir continues the setup/provider acceptance from
-  `https://preview-client-web-pr-68.inkcre-client-web.pages.dev/extensions`.
-  After review, admit Core #52 before refreshing Client #68's generated database
-  contract; only then can the independent Database contract gate become green
-  and Client admission proceed.
+  entry is complete. Provider OAuth acceptance is paused while the Client
+  selector and all-Client settings regression are reviewed. Core #52 and Client
+  #68 remain unmerged; no public Twitter Release or production delivery is
+  implied by the preview.
+- **Next Step**: Review the completed
+  [Client selector and Client Settings follow-up](70-client-selector-and-settings-follow-up.md).
+  Commit/push and preview delivery still require separate authorization. After
+  this follow-up and provider review, admit Core #52 before refreshing Client #68's generated
+  database contract; only then can the independent Database contract gate
+  become green and Client admission proceed.
 
 ## Supporting Material
 
@@ -80,4 +91,5 @@
 - [Implementation plan](40-implementation-plan.md)
 - [Implementation readiness review](50-readiness-review.md)
 - [Implementation result](60-implementation-result.md)
+- [Client selector and Client Settings follow-up](70-client-selector-and-settings-follow-up.md)
 - [Decision and question log](30-decisions-and-questions.md)

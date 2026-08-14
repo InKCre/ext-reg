@@ -183,3 +183,26 @@ Remaining actions:
    satisfy the independent `Database contract` gate before Client admission;
 4. publish `inkcre/twitter@0.2.0` and perform final delivery only under explicit
    later authorization.
+
+## Client Selector and Settings Follow-up
+
+Continued acceptance exposed that the native-Distribution cutover had removed
+the former Extensions-page Client selector and that an earlier Settings
+refactor had orphaned the all-Client management components. The authorized
+follow-up restores both without changing the canonical Extension row or Host
+contracts:
+
+- the selected Client controls the card switch;
+- this browser uses the local Web Host lifecycle;
+- an addressable Client uses its generic Extension Host API;
+- an unaddressable Client uses the existing atomic state-port RPC as durable
+  desired state, with an explicit warning that a running remote process cannot
+  be synchronously stopped;
+- setup availability remains a contribution of this browser's running Web
+  Distribution rather than the selected Client's switch state;
+- Settings again lists and edits all registered Clients beneath a separate
+  deployment scope.
+
+The restored Client card also replaces its historical nonexistent inline-input
+`confirm` event with an explicit, schema-validated update of an existing Client.
+No create/delete lifecycle was added.

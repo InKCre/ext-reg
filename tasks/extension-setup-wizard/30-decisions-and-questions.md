@@ -285,6 +285,32 @@ to Core's authority. The wizard, projection, OAuth transaction protocol, Source
 composition and readiness commands remain jointly owned by Twitter's Web and
 Core Distributions.
 
+### D027 — Selected-Client enablement control — Accepted
+
+Restore the Extensions-page Client selector as an application-level management
+surface. The card switch projects the selected Client's membership in the
+canonical `extensions.enabled[]`: this browser Client is controlled through the
+local Web Host SDK; an addressable remote Client is controlled through its
+generic Host enable/disable API; an unaddressable remote Client is controlled
+as durable desired state through the existing atomic state-port RPC. This
+desired-state path applies to every unaddressable Client without an additional
+type/label restriction. Its running process cannot be synchronously stopped,
+and the UI must say that the change is realized on its next restore/reload. No
+direct `enabled[]` edit is allowed.
+
+### D028 — Setup availability is not selector state — Accepted
+
+The selected Client controls only enablement. Whole-Extension setup remains a
+contribution of the currently running Web Distribution. Selecting Core or any
+other Client must not hide a setup contribution already loaded by this browser.
+
+### D029 — Restore all-Client Settings management — Accepted
+
+Restore the existing Client list in Settings beneath a separate all-deployment
+Clients section. This follow-up manages existing Client metadata, REST API URL,
+health and declared config; it does not introduce manual Client creation or
+deletion.
+
 ### Q010 — What is the minimum production-shaped vertical slice? — Resolved
 
 [Minimum Vertical Slice and Black-box Acceptance Proposal](27-vertical-slice-and-acceptance.md).
