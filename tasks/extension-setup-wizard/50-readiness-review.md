@@ -152,8 +152,8 @@ questions:
   existing account remains.
 - Registry/Core may be unavailable: wizard reports operational unavailability
   and leaves durable config/state/Sources unchanged.
-- First collection may fail: Finish returns the accepted job; an explicit retry
-  may create a new job only after the prior one is failed.
+- First collection may fail: Finish can be retried and may enqueue another Job.
+  That duplicate is acceptable; durable authorization guards provider work.
 - English-only first-slice copy is accepted as a presentation limitation rather
   than introducing a cross-Remote localization contract.
 - The trusted generic PostgREST/config API can still bypass Twitter's semantic

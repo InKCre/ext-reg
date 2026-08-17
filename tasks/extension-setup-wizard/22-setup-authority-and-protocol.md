@@ -100,10 +100,11 @@ routes and payload schemas are closed in
    projection: pending, succeeded, failed or expired.
 5. **Disconnect/reconnect account** — explicitly clear or replace account state;
    reconfiguration never silently overwrites a working account.
-6. **Create or select bookmark Source** — compose the Source authority
-   idempotently and avoid duplicates on retry/reopen.
-7. **Finish and start** — validate deployment facts and enqueue the initial
-   collection job idempotently, returning the job reference and readiness.
+6. **Create or select bookmark Source** — compose the Source authority through
+   its ordinary create/select operations; the Web UI prevents normal duplicate
+   submission.
+7. **Finish and start** — validate deployment facts and enqueue an initial
+   collection job, returning readiness. Rare duplicate Jobs are acceptable.
 
 One reachable enabled Core Peer processes a command, but the command mutates
 deployment-wide config, state and Source authorities. It is a transport

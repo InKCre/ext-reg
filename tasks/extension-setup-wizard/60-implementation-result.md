@@ -51,9 +51,9 @@ the Python wheel and Module Federation Distribution associations only.
 - Made provider token refresh conditional on the exact prior durable token;
   provider OAuth/401 rejection marks that authorization as requiring reconnect
   without erasing the account or its Sources.
-- Made Finish reuse or create the exact non-failed initial collection job under
-  Source-owned PostgreSQL serialization, so retries and concurrent Core Peers do
-  not create duplicate starts.
+- The earlier implementation serialized and deduplicated initial collection.
+  D030 supersedes that choice: current reconstruction uses ordinary Source
+  creation and Cron run-now, accepting rare duplicate work for better ROI.
 - Advanced Core Host SDK to `0.1.1` and the Twitter Python wheel to `0.2.0`.
 - Preserved Source authority: uninstall does not inspect/delete Sources, while a
   deleted formerly selected Source makes setup incomplete instead of producing

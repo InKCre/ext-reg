@@ -45,10 +45,9 @@ enabled and no Core Peer enabled:
    deployment state; the account is not owned by the callback Peer.
 6. The user reuses or creates one bookmark Source, chooses its user-facing
    schedule/options, reviews the result and explicitly finishes.
-7. Finish is idempotent, accepts or reuses the initial collection job, and the
-   first bounded collection records at least one bookmark through the ordinary
-   Source pipeline. Reopening setup reports the Extension as ready from durable
-   facts.
+7. Finish enqueues the initial collection job, and the first bounded collection
+   records at least one bookmark through the ordinary Source pipeline. Reopening
+   setup reports the Extension as ready from durable account/Source/Cron facts.
 
 ## Required Behavioral Coverage
 
@@ -59,8 +58,9 @@ enabled and no Core Peer enabled:
 - A failed reconnect leaves an existing working account untouched.
 - Core unavailability leaves config, state and Source facts unchanged and makes
   readiness temporarily unavailable rather than incomplete.
-- Repeating Source creation or Finish does not create duplicate default Sources
-  or duplicate initial jobs.
+- The Web UI disables Source creation and Finish while their request is pending.
+  Rare duplicate Source rows or initial Jobs are acceptable and recoverable in
+  this single-user product.
 - Disabling/re-enabling either Peer preserves deployment setup facts; disabling
   Web only removes the local entry, while disabling Core removes that command
   endpoint.

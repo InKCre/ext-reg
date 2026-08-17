@@ -25,51 +25,58 @@
   card entry -> popup wizard -> OAuth App configuration -> durable account OAuth
   -> required initial resources -> Extension readiness -> restart/resume, with
   no false "complete" state.
-- **Current Truth**: Product design, HLD and authorized local implementation are
-  complete. The Core branch now carries contract v3, deployment-wide
-  `extensions.state`, typed Host config/state operations, exact public callback
-  lifecycle, Authlib Twitter OAuth, Bookmark Source/Finish behavior and Twitter
-  Python `0.2.0`. The Client branch now carries Web Host setup contribution,
-  popup teardown, abort-safe Peer requests, the four-step Twitter wizard, synced
-  v3 generated contract, `@inkcre/core` `0.1.1` and Twitter Web `0.2.0`. Core's
-  full contract is green; Client's full contract is green with 90 tests and all
-  builds. Client contract sync/check passed against a task-built
-  final Core image through the configured SSH Docker provider. The public
-  Registry still returns `404` for `inkcre/twitter@0.2.0`. The task-owned runtime,
-  tunnel, volume, generated contract staging files and read-only probe output
-  were removed. The reviewed changes are committed and pushed in Draft Core
-  [PR #52](https://github.com/InKCre/core-py/pull/52), dependent Client
-  [PR #68](https://github.com/InKCre/client-web/pull/68), and this packet's
-  [ext-reg PR #13](https://github.com/InKCre/ext-reg/pull/13). Preview-controller
-  Client [PR #69](https://github.com/InKCre/client-web/pull/69) and Core
-  [PR #53](https://github.com/InKCre/core-py/pull/53) were admitted. Their
-  resulting topology gives Client #68 an exact checked-artifact Pages preview
-  and Core #52 isolated Core/PostgREST preview apps. The preview database is
-  seeded with enabled `inkcre/twitter@0.2.0`; a cold browser load restores the
-  Twitter Remote, renders `Set Up`, and opens the four-step `Set Up Twitter`
-  dialog. Client commit `f25e684` fixed the discovered startup/list ordering
-  race. The independent v3/stable-v2 `Database contract` failure remains a
-  deliberate merge blocker but no longer blocks Preview deployment. Continued
-  acceptance exposed two older Client regressions: the Extensions page no
-  longer selects and controls a specific Client, and Settings no longer renders
-  its existing all-Client management list. The current acceptance database
-  reports an Extension enabled on one Client; the UI does not identify it, and
-  the current Web Client was previously enabled during acceptance, so it must
-  not be assumed to be Core. The authorized follow-up implementation is now
-  complete locally: Client selection and three-path enablement dispatch are
-  restored, setup remains current-Web-runtime scoped, and Settings again manages
-  all registered Clients. The final full repository gate is green.
-- **Delivery Boundary**: The bounded black-box gate through visible Setup Wizard
-  entry is complete. Provider OAuth acceptance is paused while the Client
-  selector and all-Client settings regression are reviewed. Core #52 and Client
-  #68 remain unmerged; no public Twitter Release or production delivery is
-  implied by the preview.
-- **Next Step**: Review the completed
-  [Client selector and Client Settings follow-up](70-client-selector-and-settings-follow-up.md).
-  Commit/push and preview delivery still require separate authorization. After
-  this follow-up and provider review, admit Core #52 before refreshing Client #68's generated
-  database contract; only then can the independent Database contract gate
-  become green and Client admission proceed.
+- **Current Truth**: Product design and the setup/OAuth/Extension-state boundary
+  remain accepted. Old-baseline Core PR
+  [#52](https://github.com/InKCre/core-py/pull/52) and Client PR
+  [#68](https://github.com/InKCre/client-web/pull/68) proved the four-step wizard
+  and reached a visible setup popup in preview, but they are not mergeable
+  upstream truth. Core main has since admitted the hard Client-to-Peer cutover,
+  deployment config, capability advertisement and new Source/Cron/Job runtime;
+  PR #52 lacks those surfaces. Client main still carries stale generated
+  Client-domain projection and PR #68 builds its selector/settings/setup
+  transport on `Client.list()` and `rest_api_url`. The local always-available
+  Twitter Close correction is valid. The local Client-aware Registry-origin
+  correction proved the one-operation snapshot requirement but its authority
+  source is obsolete. Both source PRs now require the Peer-native reconstruction
+  in D029 before further preview acceptance or merge review.
+- **Latest Preview Findings**: Twitter's setup contribution emits the correct
+  close event but exposes its Close action only on the final step; the accepted
+  correction is an always-available Twitter-owned action, with no Host button
+  and no new regression test. Core #52 also freezes the Registry origin from
+  process settings. The first local correction read the old current Client, but
+  that implementation is now superseded by the admitted Peer baseline:
+  `executing Core Peer override > deployment config > process fallback`, with
+  one origin snapshot for Release and wheel consumption.
+- **Latest Implementation Result**: Sir authorized the Peer-native source batch.
+  Core and Client now have uncommitted reconstruction worktrees; the accepted
+  setup/state/Peer behavior is implemented and both repositories' full local
+  checks are green. Generic Web management reads no longer fetch secret-bearing
+  Extension state, and reconfiguration/disconnect disarms setup-owned bookmark
+  collection without deleting Source-domain records. Exact Client
+  generated-contract sync still requires an exact Core feature image because
+  the pinned generator needs an unavailable container runtime; this remains the
+  declared dependent-PR admission gate. The latest Impact Handshake removed the
+  unnecessary `register_peer` RPC/D7 migration in favor of a runtime-field-only
+  Web upsert, and simplified Source/Cron/Job setup for the single-user happy path:
+  ordinary Source create, explicit Cron create/update, and non-deduplicating
+  run-now. See
+  [Peer-native implementation progress](73-peer-native-implementation-progress.md).
+- **Preview Controller Resolution**: Core PR #52 run `31774435213` exposed a
+  baseline mismatch, not a controller compatibility requirement. The old PR
+  branch lacks the admitted Peer implementation and delivery script while Core
+  main owns both. PR #62's legacy-image fallback is rejected. Reconstruct Core
+  #52 from current main, port setup to Peer-native contracts, then migrate
+  Client #68 to the exact generated Peer contract and capability transport.
+- **Delivery Boundary**: Previous preview evidence remains useful but no longer
+  proves merge readiness. Black-box acceptance is paused until Peer-native Core
+  #52 and dependent Client #68 pass their exact contracts and previews. No
+  public Twitter Release, production delivery, PR merge or PR #62 closure is
+  implied.
+- **Next Step**: Under separate commit/push authority, create the exact Core
+  feature image, sync the Client generated truth, remove the narrow temporary
+  type seam and rerun the already-green Client contract before merge. Commit,
+  force-with-lease push, ordinary push, PR closure and preview delivery remain
+  separately authorized operations.
 
 ## Supporting Material
 
@@ -92,4 +99,7 @@
 - [Implementation readiness review](50-readiness-review.md)
 - [Implementation result](60-implementation-result.md)
 - [Client selector and Client Settings follow-up](70-client-selector-and-settings-follow-up.md)
+- [Preview acceptance follow-up](71-preview-acceptance-follow-up.md)
+- [Peer-native PR reconstruction](72-peer-native-pr-reconstruction.md)
+- [Peer-native implementation progress](73-peer-native-implementation-progress.md)
 - [Decision and question log](30-decisions-and-questions.md)

@@ -19,10 +19,10 @@ pre-implementation plan rather than being rewritten into a retrospective.
   Source rows/jobs; each Host owns runtime lifecycle; Twitter owns setup/OAuth.
 - **Consumer impact**: Core database contract advances to v3; Core and Web Host
   SDKs become `0.1.1`; Twitter becomes one cross-format `0.2.0` Release.
-- **Failure posture**: all durable commands are retryable/conditional; callback,
-  refresh and Source failures preserve prior authoritative facts; a claimed
-  one-use OAuth code is never falsely treated as lease-recoverable; no hidden
-  rollback/deploy action is added.
+- **Failure posture**: callback and token refresh keep their required conditional
+  semantics. Ordinary Source/Cron/Job commands optimize the single-user happy
+  path; UI pending state handles normal double-submit and rare duplicate work is
+  accepted rather than buying a new idempotency subsystem.
 - **Delivery boundary**: two new PRs ready for review; no merge, publication,
   deployment or black-box acceptance.
 
@@ -87,16 +87,15 @@ On the same Core branch:
 4. Declare the exact public callback and implement standalone bounded responses.
 5. Add setup projection, OAuth App, begin/poll/disconnect, bookmark Source and
    Finish endpoints.
-6. Add Source-domain `ensure_exists` and initial-job operations in Core's
-   existing Source manager/job manager; ensure a default exists without imposing
-   a one-Source-per-type invariant, and do not make Twitter own database
-   concurrency.
+6. Reuse `SourceManager.create()`, add explicit `CronManager.create/update()`
+   operations, and use the existing `CronManager.run_now()` for Finish. Do not
+   add setup idempotency keys, advisory locks or Job deduplication.
 7. Fix empty-bookmark collection and restore each bounded official API operation
    from fresh durable config/state in a newly closed Authlib client; do not retain
    an official cross-operation singleton. Keep Twikit outside the setup UI and
    retain its local session only while its fresh config binding matches.
 8. Give every successful account authorization an opaque `authorization_id`;
-   bind Finish's initial job config and readiness to that ID, and fail the job
+   bind Finish's Cron/initial Job config and readiness to that ID, and fail the job
    before provider work if reconnect raced with Finish. Then update Twitter/Core
    tests and wheel metadata/entry-point probes.
 
@@ -106,7 +105,7 @@ Verification for this batch:
 injected Authlib transport/time/random focused tests
 restart/replay/overlapping-flow/conditional refresh, cross-Peer freshness and redaction tests
 per-operation official client close and Twikit config-cache replacement tests
-real PostgreSQL Source ensure/Finish idempotency and current-account job tests
+real PostgreSQL Source/Cron operations and current-account job tests
 Twitter Source empty-result/first-job tests
 build and verify all six first-party wheels
 load/start/close Twitter wheel from site-packages
@@ -228,7 +227,7 @@ readability, but it must remain within these owned surfaces.
 | Host state API | `app/business/extension/main.py`, `runtime.py`, package exports/routes | existing `tests/test_extension_registry_runtime.py` plus typed-state and cross-Peer config freshness cases |
 | Public callback | new `app/business/extension/public_http.py`, `runtime.py`, `app/middleware.py` | new `tests/test_extension_public_http.py`, `tests/test_jwt_contract.py`, logging tests |
 | Twitter setup | `extensions/twitter/{__init__,api,schema,bookmark}.py` plus a focused setup/OAuth module | `tests/extensions/test_twitter.py` and new setup-focused tests |
-| Source ensure/Finish | `app/business/source/main.py`, `collect_job.py` | `tests/test_extension_source_lifecycle.py`, Twitter setup tests |
+| Source/Cron/Finish | `app/business/{source/main,cron}.py`, Twitter setup flow | Source/Cron operation and Twitter setup tests |
 | Versions/dependencies | root and Twitter `pyproject.toml`, `pdm.lock`, `app/version.py` | `tests/test_extension_distribution.py`, six-wheel probe |
 | Generated/durable truth | migration integrity, deployment profile, schema/OpenAPI and nearest guidance | migration/schema/deployment-profile checks |
 

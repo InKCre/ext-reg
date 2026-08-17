@@ -30,8 +30,8 @@ Command response contract:
 | Begin OAuth | `201` transaction reference/URL | `409` prerequisite missing, `503` transient provider preparation |
 | Poll transaction | `200` bounded transaction projection | `404` unknown/pruned transaction |
 | Disconnect | `204` | idempotent when already disconnected |
-| Ensure bookmark Source | `200` `{source, created}` | `409` account/runtime prerequisite, `422` invalid schedule |
-| Finish | `200` `{job, created}` | `409` readiness/source mismatch |
+| Configure bookmark Source | `200` refreshed projection | `409` account/runtime prerequisite, `422` invalid schedule |
+| Finish | `200` refreshed projection | `409` readiness/source mismatch |
 
 All authenticated error responses use the existing Core JSON error contract and
 bounded messages. The public callback renders fixed HTML: `200` for success,
@@ -85,12 +85,11 @@ the selected Core's configured public `CLIENT_BASE_URL`; a missing/non-public
 value is an explicit Prepare blocker.
 
 Readiness is fact-derived. `ready` requires a configured current App, a
-restorable connected account bound to it, at least one eligible bookmark Source
-with a non-null schedule, and at least one accepted non-failed collection job
-for that Source whose config carries the current account's `authorization_id`.
-Before the last condition, the Web flow may show Review/Start while readiness
-remains `incomplete` with `initial_collection_not_started`. Provider/Core availability
-problems are `temporarily_unavailable`; they do not erase durable facts.
+restorable connected account bound to it, one selected eligible bookmark Source
+and an enabled Cron whose Job template carries the current account's
+`authorization_id`. Finish enqueues an initial Job after establishing those
+facts, but Job history is not a second readiness authority. Provider/Core
+availability problems are `temporarily_unavailable`; they do not erase durable facts.
 The GET projection itself performs no X network call. Begin/callback and Finish
 are the bounded operational checks; ordinary collection remains responsible for
 later provider failures.
@@ -261,53 +260,41 @@ first release supports one initial bookmark Source:
 
 - list/reuse every existing `extensions.twitter.bookmark.Source` in the setup
   projection;
-- if none exists, Core's Source authority performs an advisory-lock-backed
-  `ensure_exists(type, nickname, collect_at)` and returns the created or
-  race-winning existing row;
-- concurrent/retried requests return the same existing row instead of creating
-  duplicate defaults;
-- when `source_id` is supplied, the user is explicitly editing that validated
-  Twitter bookmark Source's nickname/schedule through the Source authority;
-- a race-returned existing Source is not silently renamed or rescheduled, so
-  the projection may ask the user to confirm/update it before Finish.
+- if the user chooses Create, Core's existing `SourceManager.create()` creates
+  one ordinary Source row;
+- the Web UI disables the action while the request is pending; rare duplicate
+  Source rows are acceptable and remain manageable through the Sources surface;
+- when `source_id` is supplied, the command validates and selects that existing
+  Twitter bookmark Source without editing it;
+- selecting an existing Source does not silently rename it.
 
-Creating or editing the selected Source also refreshes that Source's scheduler
-entry in the current Core process after the durable commit. A scheduler failure
-does not roll back or delete the Source row; the projection reports temporary
-runtime unavailability, and a retry/bootstrap rebuilds scheduling from the
-durable Source authority.
+Configuring the selection creates or updates one disabled Cron template. Finish
+enables that template and enqueues a Job. A Cron failure does not roll back or
+delete the Source row.
 
 No newest-versus-history option is exposed in this release. The first job uses
 the current bounded `full=false, result_limit=40` behavior. The bookmark
 collector is corrected to handle an empty provider result without indexing the
 first tweet.
 
-`POST /twitter/setup/finish` accepts one Source ID. It validates the current
-account and Source type, performs one bounded authenticated `/2/users/me`
-check through the restorable client, then asks the Source job authority to return an
-existing pending/running/finished job or create one pending job under a
-serialized Source-domain operation. If only failed jobs exist, an explicit
-Finish retry creates one new pending job. This treats any prior successful or
-in-flight collection whose job config carries the current account's
-`authorization_id` as proof that the Source was already started, so no second
-idempotency table/key is needed. Finish passes its captured authorization ID to
-the Source job operation after `/2/users/me`; the collector fails that job
-without provider work if the current account no longer matches. Jobs belonging
-to an earlier authorization cannot make a reconnected account appear ready,
-even when reconnection races between the provider check and job insert. The
-response contains the accepted job reference; the wizard does not wait for a
+`POST /twitter/setup/finish` validates the current account and selected Source,
+performs one bounded authenticated `/2/users/me` check, updates/enables the
+ordinary Cron template and calls the existing `CronManager.run_now()`. A repeated
+Finish may enqueue another Job; that low-probability duplicate is acceptable.
+The captured `authorization_id` remains in the Job template, so reconnect makes
+old work ineligible before provider execution. The wizard does not wait for a
 historical sync.
 
 ## Focused Verification
 
 Tests use injected Authlib transport/time/random seams and real database
-transactions. They cover configure/idempotency/reset confirmation; S256/scopes;
+transactions. They cover configure/reset confirmation; S256/scopes;
 restart-safe begin/callback/poll; superseding overlapping flows; exchange claim
 and replay; expiry/pruning;
 failure preserving a working account; conditional refresh; projection redaction;
 cross-Peer config/token freshness, per-operation official clients and Twikit
 cache replacement; standalone
-callback; Source ensure/Finish idempotency; reconnect ignoring pre-connection
-jobs; reconnect racing Finish; and empty bookmarks.
+callback; ordinary Source/Cron creation and Finish enqueue; reconnect ignoring
+pre-connection jobs; reconnect racing Finish; and empty bookmarks.
 They do not introduce a fake public X deployment or replace Sir's deferred
 black-box acceptance.

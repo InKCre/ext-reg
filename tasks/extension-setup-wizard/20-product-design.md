@@ -123,7 +123,8 @@ The formerly open implementation shapes are now closed in HLD:
 - Twitter owns its exact config/state/setup protocol and Authlib OAuth client;
 - Core owns one exact public callback contribution and database state
   transactions;
-- Finish explicitly creates or reuses the first bounded collection job;
+- Finish explicitly enqueues the first bounded collection job; an unlikely duplicate
+  enqueue is acceptable for this single-user product;
 - the first release does not expose a newest-versus-history choice.
 
 See [Canonical Extension State](32-hld-extension-state.md),

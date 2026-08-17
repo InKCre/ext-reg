@@ -132,11 +132,11 @@ crashed process cannot know whether X consumed the one-use code.
 
 ### D018 — Source and Finish semantics
 
-Implementation baseline. The first slice reuses an existing bookmark Source or
-asks Core's Source authority to ensure at least one exists under serialization.
-This does not impose a one-Source-per-type invariant: existing Sources remain
-independent and selectable. Finish creates/reuses one initial bounded job. No
-history-mode choice or Source check is added to uninstall.
+Superseded in part by D030. The first slice reuses a selected bookmark Source or
+uses ordinary Source creation. Existing Sources remain independent and
+selectable. Finish enqueues one bounded initial Job; rare duplicate Sources or
+Jobs are acceptable. No history-mode choice or Source check is added to
+uninstall.
 
 ### D019 — Host and Extension versions
 
@@ -202,6 +202,92 @@ non-empty state without executing future bytes. Same-version install is
 idempotent; a version change is allowed only while canonical state is `{}` and
 otherwise fails before mutation. The initial Twitter `0.1.1 -> 0.2.0` cut remains
 valid because the new column starts empty.
+
+### D027 — Setup exit remains Extension-owned
+
+Accepted during preview review. The Host popup continues to provide no cancel
+or confirm action. Twitter renders one always-available Close action and emits
+the existing contribution `close` event. The action is not restricted to the
+terminal step, and closing aborts transient wizard work without rolling back
+durable setup facts.
+
+### D028 — Registry origin is dynamically Client-overridable — Superseded
+
+The preview diagnosis correctly established the need for an operation-time
+override and one origin snapshot, but its Client-specific source was tied to the
+obsolete PR baseline. D029 replaces the authority order after the accepted Peer
+cutover; no `ClientManager` compatibility path is retained.
+
+### D029 — Rebuild the setup slice on the admitted Peer baseline
+
+Accepted after preview-controller diagnosis. Core PR #52 is not made deployable
+by teaching current `main` to accept a legacy Client image. Its old feature
+branch is reconstructed from current Core `main`, then the setup capability is
+ported semantically onto the current Peer, Extension Host, Source, Cron and Job
+contracts. Client PR #68 is subsequently migrated from the technical `Client`
+domain to the generated Peer contract and exact capability invocation.
+
+The effective Registry origin for one Host operation is:
+
+1. the executing Peer's non-empty `config.extension_registry_url`;
+2. deployment config `extension.registry.extension_registry_url`;
+3. the process setting/default.
+
+Each Host snapshots the result once for its native Release/Distribution
+operation; Core specifically shares one snapshot across exact Release
+resolution and Python Distribution acquisition. The OAuth callback URL comes
+from the executing Core Peer's admitted public HTTP base URL. Twitter setup
+commands are one Twitter-owned exact Peer capability; the public OAuth callback
+remains the only unauthenticated route. No generic setup capability or fixed
+Web-to-Core origin is introduced.
+
+### D030 — Browser identity and connection are Peer-native
+
+Accepted for the reconstruction batch. A browser origin generates and persists
+one technical Peer UUID, migrating its prior Client UUID when present. Saving
+meta configuration must first prove database/JWT connectivity, register that
+Peer, save its owner configuration and renew its database-time lease. The
+database registration function refreshes runtime-owned name, config schema and
+capabilities without overwriting owner-authored config or labels. User-facing
+surfaces continue to say “Client” where they describe the product rather than
+the technical protocol node.
+
+### D031 — Selected-Client control is Peer topology dispatch
+
+Accepted. The Extensions selector lists Peer rows as product Clients. The
+current browser executes its local Web Host lifecycle; a live selected Peer
+advertising `core.extension.management.v1` receives an exact capability command;
+any other selected Client is still controllable through the atomic durable
+desired-state RPC, without an extra label/type restriction. Setup availability
+continues to come only from this browser's running Web Distribution.
+
+### D032 — Twitter setup transport is one exact Peer capability
+
+Accepted by the Peer-native reconstruction. Twitter Web discovers live Core
+Peers from `core.extension.management.v1` advertisements and invokes
+`inkcre.twitter.setup.v1` on the exact selected Core Peer. It does not probe
+arbitrary Client/Core origins, use postMessage, or introduce a generic setup
+protocol. The public provider callback remains a standalone lifecycle-bound
+Core route.
+
+### D033 — Generic management does not project Extension-produced state
+
+Implementation correction. `extensions.state` remains deployment-wide and may
+contain credentials inside the accepted authenticated-Peer boundary, but the
+generic Extension list/get/mutation protocol has no reason to transport it.
+Core management models exclude it and the Web PostgREST adapter explicitly
+selects only name, version, enabled Peers, nickname, config and config schema.
+Schema stripping after an all-column response is insufficient because the bytes
+would already have reached the browser.
+
+### D034 — Authorization reset disarms setup-owned collection
+
+Implementation correction. Replacing the OAuth App with confirmation,
+disconnecting the account or reconciling a direct config change invalidates the
+bound OAuth account/transactions and disables the setup-owned bookmark Cron.
+The Source and Cron remain reusable for reconnect/Finish; this does not inspect
+or delete Source-domain records during Extension uninstall and therefore does
+not change D012.
 
 ## Resolved Product Questions
 
@@ -311,6 +397,21 @@ Clients section. This follow-up manages existing Client metadata, REST API URL,
 health and declared config; it does not introduce manual Client creation or
 deletion.
 
+### D030 — Single-user setup command ROI boundary — Accepted
+
+Do not buy distributed idempotency for low-probability, low-harm duplicate
+Source or initial Job creation. The Web wizard disables Source/Finish actions
+while their request is pending. Core reuses ordinary Source creation, exposes
+clear Cron create/update methods and runs the initial Job through the existing
+run-now path. Rare duplicate rows or Jobs remain acceptable and manageable.
+
+### D031 — Browser Peer registration stays in the runtime — Accepted
+
+Do not add an `inkcre.register_peer` database RPC. `WebPeerRuntime` performs an
+ordinary `peers` upsert containing only runtime-owned `id`、`name`、
+`config_schema` and `capabilities`; omitted owner-authored `config` and `labels`
+remain unchanged. Core retains no browser-specific registration protocol.
+
 ### Q010 — What is the minimum production-shaped vertical slice? — Resolved
 
 [Minimum Vertical Slice and Black-box Acceptance Proposal](27-vertical-slice-and-acceptance.md).
@@ -322,6 +423,7 @@ repository checks but do not invent a substitute provider harness.
 ## Queued Questions
 
 No product, HLD, dependency, environment or repository-sequencing question is
-queued. The independently corrected implementation proposal is ready for Sir's
-review; source implementation remains unauthorized until a later explicit
-start.
+queued. Sir authorized the Peer-native implementation batch; the Core and Web
+source results now pass their full local checks. The only remaining admission
+gate is mechanical generated-contract synchronization from the exact Core
+feature image after separate commit/push authority makes that image available.

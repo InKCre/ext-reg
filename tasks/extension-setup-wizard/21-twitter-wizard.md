@@ -91,16 +91,17 @@ current bounded `full=false, result_limit=40` initial job. A later product
 decision may add a history policy once collection semantics can support it
 without misleading empty-state behavior.
 
-Reopening setup must not create duplicate default Sources. Source identity and
-cursor state remain Core-owned domain facts.
+The UI disables the creation action while its request is pending. An unlikely
+duplicate Source from a repeated or concurrent request is acceptable; Source
+identity and cursor state remain Core-owned domain facts.
 
 ### Step 4 — Review and start
 
 Show the chosen account, Source, and schedule. Run a bounded readiness command
 that verifies the durable authorization and required Source state. On explicit
-Finish, enqueue the first collection job (or confirm an already queued/running
-job) and close when Core accepts the command. The wizard does not wait for a
-complete bookmark history sync.
+Finish, enqueue the first collection job and close when Core accepts the
+command. A repeated Finish may enqueue another Job; the wizard does not wait for
+a complete bookmark history sync.
 
 ## Derived Resume Model
 
