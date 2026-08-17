@@ -61,6 +61,33 @@
   ordinary Source create, explicit Cron create/update, and non-deduplicating
   run-now. See
   [Peer-native implementation progress](73-peer-native-implementation-progress.md).
+- **Latest UX and Protocol Review**: Black-box acceptance reached the Bookmark
+  Source step and exposed a connected design defect. The UI conflates choosing
+  and creating a Source, exposes unexplained hour/minute fields, uses raw
+  controls and hard-coded stepper styling, and passes the nonexistent
+  `InkButton.loading` prop instead of `isLoading`. More importantly, the
+  Peer-native implementation drifted from the accepted semantic routes to one
+  seven-way `action` dispatcher and delegated ordinary Source/Cron/Job work to
+  the Twitter Core Distribution. The proposed correction keeps Core Twitter
+  OAuth-only, composes ordinary Source/Cron/Job rows directly in the Twitter Web
+  target, removes copied Source/Cron IDs and the low-ROI `authorization_id`
+  binding from Extension state/job config, and publishes five fixed semantic
+  Peer capabilities. See
+  [Setup UX and protocol review](74-setup-ux-and-protocol-review.md).
+- **UX and Protocol Correction Result**: Sir accepted the connected correction
+  and authorized implementation, commit and push. Core Twitter `0.2.1` now
+  publishes five fixed OAuth/account capabilities, keeps only OAuth/account
+  facts in Extension state, and no longer imports Source/Cron/Job authorities
+  from setup. Bookmark collection resolves the current account at execution
+  instead of carrying `authorization_id` in Job parameters. Web Twitter `0.2.1`
+  now composes ordinary Source/Cron/Job models directly; `@inkcre/core` `0.1.2`
+  adds the missing ordinary Cron update operation. Step 3 explicitly separates
+  existing Source selection from new Source creation, uses the UI package's
+  dropdown/time picker/button happy paths, provides operation-specific loading
+  states, and uses application design tokens. Core's pinned full check passed
+  with 489 tests/41 skips; Web's full check passed with 138 tests and all
+  workspace/MF builds. The source branches are ready for commit, push and
+  Preview delivery under the authorization already recorded in this turn.
 - **Preview Controller Resolution**: Core PR #52 run `31774435213` exposed a
   baseline mismatch, not a controller compatibility requirement. The old PR
   branch lacks the admitted Peer implementation and delivery script while Core
@@ -72,11 +99,11 @@
   #52 and dependent Client #68 pass their exact contracts and previews. No
   public Twitter Release, production delivery, PR merge or PR #62 closure is
   implied.
-- **Next Step**: Under separate commit/push authority, create the exact Core
-  feature image, sync the Client generated truth, remove the narrow temporary
-  type seam and rerun the already-green Client contract before merge. Commit,
-  force-with-lease push, ordinary push, PR closure and preview delivery remain
-  separately authorized operations.
+- **Next Step**: Commit and push the three coherent repository batches, observe
+  Core and Client Preview delivery, publish the immutable Twitter `0.2.1`
+  native associations through the existing checked-main/Registry path as
+  required by Preview, then hand Sir the exact Web Preview entry for acceptance.
+  Do not merge either PR.
 
 ## Supporting Material
 
@@ -102,4 +129,5 @@
 - [Preview acceptance follow-up](71-preview-acceptance-follow-up.md)
 - [Peer-native PR reconstruction](72-peer-native-pr-reconstruction.md)
 - [Peer-native implementation progress](73-peer-native-implementation-progress.md)
+- [Setup UX and protocol review](74-setup-ux-and-protocol-review.md)
 - [Decision and question log](30-decisions-and-questions.md)
