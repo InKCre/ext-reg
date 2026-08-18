@@ -7,9 +7,9 @@ from pathlib import Path
 
 import httpx
 import pytest
+from inkcre_extension_toolkit.client import RegistryClient
 from pydantic import ValidationError
 
-from inkcre_extension_registry.client import RegistryClient
 from inkcre_extension_registry.contracts.models import (
     PrepareReleaseRequest,
     PythonEntryPoint,

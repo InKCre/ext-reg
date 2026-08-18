@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 import httpx
 
-from .contracts.models import PrepareReleaseRequest, ReleaseRecord
+from .contracts import PrepareReleaseRequest, ReleaseRecord
 
 
 class RegistryHTTPError(RuntimeError):

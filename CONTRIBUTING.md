@@ -24,8 +24,9 @@ ephemeral evidence, but canonical packages and production deployment only come
 from an exact successful current-`main` revision. Do not commit credentials,
 local Wrangler state, generated dependency directories, or unrelated changes.
 
-Registry publication and Cloudflare production changes are separate privileged
-operations. Extension publishers prepare typed associations with
+Registry, Toolkit publication and Cloudflare production changes are separate
+privileged operations. Extension publishers install the independent
+`inkcre-extension-toolkit[cli]` distribution, prepare typed associations with
 `inkcre-ext prepare-release`, use `uv publish`/Twine for wheels or
 `inkcre-ext upload-module-federation` for a native Remote snapshot, and publish
 the Release explicitly. Source revision and build identity should accompany the

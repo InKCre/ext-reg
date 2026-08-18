@@ -13,6 +13,12 @@ The service runs as a Python Cloudflare Worker with D1 metadata and private R2
 bytes. It does not publish a generic target manifest or a shared Runtime/API
 package.
 
+This repository also releases the independent
+`inkcre-extension-toolkit` developer/CD distribution. Its `cli` extra exposes
+`inkcre-ext` to inspect native artifacts, publish Releases, and build
+deterministic static preview facades without depending on the Registry service
+implementation.
+
 The public Registry origin is [`https://registry.inkcre.dev`](https://registry.inkcre.dev).
 Its root page is a read-only Extension catalog; package consumers continue to
 use the native APIs described above.

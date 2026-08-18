@@ -1,0 +1,32 @@
+[project]
+name = "inkcre-extension-toolkit"
+version = "0.1.0"
+description = "Developer and delivery tooling for InKCre Extensions"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+license = "AGPL-3.0-only"
+authors = [{ name = "InKCre" }]
+dependencies = [
+  "packaging>=25,<27",
+  "pydantic>=2.10.6,<3",
+  "semantic-version>=2.10,<3",
+]
+
+[project.optional-dependencies]
+cli = [
+  "httpx>=0.28,<0.29",
+  "typer>=0.21,<0.22",
+]
+
+[project.scripts]
+inkcre-ext = "inkcre_extension_toolkit.cli:app"
+
+[project.urls]
+Repository = "https://github.com/InKCre/ext-reg"
+
+[build-system]
+requires = ["hatchling>=1.29,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inkcre_extension_toolkit"]

@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "ModuleFederationPreviewDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "minLength": 1,
+          "title": "Artifact",
+          "type": "string"
+        },
+        "kind": {
+          "const": "module_federation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "producer": {
+          "minLength": 1,
+          "title": "Producer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "producer",
+        "artifact"
+      ],
+      "title": "ModuleFederationPreviewDistribution",
+      "type": "object"
+    },
+    "PythonPreviewDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact": {
+          "minLength": 1,
+          "title": "Artifact",
+          "type": "string"
+        },
+        "kind": {
+          "const": "python",
+          "title": "Kind",
+          "type": "string"
+        },
+        "producer": {
+          "minLength": 1,
+          "title": "Producer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "producer",
+        "artifact"
+      ],
+      "title": "PythonPreviewDistribution",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "distributions": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "module_federation": "#/$defs/ModuleFederationPreviewDistribution",
+            "python": "#/$defs/PythonPreviewDistribution"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/PythonPreviewDistribution"
+          },
+          {
+            "$ref": "#/$defs/ModuleFederationPreviewDistribution"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Distributions",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "distributions"
+  ],
+  "title": "PreviewInventory",
+  "type": "object"
+}

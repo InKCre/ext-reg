@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from inkcre_extension_toolkit.simple import PythonFileRecord
+
 from ..contracts.models import (
     ExtensionRecord,
     ExtensionSummary,
@@ -59,22 +61,6 @@ class PreparedPythonDistribution:
     entry_name: str
     entry_object: str
     state: str
-
-
-@dataclass(frozen=True)
-class PythonFileRecord:
-    normalized_project: str
-    project_version: str
-    filename: str
-    sha256: str
-    size: int
-    filetype: str
-    requires_python: str | None
-    core_metadata_sha256: str
-    r2_key: str
-    metadata_r2_key: str
-    uploaded_at: str
-    yank_reason: str | None = None
 
 
 @dataclass(frozen=True)
