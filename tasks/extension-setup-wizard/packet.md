@@ -149,12 +149,17 @@
   Separate Client and Core bootstrap worktrees now carry the default-branch
   controllers plus their repository-wide PDM manifests, inventories/build
   helpers and direct same-run deployment paths. Client's existing full check
-  passes; Core workflow/YAML/actionlint/Ruff/Pyrefly checks pass. Neither Peer
-  has a `pdm.lock` yet because the Toolkit Release asset does not exist, and no
-  lock was forged. The accepted immutable asset is
+  passes; Core workflow/YAML/actionlint/Ruff/Pyrefly checks pass. The Toolkit
+  split merged through ext-reg PR #14, and the accepted immutable asset is now
+  public as
   `toolkit-v0.1.0/inkcre_extension_toolkit-0.1.0-py3-none-any.whl`; Peer PDM
-  dependencies use its `cli` extra. No commit, push, release, merge or remote
-  deployment has occurred.
+  dependencies use its `cli` extra. Both controller worktrees now contain real
+  PDM locks with SHA256
+  `7ab1de5160d0bafbdf9f99b6b2a2b156a406b6f6afe14dc0342073620299bd64`.
+  Frozen installs, Client's 105-test full check and MF facade smoke, Core's
+  453-test full check and seven-wheel facade smoke all pass. The controller
+  branches remain local and no Peer remote mutation or preview deployment has
+  occurred.
 - **Preview Controller Resolution**: Core PR #52 run `31774435213` exposed a
   baseline mismatch, not a controller compatibility requirement. The old PR
   branch lacks the admitted Peer implementation and delivery script while Core
@@ -174,12 +179,9 @@
   history did not publish that version. The transient remote source used by the
   earlier successful run is therefore an audit-evidence gap, recorded without
   inventing provenance.
-- **Next Step**: With separately authorized Git/release operations, land the
-  Toolkit split on ext-reg `main`, publish the independent
-  `toolkit-v0.1.0` wheel asset, and replace Registry's bootstrap workspace range
-  with that immutable asset before any standalone Registry service release.
-  Generate genuine PDM locks in both controller worktrees, rerun their frozen
-  checks, then land those bootstrap/controller changes on Client/Core `main`.
+- **Next Step**: Land the prepared Registry metadata pin so standalone Registry
+  wheels and the Worker lock resolve the immutable Toolkit asset, then land the
+  prepared bootstrap/controller changes on Client/Core `main`.
   Because `pull_request_target` executes default-branch code, only after that
   may PR #71 and PR #65 update from `main`, drop duplicate preview scaffolding,
   and rerun the same-origin/sibling preview acceptance. Commit, push, release,
