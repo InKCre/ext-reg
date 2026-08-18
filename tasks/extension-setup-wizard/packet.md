@@ -186,6 +186,14 @@
   may PR #71 and PR #65 update from `main`, drop duplicate preview scaffolding,
   and rerun the same-origin/sibling preview acceptance. Commit, push, release,
   merge and cross-repository mutations remain separately governed operations.
+- **Preview delivery correction**: The repeated Core preview failures exposed
+  an over-designed verification boundary. Per-file public downloads,
+  byte-for-byte comparison, long propagation retries, cache-busters, and
+  immutable deployment URL/digest substitution are rejected for preview
+  delivery. Pages provider success is sufficient automation evidence; Client
+  and Core consumer acceptance remains a separate black-box activity and does
+  not block Peer startup. See the restraint section in
+  [Preview delivery authority and readiness review](77-preview-delivery-authority-review.md).
 
 ## Supporting Material
 
