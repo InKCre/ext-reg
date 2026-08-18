@@ -7,15 +7,30 @@ from typing import Annotated
 import typer
 
 from .client import RegistryClient
-from .contracts.models import PrepareReleaseRequest
+from .contracts import PrepareReleaseRequest
+from .preview import build_preview_registry
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+preview_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+app.add_typer(preview_app, name="preview")
 
 
 def _client(registry_url: str, token: str | None) -> RegistryClient:
     if not token:
         raise typer.BadParameter("publisher token is required")
     return RegistryClient(registry_url, token=token)
+
+
+@preview_app.command("build")
+def preview_build(
+    inventory: Annotated[Path, typer.Option("--inventory", exists=True, dir_okay=False)],
+    public_origin: Annotated[str, typer.Option("--public-origin")],
+    output: Annotated[Path, typer.Option("--output", file_okay=False)],
+) -> None:
+    """Build a multi-Extension static preview Registry facade."""
+
+    result = build_preview_registry(inventory, public_origin, output)
+    typer.echo(result.model_dump_json())
 
 
 @app.command("prepare-release")

@@ -50,21 +50,24 @@ Owns:
 
 ### `ext-reg`
 
-Needs no source change. Its native Release already supports independently
-published Python and Module Federation associations under the same Extension
-name/version. This task packet is the only Registry-repository mutation for this
-planning phase.
+The Registry service needs no Release-contract change for setup. The later
+preview-facade correction does require an Extension Developer Toolkit source change:
+Registry-owned validation and serialization must generate a multi-Extension
+static Preview Registry consumed by Peer preview workflows. See
+[Multi-Extension Static Preview Registry](75-multi-extension-preview-registry.md).
+That follow-up does not change production Registry runtime authority.
 
 ## Existing CD Happy Path
 
-No new publisher workflow is required:
+No new production publisher workflow is required:
 
 - Core's `extension-publish.yml` detects the changed Twitter subtree, builds and
   verifies the wheel, prepares the native Python association, uploads through
   `/legacy/`, and publishes/reads back the exact Release.
-- Client's checked-main delivery uploads the exact Twitter MF artifact, prepares
-  the native Module Federation association, publishes it and verifies its
-  Registry-hosted manifest/assets before Pages delivery.
+- Client's protected-main release workflow builds the Twitter MF Distribution,
+  prepares the native Module Federation association, publishes and verifies it,
+  and deploys the Client output in that release lane. It does not consume a
+  pull-request checks artifact as deployment input.
 - Registry permits the second native association to append to an already
   published immutable Release, so merge order does not change Extension
   identity. Operationally Core should merge/publish first, then Client, so the
@@ -73,6 +76,14 @@ No new publisher workflow is required:
 This implementation task stops before either workflow can run on `main`.
 Publishing, deployment and black-box acceptance remain outside the authorized
 boundary.
+
+PR integration preview is distinct from production publication. A Peer may
+host a static read-only Registry projection beside its application, but the
+Extension Developer Toolkit must generate that projection for all supplied
+Extensions in one invocation. Peer-specific Release/path assemblers are not an
+accepted long-term delivery path. The preview workflow verifies, builds and
+deploys one exact pull-request head in the same run; required checks do not
+upload SPA, MF, wheel or Preview Registry outputs for preview delivery.
 
 ## Cross-repository Contract Synchronization
 

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from inkcre_extension_toolkit.preview import PreviewInventory
+
 from inkcre_extension_registry.contracts.models import (
     ExtensionRecord,
     PrepareReleaseRequest,
@@ -27,6 +29,7 @@ def generated_contracts() -> dict[Path, bytes]:
             mode="serialization"
         ),
         "release.schema.json": ReleaseRecord.model_json_schema(mode="serialization"),
+        "preview-inventory.schema.json": PreviewInventory.model_json_schema(mode="validation"),
     }
     outputs = {CONTRACTS / name: _encoded(schema) for name, schema in models.items()}
     outputs[CONTRACTS / "openapi.json"] = _encoded(create_app().openapi())

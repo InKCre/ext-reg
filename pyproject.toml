@@ -8,23 +8,10 @@ license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
   "fastapi>=0.139.2,<0.142",
+  "inkcre-extension-toolkit>=0.1,<0.2",
   "packaging>=25,<27",
-  "pydantic>=2.10.6,<3",
   "python-multipart>=0.0.22,<0.1",
-  "semantic-version>=2.10,<3",
 ]
-
-[project.optional-dependencies]
-client = [
-  "httpx>=0.28,<0.29",
-]
-cli = [
-  "httpx>=0.28,<0.29",
-  "typer>=0.21,<0.22",
-]
-
-[project.scripts]
-inkcre-ext = "inkcre_extension_registry.cli:app"
 
 [project.urls]
 Repository = "https://github.com/InKCre/ext-reg"
@@ -52,6 +39,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/inkcre_extension_registry"]
 
+[tool.uv.workspace]
+members = ["toolkit"]
+
+[tool.uv.sources]
+inkcre-extension-toolkit = { workspace = true }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -66,6 +59,6 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pyright]
 pythonVersion = "3.13"
-include = ["src", "tests"]
+include = ["src", "tests", "toolkit/src"]
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false

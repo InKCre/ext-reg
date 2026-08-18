@@ -13,8 +13,8 @@ from importlib.metadata import distributions
 from pathlib import Path
 
 import httpx
+from inkcre_extension_toolkit.client import RegistryClient
 
-from inkcre_extension_registry.client import RegistryClient
 from inkcre_extension_registry.contracts.models import PrepareReleaseRequest
 
 

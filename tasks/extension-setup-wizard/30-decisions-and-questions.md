@@ -412,6 +412,110 @@ ordinary `peers` upsert containing only runtime-owned `id`、`name`、
 `config_schema` and `capabilities`; omitted owner-authored `config` and `labels`
 remain unchanged. Core retains no browser-specific registration protocol.
 
+### D032 — Static Preview Registry construction belongs to the Developer Toolkit — Accepted
+
+A Client Pages preview may host a bounded, read-only Registry facade for
+Client/Extension integration. Same-origin hosting is not Registry authority.
+The Extension Developer Toolkit owned by `ext-reg`, rather than a Peer
+repository, must validate and generate the Release/native Distribution
+projection. One Toolkit invocation supports multiple Extensions and composes
+one deterministic static tree; it is not a Twitter-specific command repeated
+once per plugin. Peers only supply explicit exact-head build inputs, host the
+output and test it as consumers.
+
+### D033 — One explicit inventory includes both native Distribution kinds — Accepted
+
+The first `inkcre-ext preview build` slice consumes one explicit,
+language-neutral inventory containing multiple Extension Distribution inputs.
+It supports both Module Federation snapshots and Python wheels/Simple API in
+the first version. The inventory points to producer metadata and build outputs
+from the same verified preview checkout rather than duplicating Release
+descriptors. Static output covers the
+exact Release and native read paths Host SDKs consume; absent inputs produce no
+false association.
+
+### D034 — Worker and static preview share executable projections — Accepted
+
+Avoid Registry API drift structurally, not with duplicated fixtures. Extract
+Release, Simple HTML/PEP 658, native path and Module Federation materialization
+into pure Registry-owned application functions used by both Worker handlers
+and the static Preview builder. Peer repositories do not own expected Registry
+JSON. Do not add a differential test or any other new test for this follow-up;
+reuse the existing Registry checks and Peer preview smoke paths.
+
+### D035 — Each Peer preview delivery owns its native facade — Accepted
+
+Do not put every native Distribution into every preview. `client-web` hosts a
+same-origin multi-Extension facade containing the supplied Module Federation
+associations. `core-py` delivery publishes a sibling multi-Extension Preview
+Registry origin containing the supplied Python associations, Simple pages,
+wheels and metadata built from the same exact PR head. It is not served by
+the Core ASGI process because startup restore must acquire wheels before that
+process accepts requests. Each exact Release descriptor exposes only
+associations backed by bytes on its Registry origin. The shared Toolkit supports
+both formats; the per-Peer inventory selects the projection. Hosting does not
+transfer Registry authority to the Peer.
+
+### D036 — Core's sibling Preview Registry is Cloudflare Pages — Accepted
+
+Deploy Core's Toolkit-generated static Python facade to a dedicated Cloudflare
+Pages project, not Heroku, a Worker/D1/R2 preview, the Client Pages project or
+the ext-reg UI-preview project. The Core PR workflow builds all first-party
+wheels, deploys and smokes its exact-head static tree first, then configures the
+Heroku Core preview to use that stable PR alias before application startup. PR
+cleanup retires the Pages branch with the other preview resources.
+
+### D037 — Peer workflows consume a released, locked Developer SDK — Superseded
+
+Do not pin an ext-reg Git commit or moving branch in Client/Core workflow YAML.
+The lockfile direction remains accepted, but publishing the CLI in a normal
+`inkcre-extension-registry` release and using uv in Client were rejected by the
+subsequent unit-boundary review. D038 replaces those details.
+
+### D038 — Registry, Host SDK and Developer Toolkit are separate units — Accepted
+
+Publish `inkcre-ext preview build` in an independently versioned
+`inkcre-extension-toolkit` distribution, initially `0.1.0`. The Registry
+service distribution does not expose this developer CLI; Host SDKs do not
+depend on it at runtime. Registry service code may depend one way on the
+Toolkit's pure artifact inspection/projection library to prevent drift. Both
+Core and Client consume the released Toolkit through PDM plus `pdm.lock`.
+Client keeps pnpm for its application but owns one PDM tooling project;
+there is no technical limitation requiring uv, so uv is rejected.
+
+### D039 — Client's PDM development-tool project lives at repository root — Accepted
+
+Client may be a polyglot repository: root pnpm continues to own application and
+Extension JavaScript dependencies, while root PDM owns Python development tools
+only. Use root `pyproject.toml` and `pdm.lock`, which is PDM's normal happy path.
+Do not recreate the deleted historical `tooling/extension-publisher` directory.
+An `extensions/` PDM project would work technically, but the Toolkit lock serves
+repository-wide multi-Extension preview/CD and therefore belongs at the root.
+
+### D040 — Preview delivery builds and deploys its own exact-head output — Accepted
+
+Do not make `Client checks`, Core checks, or any other pull-request validation
+job the producer of deployable Preview Registry, SPA, Module Federation, wheel,
+or Pages artifacts. In particular, do not use an `upload-artifact` /
+`workflow_run` / `download-artifact` handoff from checks into preview delivery.
+
+The repository-owned preview workflow is one delivery authority. It verifies an
+eligible same-repository pull request with a trusted controller, checks out the
+exact pull-request head, installs the repository's frozen toolchains, builds the
+Peer application and relevant Extension Distributions, runs `inkcre-ext preview
+build`, deploys that output, and smoke-checks the deployed preview in the same
+workflow run. Required checks remain independent merge evidence; they may build
+for validation or upload diagnostic failure evidence, but their outputs are not
+delivery inputs. Fork pull requests receive no preview credentials and follow
+the organization-level maintainer-approval behavior for secret-free Actions.
+
+The Toolkit needs its public origin before Pages deployment, so each workflow
+uses a deterministic, PR-scoped Pages branch alias as `--public-origin`. The
+delivery step must assert that Wrangler reports the expected alias. Core passes
+that same alias as `EXTENSION_REGISTRY_URL` before starting its Heroku preview.
+Do not claim a random deployment URL as the embedded origin after the static
+tree has already been built.
+
 ### Q010 — What is the minimum production-shaped vertical slice? — Resolved
 
 [Minimum Vertical Slice and Black-box Acceptance Proposal](27-vertical-slice-and-acceptance.md).
@@ -422,8 +526,9 @@ repository checks but do not invent a substitute provider harness.
 
 ## Queued Questions
 
-No product, HLD, dependency, environment or repository-sequencing question is
-queued. Sir authorized the Peer-native implementation batch; the Core and Web
-source results now pass their full local checks. The only remaining admission
-gate is mechanical generated-contract synchronization from the exact Core
-feature image after separate commit/push authority makes that image available.
+No product or HLD question is queued. D032–D040 freeze multi-Extension ownership,
+the explicit inventory, both native kinds, shared executable projections,
+per-Peer preview-owned native facades, Core Cloudflare hosting and the
+no-new-tests and preview-delivery authority constraints. The implementation plan
+has been reviewed against organization governance; source work resumes only from
+the corrected same-run preview topology.

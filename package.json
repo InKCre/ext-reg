@@ -7,7 +7,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "uv run python -m build",
+    "build": "uv build --all-packages",
     "check": "pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm worker:build",
     "contracts:check": "uv run python scripts/generate_contracts.py --check",
     "contracts:generate": "uv run python scripts/generate_contracts.py",
@@ -16,7 +16,7 @@
     "lint": "uv run ruff check .",
     "test": "uv run pytest",
     "type-check": "uv run pyright",
-    "worker:build": "uv run pywrangler deploy --dry-run --outdir dist/worker"
+    "worker:build": "uv build --all-packages && UV_FIND_LINKS=dist uv run pywrangler deploy --dry-run --outdir dist/worker"
   },
   "devDependencies": {
     "prettier": "3.6.2",
