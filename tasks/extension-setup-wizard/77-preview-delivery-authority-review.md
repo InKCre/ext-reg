@@ -42,7 +42,6 @@ Trusted PR preview controller
   -> build Peer + relevant Extension Distributions
   -> inkcre-ext preview build
   -> deploy directly to PR-scoped Pages resource
-  -> smoke deployed consumer paths
   -> report preview status
 
 Trusted PR-close controller
@@ -96,9 +95,9 @@ checks -> upload deployable outputs -> workflow_run -> download -> deploy
 6. Run `pdm run inkcre-ext preview build` with the deterministic Client PR Pages
    alias as `--public-origin`, writing the static Registry projection into the
    SPA deployment directory.
-7. Reverify the PR head immediately before external delivery, deploy that
-   directory directly, assert the returned Pages alias, and smoke the SPA,
-   exact Release, MF manifest and one referenced asset.
+7. Reverify the PR head immediately before external delivery and deploy that
+   directory directly. Provider acceptance is the delivery gate; consumer-path
+   acceptance remains a separate black-box activity.
 8. Keep the existing PR-close cleanup authority and deterministic branch name.
 
 The expected Client origin remains
@@ -114,11 +113,10 @@ from its existing `preview/client-web/pr-<number>` branch convention.
    inventory.
 3. Run `pdm run inkcre-ext preview build` with the deterministic Core PR sibling
    Pages alias as `--public-origin`.
-4. Reverify the PR head, deploy the static tree directly to the dedicated
-   `inkcre-core-py-extension-registry-preview` Pages project, assert the alias,
-   and smoke exact Release, Simple HTML, wheel and PEP 658 metadata reads.
+4. Reverify the PR head and deploy the static tree directly to the dedicated
+   `inkcre-core-py-extension-registry-preview` Pages project.
 5. Set `EXTENSION_REGISTRY_URL` on the deterministic Heroku preview app to the
-   verified Pages alias before releasing/starting Core.
+   precomputed Pages alias before releasing/starting Core.
 6. Continue the existing Heroku/PostgREST/database delivery and smoke path.
 7. PR-close cleanup removes the exact Pages branch in addition to the existing
    Heroku and preview-database resources.
@@ -138,10 +136,9 @@ can materialize absolute Release/native URLs. A random Pages deployment URL is
 not available yet and would create a build/deploy cycle.
 
 Use a deterministic PR-scoped branch alias, known from the project and branch
-name before build. Delivery must compare Wrangler's reported alias with this
-expected value and fail before downstream delivery on mismatch. The random
-deployment URL remains useful diagnostic identity but is not the embedded
-Registry origin.
+name before build. It is both the Toolkit's embedded public origin and Core's
+configured Registry origin. A random deployment URL, cache-buster, content
+digest, or byte-for-byte public read is not a second delivery authority.
 
 Use simple branch names such as `pr-<number>` for the dedicated Core project.
 Client may retain its current deterministic alias convention if the expected
@@ -178,8 +175,8 @@ Remote commit, push, merge and Toolkit publication remain separately authorized.
 ### Batch D — Core sibling facade
 
 - build all first-party wheels and the facade inside Core preview delivery;
-- deploy/smoke the dedicated Pages sibling before Heroku startup;
-- pass the verified alias through `EXTENSION_REGISTRY_URL`;
+- deploy the dedicated Pages sibling before Heroku startup;
+- pass the precomputed alias through `EXTENSION_REGISTRY_URL`;
 - extend cleanup to the Core Pages preview branch.
 
 ### Batch E — Cross-repository preview acceptance
@@ -211,13 +208,13 @@ The follow-up is complete only when all statements are true:
    remains.
 5. Client preview serves its supplied MF facade on the Client Pages origin.
 6. Core preview serves all supplied first-party Python wheels from its dedicated
-   Pages sibling, and Core starts with that verified alias as fallback Registry
+   Pages sibling, and Core starts with that alias as fallback Registry
    origin.
 7. Same-repository identity, exact-head reverification, preview environment,
    deterministic concurrency/resources, SHA-pinned Actions and PR-close cleanup
    remain intact. Fork PRs receive no preview credentials.
-8. Existing repository checks and existing preview smoke paths pass; this
-   follow-up adds no test files or test cases.
+8. Existing repository checks pass; consumer black-box acceptance is recorded
+   separately and this follow-up adds no test files or test cases.
 9. Client PR #71 can open the `inkcre/twitter@0.2.1` setup popup while connected
    to Core PR #65 using only those PR-owned preview facades.
 
@@ -234,3 +231,25 @@ The prior local preview-builder source remains useful implementation evidence,
 but it is in the wrong Registry distribution and must move before release. No
 source mutation, commit, push, release, deployment or cross-repository change is
 performed by this packet-only review.
+
+## Preview Verification Restraint
+
+Preview delivery optimizes for review availability, not artifact attestation.
+The following are explicit anti-patterns for this task and must trigger a plan
+review instead of another patch:
+
+- downloading every public file and comparing it byte-for-byte with local build
+  output;
+- increasing retry counts or propagation windows to make an eventually visible
+  preview look transactional;
+- adding cache-busters or cache-control workarounds to force a delivery check;
+- replacing the intended stable preview alias with an immutable deployment URL,
+  digest, hash, or other stronger identity solely to satisfy smoke automation;
+- blocking one provider's preview startup on another provider's full public
+  read-surface convergence.
+
+The accepted stopping rule is simpler: a successful provider deployment command
+is sufficient for automation. At most, a later independent smoke may assert that
+one representative URL does not return `404`; it must not become a prerequisite
+for the Peer preview to start. If that low-cost check is unreliable, remove it
+rather than adding resilience machinery.
