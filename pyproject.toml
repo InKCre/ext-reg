@@ -8,7 +8,7 @@ license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
   "fastapi>=0.139.2,<0.142",
-  "inkcre-extension-toolkit>=0.1,<0.2",
+  "inkcre-extension-toolkit @ https://github.com/InKCre/ext-reg/releases/download/toolkit-v0.1.0/inkcre_extension_toolkit-0.1.0-py3-none-any.whl",
   "packaging>=25,<27",
   "python-multipart>=0.0.22,<0.1",
 ]
@@ -38,6 +38,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/inkcre_extension_registry"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv.workspace]
 members = ["toolkit"]
