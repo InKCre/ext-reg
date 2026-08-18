@@ -1,43 +1,57 @@
 # InKCre Extension Registry
 
-This repository owns the public Extension release contract, catalog and admission rules, developer tooling, and distribution infrastructure for InKCre. It does not own deployment installation state, peer enablement, runtime activity, or every first-party extension implementation.
+This repository owns the public Extension release control plane, native
+Distribution hosting, and the independent Extension Developer Toolkit.
 
 ## Repository Map
 
-- `docs/`: durable repository-owned knowledge and navigation.
-- `tasks/`: active, disposable task control surfaces.
-- `.agents/skills/svc/`: generated local SVC integration; do not edit by hand.
+- `src/inkcre_extension_registry/`: Registry contracts and Worker service.
+- `toolkit/`: independently released developer and delivery tooling.
+- `contracts/`: generated schemas and OpenAPI; never edit by hand.
+- `migrations/`: checked-in D1 schema history.
+- `docs/`: durable local knowledge; `tasks/`: volatile task packets.
 
 ## Knowledge Owners
 
-- Shared InKCre product truth and cross-unit contracts remain in `InKCre/docs`.
-- Registry-specific executable truth should prefer schemas, code, configuration, tests, assertions, and delivery automation.
-- Expensive Registry-local design truth that cannot be preserved mechanically belongs under `docs/`.
-- Active evidence, decisions, uncertainties, and next actions belong in the current task packet.
+- Shared InKCre product truth and cross-unit contracts: `InKCre/docs` Hub.
+- Registry and Toolkit internal design: `docs/30-unit-tdd/`.
+- Runtime, packaging, delivery, migration, and recovery: `docs/40-deployment/`.
+- Executable facts: source, schemas, configuration, tests, and automation.
+- Active evidence and provisional decisions: current `tasks/*/packet.md`.
 
 ## Working Rules
 
-- Default to Python for Registry tooling and services. Use TypeScript only where a browser or `client-web` contract requires it.
-- Keep manifest and protocol truth language-neutral so every peer validates the same contract.
-- Require explicit human authorization before modifying code or project state; task-packet maintenance is the exception.
-- Require separate explicit authorization for commits, pushes, releases, remote creation, publication, production changes, and cross-repository mutation.
-- Preserve the distinction between Registry releases, deployment `installed`, peer/client `enabled`, and runtime `running` state.
-- Do not introduce arbitrary runtime code download into `core-py` without an approved security and lifecycle contract.
+- Default to Python. Use TypeScript only at a browser or `client-web` seam.
+- Keep manifest and protocol truth language-neutral.
+- Preserve Registry Release, deployment `installed`, Peer `enabled`, and
+  process/browser `running` as distinct authorities.
+- Registry, Toolkit, Host SDKs, and first-party Extensions are independent
+  release units. Do not create reverse dependencies from the Toolkit into the
+  Registry service.
+- Never hand-edit `contracts/*`; change its source model or route and run
+  `pnpm contracts:generate`.
+- Treat checked-in D1 migrations as append-only after deployment. Production
+  resource mutation requires a separate, explicit authorization.
 
 ## Current Checks
 
-- Install frozen dependencies: `uv sync --frozen && pnpm install --frozen-lockfile`.
-- Run the full repository contract: `pnpm check`.
-- Inspect SVC integration: `svc status --json`.
-- Verify patch whitespace: `git diff --check`.
-- Task-specific commands and production evidence must be recorded in the active packet.
+- Install: `uv sync --frozen && pnpm install --frozen-lockfile`.
+- Full contract: `pnpm check`.
+- Generate contracts intentionally: `pnpm contracts:generate`.
+- SVC health: `svc status . --json`; patch hygiene: `git diff --check`.
+- Read the active packet before changing its governed scope. Keep production
+  evidence and task-specific verification there.
 
-<!-- svc:begin navigation sha256=01d8643023a40533a997a67c70e920bb0ff0056081d2d18bec59e47324318152 -->
+<!-- svc:begin -->
 ## SVC
 
-This project uses the local Sustainable Vibe Coding CLI. Query framework guidance when it is needed instead of copying framework documents into this repository.
+Use `svc --help` or `svc <command> --help`.
 
-- Use `svc lookup --keyword "<need>"` to find relevant guidance, then `svc lookup --name '<exact-path-regex>'` to read an authoritative document.
-- Use `svc status` before broad process changes. If the installed corpus is newer than the adopted version in `svc.json`, read its migration guidance before `svc adopt`.
-- Treat all unmarked project instructions and documentation as consumer-owned.
-<!-- svc:end navigation -->
+- `svc status`: inspect project state
+- `svc lookup`: read SVC guidance
+- `svc task init`: create a task packet
+- `svc task grow`: inspect packet shape without changing files
+- `svc dev`: manage declared development targets
+
+If `AGENTS.local.md` exists, read it after this file. It is ignored local guidance; shared rules belong here.
+<!-- svc:end -->

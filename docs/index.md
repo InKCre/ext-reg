@@ -1,21 +1,23 @@
 # Documentation
 
-This directory is the navigation root for durable Extension Registry knowledge. Shared InKCre product truth and cross-unit contracts remain owned by the `InKCre/docs` Hub; active work remains under `tasks/`.
+This directory is the navigation root for durable Extension Registry knowledge.
+Shared InKCre product truth and cross-unit contracts remain owned by the
+`InKCre/docs` Hub; active work remains under `tasks/`.
 
-## Current Navigation
+## Owners
 
-- Active MVP control surface: [`tasks/extension-registry-mvp/packet.md`](../tasks/extension-registry-mvp/packet.md)
-- Repository architecture: [`ARCHITECTURE.md`](../ARCHITECTURE.md)
-- Filesystem ownership: [`FILESYSTEM.md`](../FILESYSTEM.md)
-- Production operations: [`operations.md`](operations.md)
-- Registry-local durable documents will be admitted only when schemas, code, tests, configuration, or automation cannot preserve the required contract clearly enough.
+- [Unit TDD](30-unit-tdd/README.md): Registry and Toolkit internal design.
+- [Deployment](40-deployment/README.md): local runtime, production delivery,
+  previews, migration, and recovery.
+- [Contributor workflow](../CONTRIBUTING.md): toolchain, checks, and pull-request
+  expectations.
 
-<!-- svc:begin navigation sha256=01d8643023a40533a997a67c70e920bb0ff0056081d2d18bec59e47324318152 -->
-## SVC
+Prefer code, schemas, configuration, tests, assertions, and automation when
+they can preserve a fact mechanically. Do not promote task evidence or
+provisional decisions here.
 
-This project uses the local Sustainable Vibe Coding CLI. Query framework guidance when it is needed instead of copying framework documents into this repository.
+<!-- svc:begin navigation sha256=7f7f63d0b8989624f57bd21b82b2ac2d05e4445edfd5af4bc3742996f0754bda -->
+## SVC Corpus
 
-- Use `svc lookup --keyword "<need>"` to find relevant guidance, then `svc lookup --name '<exact-path-regex>'` to read an authoritative document.
-- Use `svc status` before broad process changes. If the installed corpus is newer than the adopted version in `svc.json`, read its migration guidance before `svc adopt`.
-- Treat all unmarked project instructions and documentation as consumer-owned.
+Use `svc lookup` when packaged Sustainable Vibe Coding Corpus guidance is relevant, and discover its browse/search/read grammar through `svc lookup --help`. Project documentation outside this marked block remains Consumer-owned.
 <!-- svc:end navigation -->

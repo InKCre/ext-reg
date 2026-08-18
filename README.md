@@ -31,5 +31,5 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
-The active delivery plan and evidence live in
-[`tasks/extension-registry-mvp/packet.md`](tasks/extension-registry-mvp/packet.md).
+See the [documentation index](docs/index.md) for internal design and deployment
+guidance. Contributor workflow lives in [CONTRIBUTING.md](CONTRIBUTING.md).
