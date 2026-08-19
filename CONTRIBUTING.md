@@ -25,7 +25,19 @@ ephemeral evidence, but canonical packages and production deployment only come
 from an exact successful current-`main` revision. Do not commit credentials,
 local Wrangler state, generated dependency directories, or unrelated changes.
 
-Registry, Toolkit publication and Cloudflare production changes are separate
+Package release intent uses the ecosystem-native release tool:
+
+- Toolkit and Core Python Runtime changes use Changie. Add a project-scoped
+  fragment with `changie new --projects toolkit` or
+  `changie new --projects runtime-core-py`, then batch and merge that project
+  before review.
+- Client Web Runtime changes use `pnpm changeset`. Changesets creates the
+  protected-main Version PR and updates its version and changelog.
+
+The three package versions are independent. Registry Worker deployment has its
+own release lifecycle and is never versioned by either package tool.
+
+Registry, Toolkit publication, Runtime publication and Cloudflare production changes are separate
 privileged operations. Extension publishers install the independent
 `inkcre-extension-toolkit[cli]` distribution, prepare typed associations with
 `inkcre-ext prepare-release`, use PDM/Twine for wheels or

@@ -1,0 +1,40 @@
+changesDir: .changes
+unreleasedDir: unreleased
+headerPath: header.tpl.md
+versionExt: md
+versionFormat: '## {{.Version}} - {{.Time.Format "2006-01-02"}}'
+kindFormat: '### {{.Kind}}'
+changeFormat: '* {{.Body}}'
+kinds:
+  - label: Added
+    auto: minor
+  - label: Changed
+    auto: patch
+  - label: Deprecated
+    auto: minor
+  - label: Removed
+    auto: major
+  - label: Fixed
+    auto: patch
+  - label: Security
+    auto: patch
+newlines:
+  afterChangelogHeader: 0
+  beforeChangelogVersion: 1
+  endOfVersion: 1
+projectsVersionSeparator: '-'
+projects:
+  - label: Extension Developer Toolkit
+    key: toolkit
+    changelog: toolkit/CHANGELOG.md
+    replacements:
+      - path: toolkit/pyproject.toml
+        find: '^version = ".*"$'
+        replace: 'version = "{{.VersionNoPrefix}}"'
+  - label: Core Python Extension Host Runtime
+    key: runtime-core-py
+    changelog: runtimes/core-py/CHANGELOG.md
+    replacements:
+      - path: runtimes/core-py/pyproject.toml
+        find: '^version = ".*"$'
+        replace: 'version = "{{.VersionNoPrefix}}"'

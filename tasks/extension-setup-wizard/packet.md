@@ -20,9 +20,10 @@ Extension config/state and Source/Cron/Job ownership distinct.
   Host Runtime family; Python activation is local-first; `ExtensionManager` and
   `ExtensionBase` belong to that Runtime; Core's rich `ExtensionModel` remains
   the database authority; no Repository or generic Port layer is introduced.
-- Local source implementation and Peer adoption checks are complete. Commit,
-  push, package publication, released-lock normalization and remote deployment
-  remain separately gated.
+- Local source implementation and Peer adoption checks are complete. The
+  Runtime-family commit is pushed; package release management is being aligned
+  with Changie/Changesets before PR review. Package publication,
+  released-lock normalization and remote deployment remain separately gated.
 
 ## Current Authority
 
@@ -65,6 +66,9 @@ authority. Their status and replacement are recorded in
   regeneration plus a clean diff is the drift gate.
 - Python development uses one root PDM workspace and `pdm.lock`; no uv command,
   uv lock or nested Python environment is a repository interface.
+- Python package versions and changelogs use Changie; the Web Runtime uses
+  Changesets and a protected-main Version PR. Package publication consumes
+  those managed versions and is separate from Registry Worker deployment.
 - Repositories do not maintain automated test suites. Validation is limited to
   generated-contract checks, static analysis, package builds and deployment
   smoke where applicable.
@@ -91,7 +95,8 @@ merge remain separate authorization boundaries.
 
 ## Current Gate
 
-Toolkit 0.2.0 and both Runtime 0.1.0 release units are locally green. The next
-gate is explicit authorization to commit/push and publish those independent
-packages; only after publication can Core and Client record normal released
-dependencies and frozen locks. Remote preview acceptance remains later.
+Toolkit 0.2.0 and Core Runtime 0.1.0 are Changie baselines; the pending Web
+Runtime changeset will establish 0.1.0 through a Version PR. The next gate is
+reviewing and committing the release-management correction, then opening the
+Runtime-family PR. Publication remains separately gated; only afterward can
+Core and Client record released dependencies and frozen locks.
