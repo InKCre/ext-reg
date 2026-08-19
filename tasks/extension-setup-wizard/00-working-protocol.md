@@ -22,9 +22,9 @@
 
 ## Current Mode
 
-Product design -> HLD -> implementation plan are complete. The packet is at
-Sir's plan-review gate. No source implementation is authorized until a new
-explicit start after that review.
+This chronological protocol is retained as accepted collaboration history.
+Current state, authority and gates now live in `active/00-state.md`; the task
+dashboard is `packet.md`. No source implementation is currently authorized.
 
 ## Repository Boundary
 

@@ -246,11 +246,11 @@ readability, but it must remain within these owned surfaces.
 Core, using repository-pinned PDM behavior:
 
 ```text
-uv tool run --from pdm==2.27.0 pdm lock --check
-uv tool run --from pdm==2.27.0 pdm run check:migrations
-uv tool run --from pdm==2.27.0 pdm run test <focused test paths>
-uv tool run --from pdm==2.27.0 pdm run check
-uv tool run --from pdm==2.27.0 pdm run python scripts/dev_database.py ensure <task-instance>
+pdm lock --check
+pdm run check:migrations
+pdm run test <focused test paths>
+pdm run check
+pdm run python scripts/dev_database.py ensure <task-instance>
 git diff --check
 ```
 

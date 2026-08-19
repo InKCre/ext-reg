@@ -1,6 +1,6 @@
 [project]
 name = "inkcre-extension-toolkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Developer and delivery tooling for InKCre Extensions"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -16,6 +16,7 @@ dependencies = [
 cli = [
   "httpx>=0.28,<0.29",
   "typer>=0.21,<0.22",
+  "wheel>=0.46,<0.48",
 ]
 
 [project.scripts]

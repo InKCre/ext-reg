@@ -8,12 +8,12 @@ AGENTS.local.md
 
 # Python
 .venv/
+.pdm-python
 .venv-workers/
 python_modules/
 __pycache__/
 *.py[cod]
 *.egg-info/
-.pytest_cache/
 .ruff_cache/
 .pyright/
 build/

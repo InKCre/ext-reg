@@ -16,7 +16,7 @@ Distribution hosting, and the independent Extension Developer Toolkit.
 - Shared InKCre product truth and cross-unit contracts: `InKCre/docs` Hub.
 - Registry and Toolkit internal design: `docs/30-unit-tdd/`.
 - Runtime, packaging, delivery, migration, and recovery: `docs/40-deployment/`.
-- Executable facts: source, schemas, configuration, tests, and automation.
+- Executable facts: source, schemas, configuration, builds, and automation.
 - Active evidence and provisional decisions: current `tasks/*/packet.md`.
 
 ## Working Rules
@@ -38,7 +38,7 @@ Distribution hosting, and the independent Extension Developer Toolkit.
 - Follow the organization-wide
   [Verification and Test Policy](https://github.com/InKCre/.github/blob/main/TESTING.md); the checks below are Registry-local
   verification contracts, not a separate testing policy.
-- Install frozen dependencies: `uv sync --frozen && pnpm install --frozen-lockfile`.
+- Install frozen dependencies: `pdm install --frozen-lockfile && pnpm install --frozen-lockfile`.
 - Run the full repository contract: `pnpm check`.
 - Generate contracts intentionally: `pnpm contracts:generate`.
 - Inspect SVC integration: `svc status --json`.

@@ -12,7 +12,7 @@ Shared InKCre product truth and cross-unit contracts remain owned by the
 - [Contributor workflow](../CONTRIBUTING.md): toolchain, checks, and pull-request
   expectations.
 
-Prefer code, schemas, configuration, tests, assertions, and automation when
+Prefer code, schemas, configuration, build checks, assertions, and automation when
 they can preserve a fact mechanically. Do not promote task evidence or
 provisional decisions here.
 

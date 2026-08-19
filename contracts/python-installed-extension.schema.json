@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "InstalledHostSdk": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "core-py",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "InstalledHostSdk",
+      "type": "object"
+    },
+    "InstalledPythonDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_point": {
+          "$ref": "#/$defs/PythonEntryPoint"
+        },
+        "project": {
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,198}[A-Za-z0-9])?$",
+          "title": "Project",
+          "type": "string"
+        },
+        "project_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Project Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "project_version",
+        "entry_point"
+      ],
+      "title": "InstalledPythonDistribution",
+      "type": "object"
+    },
+    "PythonEntryPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$",
+          "title": "Group",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "object": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.]*(?::[A-Za-z_][A-Za-z0-9_.]*)?$",
+          "title": "Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group",
+        "name",
+        "object"
+      ],
+      "title": "PythonEntryPoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "host_sdk": {
+      "$ref": "#/$defs/InstalledHostSdk"
+    },
+    "name": {
+      "maxLength": 129,
+      "minLength": 3,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+      "title": "Name",
+      "type": "string"
+    },
+    "python": {
+      "$ref": "#/$defs/InstalledPythonDistribution"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "maxLength": 128,
+      "minLength": 5,
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "version",
+    "host_sdk",
+    "python"
+  ],
+  "title": "InstalledExtension",
+  "type": "object"
+}

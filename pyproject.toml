@@ -8,7 +8,7 @@ license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
   "fastapi>=0.139.2,<0.142",
-  "inkcre-extension-toolkit @ https://github.com/InKCre/ext-reg/releases/download/toolkit-v0.1.0/inkcre_extension_toolkit-0.1.0-py3-none-any.whl",
+  "inkcre-extension-toolkit>=0.2,<0.3",
   "packaging>=25,<27",
   "python-multipart>=0.0.22,<0.1",
 ]
@@ -19,15 +19,15 @@ Repository = "https://github.com/InKCre/ext-reg"
 [dependency-groups]
 dev = [
   "build>=1.4,<2",
+  "datamodel-code-generator>=0.35,<0.36",
   "httpx>=0.28,<0.29",
   # Keep the verified Cloudflare Worker dependency while the public wheel
   # metadata remains compatible with peer runtimes on newer Pydantic minors.
   "pydantic==2.10.6",
   "pyright>=1.1.405,<2",
-  "pytest>=9,<10",
-  "pytest-asyncio>=1.3,<2",
   "ruff>=0.14,<0.15",
   "typer>=0.21,<0.22",
+  "wheel>=0.46,<0.48",
   "workers-py>=1.16,<2",
   "workers-runtime-sdk>=1.6,<2",
 ]
@@ -42,16 +42,8 @@ packages = ["src/inkcre_extension_registry"]
 [tool.hatch.metadata]
 allow-direct-references = true
 
-[tool.uv.workspace]
-members = ["toolkit"]
-
-[tool.uv.sources]
-inkcre-extension-toolkit = { workspace = true }
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-asyncio_mode = "auto"
+[tool.pdm.workspace]
+members = ["toolkit", "runtimes/core-py"]
 
 [tool.ruff]
 target-version = "py312"
@@ -62,6 +54,15 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.pyright]
 pythonVersion = "3.13"
-include = ["src", "tests", "toolkit/src"]
+include = ["src", "toolkit/src", "runtimes/core-py/src"]
+ignore = ["runtimes/core-py/src/inkcre_extension_runtime_core_py/generated"]
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
+
+[[tool.pyright.executionEnvironments]]
+root = "runtimes/core-py"
+extraPaths = ["runtimes/core-py/src"]
+reportMissingImports = false
+
+[[tool.pyright.executionEnvironments]]
+root = "."

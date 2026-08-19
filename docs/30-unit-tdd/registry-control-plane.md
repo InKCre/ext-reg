@@ -33,7 +33,7 @@ and materializes only the manifest's public path from canonical
 `PUBLIC_ORIGIN`. It does not mint a second public manifest schema.
 
 The generated [OpenAPI contract](../../contracts/openapi.json), JSON Schemas,
-models, routes, and tests are the exact executable interface authorities.
+models, routes, generated contracts, and build checks are the exact executable interface authorities.
 
 ## Persistence and Security
 

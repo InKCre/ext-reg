@@ -1,0 +1,99 @@
+name: Release Extension packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Independent package to release
+        required: true
+        type: choice
+        options:
+          - toolkit
+          - runtime-core-py
+          - runtime-client-web
+      version:
+        description: Exact package version
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: extension-package-release-${{ inputs.package }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release ${{ inputs.package }} ${{ inputs.version }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+
+      - name: Install PDM
+        run: python -m pip install pdm==2.28.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: |
+          pdm install --frozen-lockfile
+          pnpm install --frozen-lockfile
+
+      - name: Verify requested version
+        env:
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$PACKAGE" in
+            toolkit) actual=$(python -c 'import tomllib; print(tomllib.load(open("toolkit/pyproject.toml", "rb"))["project"]["version"])') ;;
+            runtime-core-py) actual=$(python -c 'import tomllib; print(tomllib.load(open("runtimes/core-py/pyproject.toml", "rb"))["project"]["version"])') ;;
+            runtime-client-web) actual=$(node -p 'require("./runtimes/client-web/package.json").version') ;;
+          esac
+          test "$actual" = "$VERSION"
+
+      - name: Run repository contract
+        run: pnpm check
+
+      - name: Build selected package
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          mkdir -p release-assets
+          case "$PACKAGE" in
+            toolkit) pdm build --project toolkit --dest release-assets ;;
+            runtime-core-py) pdm build --project runtimes/core-py --dest release-assets ;;
+            runtime-client-web)
+              pnpm --filter @inkcre/extension-runtime-client-web build
+              pnpm --filter @inkcre/extension-runtime-client-web pack --pack-destination "$GITHUB_WORKSPACE/release-assets"
+              ;;
+          esac
+
+      - name: Create independent package release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+        run: >-
+          gh release create "$PACKAGE-v$VERSION"
+          release-assets/*
+          --target "$GITHUB_SHA"
+          --title "$PACKAGE v$VERSION"
+          --generate-notes
