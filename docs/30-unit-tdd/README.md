@@ -2,7 +2,7 @@
 
 These documents own expensive internal design truth for the repository's
 independently released units. Public schemas, routes, package metadata, and
-tests remain executable authority.
+generated contracts and build checks remain executable authority.
 
 - [Registry control plane](registry-control-plane.md)
 - [Extension Developer Toolkit](developer-toolkit.md)

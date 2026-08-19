@@ -1,0 +1,39 @@
+{
+  "name": "@inkcre/extension-runtime-client-web",
+  "version": "0.1.0",
+  "description": "InKCre Client Web Extension Host Runtime",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check:bindings": "pnpm generate:bindings && git diff --exit-code -- src/generated",
+    "generate:bindings": "openapi-ts -f openapi-ts.config.ts && prettier --write src/generated",
+    "type-check": "tsc --noEmit",
+    "pack": "pnpm pack"
+  },
+  "dependencies": {
+    "semver": "7.8.5",
+    "zod": "4.1.12"
+  },
+  "peerDependencies": {
+    "@inkcre/core": ">=0.1.2 <0.2.0",
+    "@module-federation/runtime": ">=0.21.4 <0.23.0"
+  },
+  "devDependencies": {
+    "@module-federation/runtime": "0.21.6",
+    "@types/semver": "7.7.1",
+    "tsdown": "0.15.11",
+    "typescript": "5.9.3"
+  }
+}

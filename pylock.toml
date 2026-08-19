@@ -24,13 +24,13 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/cb/03/10388a42375ee7e
 
 [[packages]]
 name = "idna"
-version = "3.18"
-wheels = [{ url = "https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl", upload-time = 2026-06-02T14:34:06Z, size = 65455, hashes = { sha256 = "7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2" } }]
+version = "3.19"
+wheels = [{ url = "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl", upload-time = 2026-08-18T05:14:22Z, size = 68550, hashes = { sha256 = "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4" } }]
 
 [[packages]]
 name = "inkcre-extension-toolkit"
-version = "0.1.0"
-archive = { url = "https://github.com/InKCre/ext-reg/releases/download/toolkit-v0.1.0/inkcre_extension_toolkit-0.1.0-py3-none-any.whl", hashes = { sha256 = "7ab1de5160d0bafbdf9f99b6b2a2b156a406b6f6afe14dc0342073620299bd64" } }
+version = "0.2.0"
+wheels = [{ url = "file:///Volumes/WorkSSD/Development/InKCre/ext-reg/dist/inkcre_extension_toolkit-0.2.0-py3-none-any.whl", hashes = {} }]
 
 [[packages]]
 name = "packaging"
@@ -72,10 +72,10 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/49/d3/b8441a820a491dd
 
 [[packages]]
 name = "typing-inspection"
-version = "0.4.2"
-wheels = [{ url = "https://files.pythonhosted.org/packages/dc/9b/47798a6c91d8bdb567fe2698fe81e0c6b7cb7ef4d13da4114b41d239f65d/typing_inspection-0.4.2-py3-none-any.whl", upload-time = 2025-10-01T02:14:40Z, size = 14611, hashes = { sha256 = "4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7" } }]
+version = "0.4.4"
+wheels = [{ url = "https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", upload-time = 2026-08-12T12:37:24Z, size = 14750, hashes = { sha256 = "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147" } }]
 
 [[packages]]
 name = "workers-runtime-sdk"
-version = "1.6.8"
-wheels = [{ url = "https://files.pythonhosted.org/packages/53/95/624301551cf2aeaf79c6764306b363261e7dff35c5678e621bd15cd6b3d1/workers_runtime_sdk-1.6.8-py3-none-any.whl", upload-time = 2026-08-05T03:45:38Z, size = 32787, hashes = { sha256 = "42312d9cdd8e97626ba15d4e513edd43fe781f45cf4e68bd2d5d628eb88de8c5" } }]
+version = "1.6.13"
+wheels = [{ url = "https://files.pythonhosted.org/packages/49/bc/2f676f7f4b0ffadc3737098f12ae3ad02b47003b17d2bc3657c9e8c526bc/workers_runtime_sdk-1.6.13-py3-none-any.whl", upload-time = 2026-08-12T03:35:57Z, size = 34448, hashes = { sha256 = "bc76862651bea761ed14bce80afce104e2d8e73cae8b1069e76c789c38a8308d" } }]

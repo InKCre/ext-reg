@@ -9,10 +9,27 @@ import typer
 from .client import RegistryClient
 from .contracts import PrepareReleaseRequest
 from .preview import build_preview_registry
+from .python_distribution import finalize_wheel
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 preview_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+python_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+wheel_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(preview_app, name="preview")
+app.add_typer(python_app, name="python")
+python_app.add_typer(wheel_app, name="wheel")
+
+
+@wheel_app.command("finalize")
+def python_wheel_finalize(
+    project: Annotated[Path, typer.Option("--project", exists=True, dir_okay=False)],
+    wheel: Annotated[Path, typer.Option("--wheel", exists=True, dir_okay=False)],
+    output_dir: Annotated[Path, typer.Option("--output-dir", file_okay=False)],
+) -> None:
+    """Finalize an already-built Core Extension wheel with installed metadata."""
+
+    finalized = finalize_wheel(project, wheel, output_dir)
+    typer.echo(finalized)
 
 
 def _client(registry_url: str, token: str | None) -> RegistryClient:

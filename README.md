@@ -26,7 +26,7 @@ use the native APIs described above.
 ## Local checks
 
 ```bash
-uv sync --frozen
+pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 pnpm check
 ```

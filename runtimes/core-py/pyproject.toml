@@ -1,0 +1,42 @@
+[project]
+name = "inkcre-extension-runtime-core-py"
+version = "0.1.0"
+description = "InKCre Core Python Extension Host Runtime"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.139.2,<0.142",
+  "packaging>=25,<27",
+  "pydantic>=2.10,<3",
+  "requests>=2.32,<3",
+  "semantic-version>=2.10,<3",
+]
+
+[build-system]
+requires = ["hatchling>=1.29,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inkcre_extension_runtime_core_py"]
+
+[dependency-groups]
+dev = [
+  "build>=1.4,<2",
+  "datamodel-code-generator>=0.35,<0.36",
+  "pyright>=1.1.405,<2",
+  "ruff>=0.14,<0.15",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+include = ["src"]
+ignore = ["src/inkcre_extension_runtime_core_py/generated"]
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+reportMissingImports = false

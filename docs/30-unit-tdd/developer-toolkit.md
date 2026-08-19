@@ -16,4 +16,4 @@ metadata, Release, manifest, and asset paths.
 The Toolkit is not a Registry service or Host SDK. It does not own deployment
 installation, Peer enablement, runtime activation, or Extension business
 behavior. Package metadata in `toolkit/pyproject.toml`, generated schemas,
-source, and tests are executable authority for its released interface.
+source, generated contracts, and build checks are executable authority for its released interface.

@@ -1,5 +1,7 @@
-# Root-only tool installation; there are no application packages or shared Runtime/API workspace.
-packages: []
+packages:
+  - runtimes/client-web
+
+autoInstallPeers: false
 
 allowBuilds:
   esbuild: true

@@ -516,6 +516,90 @@ that same alias as `EXTENSION_REGISTRY_URL` before starting its Heroku preview.
 Do not claim a random deployment URL as the embedded origin after the static
 tree has already been built.
 
+### D041 — Python activation is local-first and owned by a Host Runtime unit — Accepted
+
+Deployment `installed`, Core-Peer-local Python Distribution `present`, and
+runtime `running` are distinct states. Core enable/cold restore must inspect and
+validate the exact locally installed Distribution before any Registry I/O. An
+exact local hit activates without Release refresh, yank lookup or Simple access;
+only a local miss enters Registry resolution and pip acquisition. Disable does
+not remove local presence. A rebuilt ephemeral Peer may legitimately require
+Registry acquisition again.
+
+This policy belongs to an independently versioned, Core-specific Python
+Extension Host Runtime release unit in `ext-reg`, not the Registry service,
+Developer Toolkit, Core database or Peer protocol. Core depends on that Runtime
+for Release resolution, native acquisition and module load/unload. Core itself
+retains `ExtensionBase` lifecycle, RuntimeClaim and publication; the Runtime
+imports no Core tables, transports or adapters. Long-term discovery uses a versioned installed metadata
+record carried by the wheel and derived from `[tool.inkcre-extension]`, standard
+wheel metadata and entry points. Toolkit generation/admission, Registry Python
+admission and Runtime local discovery share that pure identity model. Core must
+remove its duplicate native consumer after adopting the released Runtime.
+
+### D042 — ext-reg owns the per-tech-stack/per-Peer-type Host Runtime family — Accepted
+
+Extension Registry, Extension Developer Toolkit and Extension Host Runtime are
+three first-class product unit families managed in `ext-reg`. Host Runtime is a
+family rather than one universal implementation: Core Python and Client Web
+each consume an independently released Runtime tied to their Host SDK,
+technology stack, native Distribution consumer and lifecycle model. Their
+currently embedded Runtime implementations are ownership debt to extract and
+then delete from the Peer repositories.
+
+Shared truth is limited to language-neutral Release/native association models
+and the product distinction between deployment `installed`, local/session
+`present`, and runtime `running`. An `extensions` row means the Release is
+installed in the deployment while allowing lazy native acquisition by each
+Peer. `present` is always derived by the native consumer and is never persisted
+to the shared database. Wheel-installed Extension metadata is required; its
+schema/file name and Runtime package/API names are delegated implementation
+decisions, not unresolved product questions.
+
+### D043 — Host SDK/Runtime packaging and integration seam — Accepted
+
+The **Extension Host SDK** is a conceptual name for the API seen and imported by an Extension for one
+Peer type. It includes lifecycle base/types, config/state access and
+Peer-specific contribution APIs. It is not a second distribution, package,
+manager or deployment service: Extension and Peer use the same per-Peer-type
+Host Runtime package/implementation. Its compatibility identity remains the Host
+SDK/Peer identity (`core-py`, `@inkcre/core`, and their versions), because an
+Extension may also use admitted Peer APIs directly.
+
+The **Extension Host Runtime** is that same unit's Host-side implementation that discovers,
+acquires, loads and manages Extensions. It owns `ExtensionManager`, the
+implementation and lifecycle binding of `ExtensionBase`, native Distribution
+consumption, running-instance/resource ownership and lifecycle compensation.
+No detached-Extension development use case justifies a separate SDK artifact or
+formal SDK/Host export split now.
+
+Core remains authoritative for the `extensions` SQL schema, migrations and
+database concurrency. A Repository is not required. The earlier proposal only
+followed from an unnecessary rule that Runtime could not depend on its Peer
+implementation. Restore the established Active Record/充血模型 direction:
+Core's `ExtensionModel` owns the schema and persistence behavior for the whole
+record (install/version/enabled/config/state/config-schema); the Core-specific
+Runtime's `ExtensionManager` consumes that model API directly, and
+Runtime-owned `ExtensionBase` binds the active model so config/state methods use
+the same authority. The lower Core model layer must not import Runtime, keeping
+the module graph acyclic. Do not add a Repository, reusable
+"Persistence Port" framework or "Contribution Port": each
+per-Peer-type Runtime integrates with that Peer type's existing concrete
+FastAPI/Source/Resolver/Peer or Module Federation mechanisms. Client retains
+database/UI and remote-Peer delegation. This direction supersedes the narrower
+D041 planning detail that left `ExtensionBase` lifecycle and the entire manager
+in Core. The product and architecture decision is accepted; the revised package
+dependency map remains an implementation-planning deliverable rather than an
+open product decision.
+
+The preferred mature contract toolchain is: FastAPI/Pydantic remains the
+Registry contract source and emits OpenAPI 3.1/JSON Schema; Python consumers are
+generated with `datamodel-code-generator`; Web types, fetch SDK and Zod v4
+response schemas are generated by `@hey-api/openapi-ts` with its fetch and Zod
+plugins. CI regenerates and fails on a dirty diff. Do not maintain parallel
+handwritten Zod Release models or weaken the accepted Web generation path to a
+types-only fallback during implementation.
+
 ### Q010 — What is the minimum production-shaped vertical slice? — Resolved
 
 [Minimum Vertical Slice and Black-box Acceptance Proposal](27-vertical-slice-and-acceptance.md).
@@ -526,9 +610,9 @@ repository checks but do not invent a substitute provider harness.
 
 ## Queued Questions
 
-No product or HLD question is queued. D032–D040 freeze multi-Extension ownership,
-the explicit inventory, both native kinds, shared executable projections,
-per-Peer preview-owned native facades, Core Cloudflare hosting and the
-no-new-tests and preview-delivery authority constraints. The implementation plan
-has been reviewed against organization governance; source work resumes only from
-the corrected same-run preview topology.
+No product question is queued. D041/D042 freeze Python local-first activation
+and repository ownership of the Runtime family; accepted D043 now aligns SDK/Runtime
+terminology and moves `ExtensionManager` plus `ExtensionBase` implementation
+into Runtime while preserving Core's Active Record authority without a new
+Repository. The previous extraction plan/readiness verdict is therefore
+superseded and must be mechanically revised and re-reviewed before source work.

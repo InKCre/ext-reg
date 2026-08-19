@@ -7,19 +7,20 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "uv build --all-packages",
-    "check": "pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm worker:build",
-    "contracts:check": "uv run python scripts/generate_contracts.py --check",
-    "contracts:generate": "uv run python scripts/generate_contracts.py",
-    "format": "uv run ruff format . && prettier --write .",
-    "format:check": "uv run ruff format --check . && prettier --check .",
-    "lint": "uv run ruff check .",
-    "test": "uv run pytest",
-    "type-check": "uv run pyright",
-    "worker:build": "uv build --all-packages && UV_FIND_LINKS=dist uv run pywrangler deploy --dry-run --outdir dist/worker"
+    "build": "pdm build --no-sdist --dest \"$INIT_CWD/dist\" && pdm build --project toolkit --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pdm build --project runtimes/core-py --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pnpm --filter @inkcre/extension-runtime-client-web build",
+    "check": "pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm worker:build",
+    "contracts:check": "pdm run python scripts/generate_contracts.py --check && pdm run python runtimes/core-py/scripts/generate_contracts.py --check && pnpm --filter @inkcre/extension-runtime-client-web check:bindings",
+    "contracts:generate": "pdm run python scripts/generate_contracts.py && pdm run python runtimes/core-py/scripts/generate_contracts.py && pnpm --filter @inkcre/extension-runtime-client-web generate:bindings",
+    "format": "pdm run ruff format . && prettier --write .",
+    "format:check": "pdm run ruff format --check . && prettier --check .",
+    "lint": "pdm run ruff check .",
+    "type-check": "pdm run pyright && pnpm --filter @inkcre/extension-runtime-client-web type-check",
+    "worker:build": "pdm build --project toolkit --no-sdist --dest \"$INIT_CWD/dist\" && pdm build --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && UV_FIND_LINKS=\"$INIT_CWD/dist\" pdm run pywrangler deploy --dry-run --outdir dist/worker"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "prettier": "3.6.2",
+    "typescript": "5.9.3",
     "wrangler": "4.120.0"
   }
 }

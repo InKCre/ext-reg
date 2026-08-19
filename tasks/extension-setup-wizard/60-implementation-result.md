@@ -95,7 +95,7 @@ Implementation refinements from the HLD examples:
 Core:
 
 ```text
-PDM_IGNORE_ACTIVE_VENV=1 uv tool run --from pdm==2.27.0 pdm run check
+PDM_IGNORE_ACTIVE_VENV=1 pdm run check
   migration checks: 31 + 23 passed
   format/lint/type checks: passed, 0 diagnostics
   pytest: 241 passed

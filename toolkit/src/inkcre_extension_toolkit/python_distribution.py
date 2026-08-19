@@ -3,18 +3,31 @@ from __future__ import annotations
 import configparser
 import hashlib
 import io
+import shutil
 import stat
+import subprocess
+import sys
+import tempfile
+import tomllib
 import zipfile
 from dataclasses import dataclass
 from email import policy
 from email.parser import BytesParser
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from typing import Protocol
 
 from packaging.utils import InvalidWheelFilename, parse_wheel_filename
 from packaging.version import InvalidVersion
 from packaging.version import Version as Pep440Version
 
-from .contracts import PythonEntryPoint, normalize_project_name, python_project_version
+from .contracts import (
+    InstalledExtension,
+    InstalledHostSdk,
+    PythonEntryPoint,
+    normalize_project_name,
+    python_project_version,
+    validate_host_sdk_range,
+)
 
 MAX_ARCHIVE_FILES = 4096
 MAX_EXPANDED_BYTES = 100 * 1024 * 1024
@@ -24,6 +37,12 @@ MAX_COMPRESSION_RATIO = 200
 
 class DistributionValidationError(ValueError):
     pass
+
+
+class EntryPointDescriptor(Protocol):
+    group: str
+    name: str
+    object: str
 
 
 @dataclass(frozen=True)
@@ -98,7 +117,7 @@ def inspect_wheel(
     *,
     expected_project: str,
     expected_release_version: str,
-    expected_entry_point: PythonEntryPoint,
+    expected_entry_point: EntryPointDescriptor,
 ) -> InspectedWheel:
     if PurePosixPath(filename).name != filename or "\\" in filename:
         raise DistributionValidationError("upload filename must not contain a path")
@@ -193,3 +212,149 @@ def inspect_wheel(
 
 def sha256_hex(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
+
+
+def _producer_metadata(project_path: Path) -> InstalledExtension:
+    try:
+        document = tomllib.loads(project_path.read_text(encoding="utf-8"))
+        project = document["project"]
+        extension = document["tool"]["inkcre-extension"]
+        entry_points = project["entry-points"]["inkcre.core.extensions"]
+    except (OSError, tomllib.TOMLDecodeError, KeyError, TypeError) as error:
+        raise DistributionValidationError("producer pyproject metadata is incomplete") from error
+    if not isinstance(entry_points, dict) or len(entry_points) != 1:
+        raise DistributionValidationError("producer must declare exactly one Core entry point")
+    entry_name, entry_object = next(iter(entry_points.items()))
+    try:
+        release_version = str(project["version"])
+        project_version = python_project_version(release_version)
+        host_sdk_name = str(extension["host-sdk"])
+        host_sdk_version = validate_host_sdk_range(str(extension["host-sdk-version"]))
+        if host_sdk_name != "core-py":
+            raise ValueError("host SDK must be core-py")
+        return InstalledExtension.model_validate(
+            {
+                "schema_version": 1,
+                "name": extension["name"],
+                "version": release_version,
+                "host_sdk": InstalledHostSdk(name="core-py", version=host_sdk_version),
+                "python": {
+                    "project": normalize_project_name(str(project["name"])),
+                    "project_version": project_version,
+                    "entry_point": PythonEntryPoint(
+                        group="inkcre.core.extensions",
+                        name=str(entry_name),
+                        object=str(entry_object),
+                    ).model_dump(mode="json"),
+                },
+            }
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise DistributionValidationError(f"producer metadata is invalid: {error}") from error
+
+
+def inspect_installed_extension(filename: str, content: bytes) -> InstalledExtension:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            safe = _safe_members(archive)
+            records = [
+                info for info in safe if info.filename.endswith(".dist-info/inkcre-extension.json")
+            ]
+            if len(records) != 1:
+                raise DistributionValidationError(
+                    "wheel must contain exactly one dist-info/inkcre-extension.json"
+                )
+            payload = archive.read(records[0])
+    except (zipfile.BadZipFile, KeyError, RuntimeError) as error:
+        raise DistributionValidationError("installed Extension record cannot be read") from error
+    try:
+        record = InstalledExtension.model_validate_json(payload)
+    except ValueError as error:
+        raise DistributionValidationError("installed Extension record is invalid") from error
+    inspected = inspect_wheel(
+        filename,
+        content,
+        expected_project=record.python.project,
+        expected_release_version=record.version,
+        expected_entry_point=PythonEntryPoint.model_validate(
+            record.python.entry_point.model_dump(mode="json")
+        ),
+    )
+    if inspected.project_version != record.python.project_version:
+        raise DistributionValidationError(
+            "installed Extension Project version does not match wheel metadata"
+        )
+    return record
+
+
+def finalize_wheel(project_path: Path, wheel_path: Path, output_dir: Path) -> Path:
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise DistributionValidationError("output directory must be empty")
+    if not wheel_path.is_file():
+        raise DistributionValidationError("input wheel does not exist")
+    record = _producer_metadata(project_path)
+    original = wheel_path.read_bytes()
+    inspect_wheel(
+        wheel_path.name,
+        original,
+        expected_project=record.python.project,
+        expected_release_version=record.version,
+        expected_entry_point=PythonEntryPoint.model_validate(
+            record.python.entry_point.model_dump(mode="json")
+        ),
+    )
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary = Path(temporary_directory)
+        unpacked_root = temporary / "unpacked"
+        packed_root = temporary / "packed"
+        unpacked_root.mkdir()
+        packed_root.mkdir()
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "wheel",
+                "unpack",
+                "--dest",
+                str(unpacked_root),
+                str(wheel_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        unpacked = list(unpacked_root.iterdir())
+        if len(unpacked) != 1 or not unpacked[0].is_dir():
+            raise DistributionValidationError("wheel unpack did not produce one wheel tree")
+        dist_info = list(unpacked[0].glob("*.dist-info"))
+        if len(dist_info) != 1:
+            raise DistributionValidationError("wheel must contain exactly one dist-info directory")
+        (dist_info[0] / "inkcre-extension.json").write_text(
+            record.model_dump_json(indent=2) + "\n", encoding="utf-8"
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "wheel",
+                "pack",
+                "--dest-dir",
+                str(packed_root),
+                str(unpacked[0]),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        packed = list(packed_root.glob("*.whl"))
+        if len(packed) != 1:
+            raise DistributionValidationError("wheel pack did not produce one wheel")
+        finalized_content = packed[0].read_bytes()
+        finalized_record = inspect_installed_extension(packed[0].name, finalized_content)
+        if finalized_record != record:
+            raise DistributionValidationError("finalized wheel record changed during packing")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        destination = output_dir / packed[0].name
+        shutil.copy2(packed[0], destination)
+        return destination

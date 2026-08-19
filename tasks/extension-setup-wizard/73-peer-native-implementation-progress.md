@@ -40,7 +40,7 @@ authorized by this source batch.
 Latest pinned full evidence:
 
 ```text
-uv tool run --from pdm==2.27.0 pdm run check
+pdm run check
   foundation/lock/migrations/format/lint/type checks: passed
   pyrefly: 0 diagnostics
   pytest: 488 passed, 41 skipped
