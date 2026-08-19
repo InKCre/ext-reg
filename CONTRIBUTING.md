@@ -3,6 +3,10 @@
 Use Python 3.13, Node 22, uv 0.12.3, and pnpm 11.11.0. Install frozen
 dependencies and run the repository contract before opening a pull request:
 
+Verification follows the organization-wide
+[Verification and Test Policy](https://github.com/InKCre/.github/blob/main/TESTING.md). The commands below are this
+repository's admitted local evidence.
+
 ```bash
 uv sync --frozen
 pnpm install --frozen-lockfile

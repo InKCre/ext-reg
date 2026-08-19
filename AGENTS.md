@@ -26,6 +26,9 @@ This repository owns the public Extension release contract, catalog and admissio
 
 ## Current Checks
 
+- Follow the organization-wide
+  [Verification and Test Policy](https://github.com/InKCre/.github/blob/main/TESTING.md); the checks below are Registry-local
+  verification contracts, not a separate testing policy.
 - Install frozen dependencies: `uv sync --frozen && pnpm install --frozen-lockfile`.
 - Run the full repository contract: `pnpm check`.
 - Inspect SVC integration: `svc status --json`.
