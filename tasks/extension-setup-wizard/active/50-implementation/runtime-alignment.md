@@ -55,9 +55,13 @@
   partially mutated interpreter.
 - Core CI and first-party publication now finalize raw PEP 517 wheels before
   verify/publish. Workflow lint and diff check pass.
-- `.github/workflows/packages-release.yml` prepares three independent,
-  manually selected package releases without coupling them to Registry service
-  deployment. YAML and actionlint pass; all three package assets build locally.
+- The two Python packages use Changie-managed independent versions and
+  changelogs. The Web Runtime uses Changesets and begins at `0.0.0`; its pending
+  minor changeset lets the protected-main Version PR establish `0.1.0`.
+- `.github/workflows/packages-release.yml` uses the Changesets Version PR
+  happy path, then builds missing independent package Releases from the exact
+  current-main revision in the protected `production` environment. Registry
+  service deployment remains separate.
 - Python development is rooted at one PDM workspace and one `pdm.lock`;
   `uv.lock`, uv commands and nested Runtime environments were removed. The
   Cloudflare-produced `pylock.toml` remains a Worker packaging input;
@@ -67,7 +71,10 @@
 
 ## Remaining gate
 
-- No commit, push, release, package publication, deployment or merge occurred.
+- Runtime-family implementation commit `2f7cbdf` was pushed to
+  `feat/extension-runtime-family`; the release-management correction is
+  implemented as the next branch commit. No PR, release, package publication,
+  deployment or merge occurred.
 - Publish Toolkit 0.2.0, Python Runtime 0.1.0 and Web Runtime 0.1.0 only after
   separate authorization; then update Core PDM and Client pnpm released locks
   and rerun their frozen full checks.

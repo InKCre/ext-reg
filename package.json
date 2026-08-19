@@ -8,16 +8,19 @@
   },
   "scripts": {
     "build": "pdm build --no-sdist --dest \"$INIT_CWD/dist\" && pdm build --project toolkit --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pdm build --project runtimes/core-py --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pnpm --filter @inkcre/extension-runtime-client-web build",
+    "changeset": "changeset",
     "check": "pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm worker:build",
     "contracts:check": "pdm run python scripts/generate_contracts.py --check && pdm run python runtimes/core-py/scripts/generate_contracts.py --check && pnpm --filter @inkcre/extension-runtime-client-web check:bindings",
     "contracts:generate": "pdm run python scripts/generate_contracts.py && pdm run python runtimes/core-py/scripts/generate_contracts.py && pnpm --filter @inkcre/extension-runtime-client-web generate:bindings",
     "format": "pdm run ruff format . && prettier --write .",
     "format:check": "pdm run ruff format --check . && prettier --check .",
     "lint": "pdm run ruff check .",
+    "release:version": "changeset version",
     "type-check": "pdm run pyright && pnpm --filter @inkcre/extension-runtime-client-web type-check",
     "worker:build": "pdm build --project toolkit --no-sdist --dest \"$INIT_CWD/dist\" && pdm build --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && UV_FIND_LINKS=\"$INIT_CWD/dist\" pdm run pywrangler deploy --dry-run --outdir dist/worker"
   },
   "devDependencies": {
+    "@changesets/cli": "3.0.0",
     "@hey-api/openapi-ts": "0.99.0",
     "prettier": "3.6.2",
     "typescript": "5.9.3",

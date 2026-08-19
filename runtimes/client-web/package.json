@@ -1,6 +1,6 @@
 {
   "name": "@inkcre/extension-runtime-client-web",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "InKCre Client Web Extension Host Runtime",
   "type": "module",
   "files": [
