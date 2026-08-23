@@ -30,7 +30,7 @@ wheels = [{ url = "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245
 [[packages]]
 name = "inkcre-extension-toolkit"
 version = "0.2.0"
-wheels = [{ url = "file:///Volumes/WorkSSD/Development/InKCre/ext-reg/dist/inkcre_extension_toolkit-0.2.0-py3-none-any.whl", hashes = {} }]
+archive = { url = "https://github.com/InKCre/ext-reg/releases/download/toolkit-v0.2.0/inkcre_extension_toolkit-0.2.0-py3-none-any.whl", hashes = { sha256 = "1250d05885834954d67c3ec331e28fd572ee232570aa0407fe958ba6c6301f5b" } }
 
 [[packages]]
 name = "packaging"

@@ -111,11 +111,14 @@ jobs:
         run: |
           toolkit_version=$(python -c 'import tomllib; print(tomllib.load(open("toolkit/pyproject.toml", "rb"))["project"]["version"])')
           core_runtime_version=$(python -c 'import tomllib; print(tomllib.load(open("runtimes/core-py/pyproject.toml", "rb"))["project"]["version"])')
+          web_runtime_version=$(node -p 'require("./runtimes/client-web/package.json").version')
           test "$(changie latest --project toolkit)" = "toolkit-$toolkit_version"
           test "$(changie latest --project runtime-core-py)" = "runtime-core-py-$core_runtime_version"
-          test -f runtimes/client-web/CHANGELOG.md
+          grep -F -m1 "## $web_runtime_version" runtimes/client-web/CHANGELOG.md
 
       - name: Build independent package assets
+        env:
+          SOURCE_DATE_EPOCH: '315532800'
         run: |
           mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-client-web
           pdm build --project toolkit --dest release-assets/toolkit
@@ -134,7 +137,10 @@ jobs:
             assets=$3
             tag="$package-v$version"
             if gh release view "$tag" >/dev/null 2>&1; then
-              echo "$tag already exists." >> "$GITHUB_STEP_SUMMARY"
+              existing_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
+              test "$existing_target" = "$GITHUB_SHA"
+              test "$(gh release view "$tag" --json assets --jq '.assets | length')" -gt 0
+              echo "$tag already exists at $GITHUB_SHA with package assets." >> "$GITHUB_STEP_SUMMARY"
               return
             fi
             gh release create "$tag" "$assets"/* \

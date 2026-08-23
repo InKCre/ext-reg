@@ -6,3 +6,6 @@ autoInstallPeers: false
 allowBuilds:
   esbuild: true
   workerd: true
+
+overrides:
+  js-yaml@4.2.0: 4.3.1

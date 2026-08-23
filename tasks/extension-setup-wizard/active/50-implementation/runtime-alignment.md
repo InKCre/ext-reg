@@ -62,6 +62,13 @@
   happy path, then builds missing independent package Releases from the exact
   current-main revision in the protected `production` environment. Registry
   service deployment remains separate.
+- Toolkit wheels use a fixed build epoch. The checked Worker lock points to the
+  future `toolkit-v0.2.0` Release asset and its reproducible wheel checksum;
+  local Worker dry builds temporarily resolve the workspace wheel and restore
+  the checked lock afterward.
+- Dependency Review initially rejected transitive `js-yaml 4.2.0`; the pnpm
+  workspace now uses the patched `4.3.1` through the package manager's standard
+  override mechanism rather than weakening the gate.
 - Python development is rooted at one PDM workspace and one `pdm.lock`;
   `uv.lock`, uv commands and nested Runtime environments were removed. The
   Cloudflare-produced `pylock.toml` remains a Worker packaging input;
