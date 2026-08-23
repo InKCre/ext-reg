@@ -72,7 +72,9 @@
 - Python development is rooted at one PDM workspace and one `pdm.lock`;
   `uv.lock`, uv commands and nested Runtime environments were removed. The
   Cloudflare-produced `pylock.toml` remains a Worker packaging input;
-  pywrangler's internal resolver is not a repository development interface.
+  pywrangler's internal resolver requires the `uv` executable, so PDM locks its
+  exact build-only version; uv remains an implementation detail rather than a
+  repository development interface.
 - All repository, Runtime and Peer tests were explicitly deleted, including
   pytest/Vitest/Playwright dependencies, scripts, fixtures and CI test jobs.
 

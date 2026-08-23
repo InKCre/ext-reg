@@ -27,6 +27,9 @@ dev = [
   "pyright>=1.1.405,<2",
   "ruff>=0.14,<0.15",
   "typer>=0.21,<0.22",
+  # pywrangler invokes uv internally while resolving Pyodide Worker packages.
+  # PDM remains the repository entry point and locks this transitive tool.
+  "uv==0.12.3",
   "wheel>=0.46,<0.48",
   "workers-py>=1.16,<2",
   "workers-runtime-sdk>=1.6,<2",
