@@ -97,4 +97,29 @@
   corrected protected-main release run; then update Core PDM and Client pnpm
   released locks and rerun their frozen full checks.
 
+## Python dependency acquisition correction
+
+- Preview acceptance of Twitter 0.2.0 reproduced pip resolving `authlib` from
+  the Extension Registry's Simple API. That Registry owns Extension
+  Distributions, not ordinary third-party Python packages.
+- Runtime 0.1.1 downloads the exact Extension wheel with `--no-deps`, validates
+  its installed Extension record, and then installs the local wheel while pip
+  resolves ordinary dependencies from its normal package index.
+- This keeps Registry Release resolution exact without turning a Peer preview
+  Registry into a PyPI mirror or combining the two authorities through an
+  extra index.
+- Core PR #65's preview producer now finalizes each raw PEP 517 wheel through
+  the released Toolkit before writing its preview inventory. The static
+  Registry therefore hosts the same installed-record-bearing Distribution that
+  the Runtime contract consumes.
+- A disposable Python 3.12 environment completed the real acquisition path
+  against a locally built seven-Extension sibling Registry: Twitter 0.2.0 was
+  downloaded as the exact Extension wheel, its ordinary dependency closure was
+  resolved by pip, and installed-record discovery returned
+  `extensions.twitter:Extension`.
+- The ext-reg static/build/type contract passes. Worker dry build requires the
+  repository-declared Node 22 runtime and passes there; the initially active
+  Node 26 executable lacks the Pyodide flag expected by this toolchain. Core's
+  format, lint and type checks pass, as does its seven-wheel preview build.
+
 Do not append investigation narrative or restate historical product decisions.

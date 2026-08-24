@@ -230,6 +230,7 @@ class PipDistributionConsumer:
             download = self._runner(
                 [
                     "download",
+                    "--no-deps",
                     "--only-binary=:all:",
                     "--dest",
                     str(wheel_dir),
@@ -250,9 +251,7 @@ class PipDistributionConsumer:
                         ):
                             extension_wheels.append(wheel)
                 except zipfile.BadZipFile as error:
-                    raise ExtensionAcquisitionError(
-                        "Downloaded dependency wheel is invalid"
-                    ) from error
+                    raise ExtensionAcquisitionError("Downloaded wheel is invalid") from error
             if len(extension_wheels) != 1:
                 raise ExtensionAcquisitionError(
                     "Registry did not yield exactly one Extension wheel"
@@ -263,10 +262,6 @@ class PipDistributionConsumer:
                 [
                     "install",
                     "--no-compile",
-                    "--only-binary=:all:",
-                    "--no-index",
-                    "--find-links",
-                    str(wheel_dir),
                     str(extension_wheel),
                 ]
             )
