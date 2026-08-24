@@ -148,8 +148,10 @@ The store's version-change transaction and the relation's update trigger both
 require `OLD.state = '{}'` before `version` may change. The store check happens
 under the same locked installed row and before writing the new version; the
 trigger prevents a direct PostgREST update from bypassing it. There is no attempt
-to import the incoming Distribution as a migration probe. Non-empty state makes
-a different-version install fail closed; same version remains idempotent.
+to import the incoming Distribution as a migration probe. Non-empty state leaves
+the existing version unchanged so Core can report the observable conflict and
+coordinate an explicit state migration; installing the same version remains
+idempotent.
 
 All existing first-party Python Extension Host ranges
 `>=0.1.0 <0.2.0` continue to accept Core `0.1.1`. Twitter `0.2.0` will require

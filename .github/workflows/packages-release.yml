@@ -1,0 +1,183 @@
+name: Release Extension packages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-package-release-main
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    name: Identify a merged Version PR
+    permissions:
+      contents: read
+      pull-requests: read
+    runs-on: ubuntu-latest
+    outputs:
+      version_pr: ${{ steps.release.outputs.version_pr }}
+    steps:
+      - name: Read the pull request associated with current main
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main" and .title == "chore(release): version Extension packages")] | length')
+          if [ "$count" -eq 1 ]; then
+            echo 'version_pr=true' >> "$GITHUB_OUTPUT"
+            echo 'Current main was produced by the Extension package Version PR.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'version_pr=false' >> "$GITHUB_OUTPUT"
+            echo 'Current main is not an Extension package Version PR; package publication is skipped.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  reconcile:
+    name: Reconcile Web Runtime release plan
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install the frozen JavaScript workspace
+        run: pnpm install --frozen-lockfile
+
+      - name: Create or update the package Version PR
+        id: changesets
+        uses: changesets/action@198f833dd7d863100ea6e28967bc9a9fdefadb0a # v2.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-script: pnpm release:version
+          pr-title: 'chore(release): version Extension packages'
+          commit-message: 'chore(release): version Extension packages'
+          pr-base-branch: main
+          create-github-releases: false
+          push-git-tags: false
+
+  publish:
+    name: Publish Extension package releases
+    needs: classify
+    if: needs.classify.outputs.version_pr == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    steps:
+      - name: Checkout the release revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm the release revision is current main
+        run: |
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$current_main" = "$GITHUB_SHA"
+
+      - name: Set up Python and PDM
+        uses: pdm-project/setup-pdm@973541a5febeafcfdadf8a51211435be6ecfd90f # v4.5
+        with:
+          python-version-file: .python-version
+          version: 2.28.0
+          cache: true
+
+      - name: Set up exact Changie release tool
+        uses: miniscruff/changie-action@3223cb29b92a0972dedc864ace3da01e04780ae4 # v3.0.1
+        with:
+          version: v1.25.2
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Install frozen dependencies
+        run: |
+          pdm install --frozen-lockfile
+          pnpm install --frozen-lockfile
+
+      - name: Run repository contract
+        run: pnpm check
+
+      - name: Verify managed package versions
+        run: |
+          toolkit_version=$(python -c 'import tomllib; print(tomllib.load(open("toolkit/pyproject.toml", "rb"))["project"]["version"])')
+          core_runtime_version=$(python -c 'import tomllib; print(tomllib.load(open("runtimes/core-py/pyproject.toml", "rb"))["project"]["version"])')
+          web_runtime_version=$(node -p 'require("./runtimes/client-web/package.json").version')
+          test "$(changie latest --project toolkit)" = "toolkit-$toolkit_version"
+          test "$(changie latest --project runtime-core-py)" = "runtime-core-py-$core_runtime_version"
+          grep -F -m1 "## $web_runtime_version" runtimes/client-web/CHANGELOG.md
+
+      - name: Build independent package assets
+        env:
+          SOURCE_DATE_EPOCH: '315532800'
+        run: |
+          mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-client-web
+          pdm build --project toolkit --dest release-assets/toolkit
+          pdm build --project runtimes/core-py --dest release-assets/runtime-core-py
+          pnpm --filter @inkcre/extension-runtime-client-web build
+          pnpm --filter @inkcre/extension-runtime-client-web pack \
+            --pack-destination "$GITHUB_WORKSPACE/release-assets/runtime-client-web"
+
+      - name: Create missing independent package releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_package() {
+            package=$1
+            version=$2
+            assets=$3
+            tag="$package-v$version"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              existing_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
+              test "$existing_target" = "$GITHUB_SHA"
+              test "$(gh release view "$tag" --json assets --jq '.assets | length')" -gt 0
+              echo "$tag already exists at $GITHUB_SHA with package assets." >> "$GITHUB_STEP_SUMMARY"
+              return
+            fi
+            gh release create "$tag" "$assets"/* \
+              --target "$GITHUB_SHA" \
+              --title "$package v$version" \
+              --generate-notes
+            echo "$tag published from $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          release_package toolkit \
+            "$(python -c 'import tomllib; print(tomllib.load(open("toolkit/pyproject.toml", "rb"))["project"]["version"])')" \
+            release-assets/toolkit
+          release_package runtime-core-py \
+            "$(python -c 'import tomllib; print(tomllib.load(open("runtimes/core-py/pyproject.toml", "rb"))["project"]["version"])')" \
+            release-assets/runtime-core-py
+          release_package runtime-client-web \
+            "$(node -p 'require("./runtimes/client-web/package.json").version')" \
+            release-assets/runtime-client-web
