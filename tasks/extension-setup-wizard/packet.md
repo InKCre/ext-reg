@@ -13,6 +13,13 @@ Extension config/state and Source/Cron/Job ownership distinct.
   and Client PR #71 and have reached the setup popup in preview.
 - Preview delivery controllers and the multi-Extension static Registry builder
   have landed through their own completed batches.
+- Cloudflare Pages serves a physical extensionless Release asset through its
+  SPA fallback, even though `_headers` labels the resulting HTML as JSON. The
+  isolated Toolkit correction keeps the extensionless Registry contract URL,
+  stores each inventory-derived Release at a `.json` asset, and generates one
+  sorted exact 200 internal rewrite per Release. A two-Extension generation
+  smoke and the existing repository checks pass without adding tests; Changie
+  plans Toolkit 0.2.1.
 - Re-enable acceptance exposed the next architectural defect: Core asks the
   Registry before discovering an exact wheel already present in its current
   interpreter.
@@ -103,7 +110,8 @@ merge remain separate authorization boundaries.
 ## Current Gate
 
 Toolkit 0.2.0 and Core Runtime 0.1.0 are Changie baselines; the pending Web
-Runtime changeset will establish 0.1.0 through a Version PR. The next gate is
-reviewing and committing the release-management correction, then opening the
-Runtime-family PR. Publication remains separately gated; only afterward can
-Core and Client record released dependencies and frozen locks.
+Runtime changeset will establish 0.1.0 through a Version PR. The next Registry
+gate is reviewing the static Release-route correction, then separately
+authorizing its commit, push and Toolkit 0.2.1 publication before Peer frozen
+locks consume it and rerun preview acceptance. Publication and all
+cross-repository mutations remain separately gated.

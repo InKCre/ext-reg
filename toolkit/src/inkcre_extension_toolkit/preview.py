@@ -333,6 +333,10 @@ def _headers() -> bytes:
     )
 
 
+def _redirects(release_paths: list[str]) -> bytes:
+    return "".join(f"{path} {path}.json 200\n" for path in release_paths).encode()
+
+
 def build_preview_registry(
     inventory_path: Path,
     public_origin: str,
@@ -373,12 +377,15 @@ def build_preview_registry(
                     output=staging,
                     releases=releases,
                 )
+        release_paths: list[str] = []
         for (name, version), material in sorted(releases.items()):
             namespace, local_name = name.split("/", 1)
+            release_path = f"/v1/extensions/{namespace}/{local_name}/releases/{version}"
             _write(
-                staging / "v1" / "extensions" / namespace / local_name / "releases" / version,
+                staging / (release_path.lstrip("/") + ".json"),
                 _release_bytes(material.record()),
             )
+            release_paths.append(release_path)
         projects = sorted(files_by_project)
         if projects:
             _write(staging / "simple" / "index.html", root_html(projects).encode())
@@ -389,6 +396,7 @@ def build_preview_registry(
                     project_html(records).encode(),
                 )
         _write(staging / "_headers", _headers())
+        _write(staging / "_redirects", _redirects(release_paths))
         if output_path.exists():
             output_path.rmdir()
         os.replace(staging, output_path)
