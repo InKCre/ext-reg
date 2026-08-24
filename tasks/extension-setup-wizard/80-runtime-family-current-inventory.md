@@ -47,8 +47,8 @@ they do not silently republish the historical API.
 | Current Core surface | Runtime responsibility |
 | --- | --- |
 | `app/business/extension/release.py` | exact Release/Python association values, Registry reader, native association and Host SDK precheck, Simple URL validation |
-| `app/business/extension/distribution.py` | installed Distribution discovery, pip download/preflight/install, wheel/file ownership checks, entry-point discovery, module origin validation and load/unload |
-| selected errors in `app/business/extension/errors.py` | Registry, compatibility, acquisition, entry-point, runtime and restart-required failures |
+| `app/business/extension/distribution.py` | installed Distribution discovery, pip download/install, entry-point discovery, module origin validation and load/unload |
+| selected errors in `app/business/extension/errors.py` | Registry, compatibility, acquisition, entry-point and runtime failures |
 | selected orchestration in `app/business/extension/main.py` | local-first prepare, Registry fallback and native module load/unload handle |
 
 Tests that primarily move with those surfaces are

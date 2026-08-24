@@ -29,9 +29,6 @@ class ExtensionEntryPointError(ExtensionRuntimeError): ...
 class ExtensionLifecycleError(ExtensionRuntimeError): ...
 
 
-class ExtensionRestartRequiredError(ExtensionStateConflictError): ...
-
-
 def translate_host_model_error(error: Exception) -> typing.NoReturn:
     """Translate the concrete Core Active Record boundary without a reverse dependency."""
     try:

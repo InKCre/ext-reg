@@ -49,10 +49,12 @@
 - ext-reg now has no test tree or test runner. Its current `pnpm check` passes
   contract regeneration, format, lint, Python/Web type-check, all Registry,
   Toolkit and Runtime builds, and Worker dry build.
-- Both Runtimes now reject a Registry URL with a path instead of silently
-  discarding it. Python retains restart-required after pip mutation begins;
-  this intentionally rejects the review suggestion to retry a possibly
-  partially mutated interpreter.
+- Both Runtimes reject a Registry URL with a path instead of silently
+  discarding it. After pip mutation begins, Python rediscovers the installed
+  Distribution; the next ordinary lifecycle operation retries from that
+  observable interpreter state when acquisition did not complete. It
+  neither asks the user to resolve a fail-closed/fail-fast outcome nor
+  interrupts unrelated Extensions.
 - Core CI and first-party publication now finalize raw PEP 517 wheels before
   verify/publish. Workflow lint and diff check pass.
 - The two Python packages use Changie-managed independent versions and

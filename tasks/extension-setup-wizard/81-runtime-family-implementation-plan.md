@@ -170,13 +170,10 @@ shutdown compensation. `unload()` only releases module ownership after Core has
 completed that lifecycle. The Runtime imports no `app.*` module and receives
 Host SDK identity/version from Core.
 
-The current pip safety posture remains part of the Runtime extraction. Local
-discovery is read-only. Before mutation, dependency planning must continue to
-reject replacement of Core-owned or already-loaded distributions. Once pip has
-started mutating the active interpreter, an incomplete acquisition or a
-replacement that cannot be safely observed in-process raises the existing
-restart-required class of error; extraction must not weaken this into a normal
-retry.
+Local discovery is read-only. On a local miss the Runtime delegates acquisition
+and installation to pip, then rediscovers the exact installed Distribution.
+An incomplete acquisition remains local to that Extension and a later ordinary
+lifecycle operation retries from the observable installed environment.
 
 ## Client Web Runtime API
 
@@ -251,8 +248,7 @@ Owned repository: `ext-reg`.
 
 1. Create the Python Runtime workspace package.
 2. Move/adapt Core's native Release models/client, explicit install resolution,
-   Simple URL rules, pip
-   consumer, installed discovery, file ownership checks, entry-point/module
+   Simple URL rules, pip consumer, installed discovery, entry-point/module
    loader and typed errors.
 3. Remove the `app.version` dependency by injecting Host SDK identity/version.
 4. Implement `resolve_install/prepare_installed/load/unload`; the package has no
@@ -263,8 +259,8 @@ Owned repository: `ext-reg`.
    - metadata/standard Distribution mismatch is rejected;
    - incompatible Host SDK is rejected locally;
    - load failure restores module state;
-   - dependency mutation and restart-required errors preserve their current
-     fail-closed semantics.
+   - dependency mutation is rediscovered from the installed environment and
+     remains local to the affected Extension.
 6. Build a wheel and prove it installs on Core's Python 3.12 baseline without
    changing Core framework dependencies.
 

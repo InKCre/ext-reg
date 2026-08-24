@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
-import json
+import logging
 import os
 import subprocess
 import sys
-import sysconfig
 import tempfile
 import typing
 import zipfile
@@ -21,14 +20,11 @@ from packaging.version import InvalidVersion, Version
 from semantic_version import Version as SemVer
 
 from .contracts import ExtensionReleaseDescriptor, InstalledExtensionRecord, PythonReleaseDescriptor
-from .errors import (
-    ExtensionAcquisitionError,
-    ExtensionEntryPointError,
-    ExtensionRestartRequiredError,
-)
+from .errors import ExtensionAcquisitionError, ExtensionEntryPointError
 from .release import _validate_entry_point, _validate_host, simple_project_and_index_urls
 
 INSTALLED_RECORD = "inkcre-extension.json"
+LOGGER = logging.getLogger(__name__)
 
 
 def _python_project_version(release_version: str) -> str:
@@ -133,8 +129,6 @@ class AcquiredDistribution:
 
 
 class PipDistributionConsumer:
-    _restart_required_reason: typing.ClassVar[str | None] = None
-
     def __init__(
         self,
         origin: str,
@@ -142,49 +136,6 @@ class PipDistributionConsumer:
     ) -> None:
         self.origin = origin
         self._runner = runner or self._run
-
-    @staticmethod
-    def _installed_versions() -> dict[str, str]:
-        return {
-            canonicalize_name(distribution.metadata["Name"] or ""): distribution.version
-            for distribution in importlib.metadata.distributions()
-            if distribution.metadata["Name"]
-        }
-
-    @classmethod
-    def _preflight_report(
-        cls, report_path: Path, extension_project: str
-    ) -> list[dict[str, typing.Any]]:
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise ExtensionAcquisitionError("pip dependency report is invalid") from error
-        installs = report.get("install") if isinstance(report, dict) else None
-        if not isinstance(installs, list) or any(not isinstance(item, dict) for item in installs):
-            raise ExtensionAcquisitionError("pip produced an invalid install plan")
-        installed = cls._installed_versions()
-        planned_projects: set[str] = set()
-        for item in installs:
-            metadata = item.get("metadata")
-            if not isinstance(metadata, dict):
-                raise ExtensionAcquisitionError("pip install plan omits Core Metadata")
-            name, version = metadata.get("name"), metadata.get("version")
-            if not isinstance(name, str) or not isinstance(version, str):
-                raise ExtensionAcquisitionError("pip install plan has invalid Core Metadata")
-            project = canonicalize_name(name)
-            planned_projects.add(project)
-            current = installed.get(project)
-            if (
-                current is not None
-                and Version(current) != Version(version)
-                and project != extension_project
-            ):
-                raise ExtensionAcquisitionError(
-                    f"pip plan would replace loaded Distribution {name} {current} with {version}"
-                )
-        if extension_project not in planned_projects:
-            raise ExtensionAcquisitionError("pip did not plan the exact Extension Project")
-        return typing.cast(list[dict[str, typing.Any]], installs)
 
     @staticmethod
     def _run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
@@ -208,7 +159,18 @@ class PipDistributionConsumer:
     @staticmethod
     def _require_success(result: subprocess.CompletedProcess[str], operation: str) -> None:
         if result.returncode:
-            raise ExtensionAcquisitionError(f"pip {operation} failed")
+            stdout = result.stdout or ""
+            stderr = result.stderr or ""
+            LOGGER.error(
+                "pip %s failed with exit code %s\nstdout:\n%s\nstderr:\n%s",
+                operation,
+                result.returncode,
+                stdout,
+                stderr,
+            )
+            raise ExtensionAcquisitionError(
+                f"pip {operation} failed with exit code {result.returncode}"
+            )
 
     @staticmethod
     def _validate_wheel(
@@ -217,11 +179,6 @@ class PipDistributionConsumer:
         association: PythonReleaseDescriptor,
         host_version: str,
     ) -> None:
-        package = association.entry_point.object.partition(":")[0].split(".")[:2]
-        if len(package) != 2 or package != ["extensions", association.entry_point.name]:
-            raise ExtensionAcquisitionError(
-                "Extension entry point does not own one extensions.<name> package"
-            )
         try:
             with zipfile.ZipFile(wheel) as archive:
                 names = archive.namelist()
@@ -258,43 +215,8 @@ class PipDistributionConsumer:
                         "Wheel installed record differs from the exact Registry association"
                     )
                 _validate_host(record.host_sdk.name, record.host_sdk.version, host_version)
-                prefix = "/".join(package) + "/"
-                dist_info = records[0].split("/", 1)[0] + "/"
-                files = [name for name in names if not name.endswith("/")]
-                if any(
-                    "\\" in name or name.startswith("/") or ".." in Path(name).parts
-                    for name in names
-                ):
-                    raise ExtensionAcquisitionError("Wheel contains a non-canonical path")
-                if any(
-                    not (
-                        name == prefix.removesuffix("/")
-                        or name.startswith(prefix)
-                        or name == dist_info.removesuffix("/")
-                        or name.startswith(dist_info)
-                    )
-                    for name in names
-                ):
-                    raise ExtensionAcquisitionError(
-                        "Wheel writes outside its package and dist-info"
-                    )
-                if any(name.endswith(".pth") or ".data/" in name for name in files):
-                    raise ExtensionAcquisitionError(
-                        "Wheel contains an executable or redirected path"
-                    )
         except (OSError, zipfile.BadZipFile, pydantic.ValidationError) as error:
             raise ExtensionAcquisitionError("Extension wheel is invalid") from error
-
-        purelib = Path(sysconfig.get_path("purelib")).resolve()
-        owners = {
-            Path(str(distribution.locate_file(file))).resolve()
-            for distribution in importlib.metadata.distributions()
-            if canonicalize_name(distribution.metadata["Name"] or "")
-            != canonicalize_name(association.project)
-            for file in (distribution.files or ())
-        }
-        if any((purelib / name).resolve() in owners for name in files):
-            raise ExtensionAcquisitionError("Wheel would overwrite another Distribution's file")
 
     def acquire(
         self,
@@ -302,14 +224,9 @@ class PipDistributionConsumer:
         association: PythonReleaseDescriptor,
         host_version: str,
     ) -> AcquiredDistribution:
-        if self._restart_required_reason is not None:
-            raise ExtensionRestartRequiredError(self._restart_required_reason)
         _, index_url = simple_project_and_index_urls(self.origin, association)
-        project = canonicalize_name(association.project)
-        installed_before = self._installed_versions().get(project)
         with tempfile.TemporaryDirectory(prefix="inkcre-extension-") as temporary:
             wheel_dir = Path(temporary)
-            report_path = wheel_dir / "pip-report.json"
             download = self._runner(
                 [
                     "download",
@@ -342,24 +259,6 @@ class PipDistributionConsumer:
                 )
             extension_wheel = extension_wheels[0]
             self._validate_wheel(extension_wheel, release, association, host_version)
-            plan = self._runner(
-                [
-                    "install",
-                    "--dry-run",
-                    "--report",
-                    str(report_path),
-                    "--only-binary=:all:",
-                    "--no-index",
-                    "--find-links",
-                    str(wheel_dir),
-                    str(extension_wheel),
-                ]
-            )
-            self._require_success(plan, "dependency preflight")
-            self._preflight_report(report_path, project)
-            self.__class__._restart_required_reason = (
-                "Core site-packages mutation began; restart Core before loading Extensions"
-            )
             install = self._runner(
                 [
                     "install",
@@ -376,9 +275,4 @@ class PipDistributionConsumer:
         acquired = AcquiredDistribution.discover(release.name, release.version, host_version)
         if acquired is None:
             raise ExtensionAcquisitionError("Acquired Distribution has no exact installed record")
-        if installed_before is not None:
-            raise ExtensionRestartRequiredError(
-                f"{association.project} was replaced; restart Core before loading it"
-            )
-        self.__class__._restart_required_reason = None
         return acquired

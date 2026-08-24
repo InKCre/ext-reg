@@ -10,7 +10,6 @@ from .errors import (
     ExtensionLifecycleError,
     ExtensionNotInstalledError,
     ExtensionRegistryError,
-    ExtensionRestartRequiredError,
     ExtensionRuntimeError,
     ExtensionStateConflictError,
 )
@@ -30,7 +29,6 @@ __all__ = [
     "ExtensionManager",
     "ExtensionNotInstalledError",
     "ExtensionRegistryError",
-    "ExtensionRestartRequiredError",
     "ExtensionRuntimeError",
     "ExtensionStateConflictError",
     "PublicHTTPRoute",

@@ -72,9 +72,16 @@ authority. Their status and replacement are recorded in
 - Repositories do not maintain automated test suites. Validation is limited to
   generated-contract checks, static analysis, package builds and deployment
   smoke where applicable.
+- Operational decisions converge from observable deployment and runtime facts.
+  A local acquisition, lifecycle or preview failure remains local: report the
+  observed failure, reconcile from observable state on the next ordinary
+  operation, and do not promote it into a deployment-wide failure or an
+  unresolved user-facing fail-closed/fail-fast outcome. Do not add
+  safety/security audits, designs or verification without a confirmed attacker
+  and specific attack pattern.
 - Preview delivery must not use full-tree public reads, byte comparisons,
-  cache-busters, digest substitutions, long propagation retries or similar
-  low-ROI consistency machinery.
+  cache-busters, digest substitutions or indiscriminate long propagation
+  retries; ordinary provider signals and focused probes retain observability.
 
 ## Review/Implementation Loop
 

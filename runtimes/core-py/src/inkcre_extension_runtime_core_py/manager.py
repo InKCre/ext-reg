@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import importlib
+import logging
 import typing
 from dataclasses import dataclass
 
@@ -14,12 +14,13 @@ from .distribution import AcquiredDistribution, PipDistributionConsumer
 from .errors import (
     ExtensionCompatibilityError,
     ExtensionNotInstalledError,
-    ExtensionRestartRequiredError,
     ExtensionStateConflictError,
     translate_host_model_error,
 )
 from .modules import DistributionModules
 from .release import RegistryReleaseClient, require_python_association, validate_coordinate
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -74,9 +75,7 @@ class ExtensionManager:
             return current
         loaded = self._loaded_versions.get(name)
         if loaded is not None and loaded != version:
-            raise ExtensionRestartRequiredError(
-                "A different Extension version was already imported"
-            )
+            raise ExtensionStateConflictError("Cannot change the version of a running Extension")
         origin = _registry_origin()
         release = RegistryReleaseClient(origin).get(name, version)
         if release.state is not ReleaseState.published:
@@ -107,7 +106,7 @@ class ExtensionManager:
         current = self.running.get(name)
         if current is not None:
             if current.model.version != model.version:
-                raise ExtensionRestartRequiredError("A different Extension version is running")
+                raise ExtensionStateConflictError("A different Extension version is running")
             return current.model
         host_version = _host_version()
         acquired = await asyncio.to_thread(
@@ -157,8 +156,12 @@ class ExtensionManager:
             modules.assert_origins()
         except Exception:
             if extension_class is not None:
-                with contextlib.suppress(Exception):
+                try:
                     await extension_class.on_close()
+                except Exception:
+                    logger.exception(
+                        "Extension %s on_close failed after startup failure", model.name
+                    )
                 extension_class.unbind()
             modules.abort()
             claim.release()
@@ -188,23 +191,38 @@ class ExtensionManager:
         running.extension_class.release_runtime()
         running.claim.release()
         self.running.pop(running.model.name, None)
+        self._loaded_versions.pop(running.model.name, None)
 
     async def _force_stop(self, running: RunningExtension) -> None:
-        with contextlib.suppress(Exception):
+        try:
             await running.extension_class.on_close()
-        with contextlib.suppress(Exception):
-            running.extension_class.unpublish()
-        running.extension_class.unbind()
-        running.modules.abort()
-        running.extension_class.release_runtime()
-        running.claim.release()
+        except Exception:
+            logger.exception("Extension %s on_close failed during cleanup", running.model.name)
+        cleanup = (
+            ("unpublish", running.extension_class.unpublish),
+            ("unbind", running.extension_class.unbind),
+            ("module abort", running.modules.abort),
+            ("runtime release", running.extension_class.release_runtime),
+            ("claim release", running.claim.release),
+        )
+        for operation, action in cleanup:
+            try:
+                action()
+            except Exception:
+                logger.exception(
+                    "Extension %s %s failed during cleanup", running.model.name, operation
+                )
         self.running.pop(running.model.name, None)
+        self._loaded_versions.pop(running.model.name, None)
 
     async def startup(self, app: typing.Any, peer: typing.Any = None) -> None:
         self.fastapi_app = app
         for model in self.list():
             if peer in model.enabled:
-                await self.enable(model.name, peer)
+                try:
+                    await self.enable(model.name, peer)
+                except Exception:
+                    logger.exception("Extension %s failed to start", model.name)
 
     async def shutdown(self) -> None:
         for running in tuple(self.running.values())[::-1]:

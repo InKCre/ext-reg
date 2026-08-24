@@ -58,9 +58,10 @@ accept one good record while ignoring a duplicate or malformed owner.
 
 ### 5. Active-interpreter mutation behavior was under-specified — resolved
 
-The extraction preserves Core's dependency preflight, prohibition on replacing
-Core-owned/loaded distributions and restart-required failure semantics after
-pip mutation. Local exact discovery remains read-only and zero-network.
+Local exact discovery remains read-only and zero-network. On a miss, pip owns
+acquisition and installation; the Runtime then rediscovers the exact installed
+Distribution. Failure remains local and the next ordinary lifecycle operation
+reconciles from the observable installed environment.
 
 ### 6. File and release maps were incomplete — resolved
 

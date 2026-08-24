@@ -163,14 +163,13 @@ Create `inkcre-extension-runtime-core-py 0.1.0` with:
 - `contracts.py`: generated Release/installed-record bindings plus native
   semantic validation;
 - `release.py`: exact Release/Python association reader and Simple URL rules;
-- `distribution.py`: installed discovery, pip planning/acquisition and file
-  ownership checks;
+- `distribution.py`: installed discovery and pip acquisition;
 - `modules.py`: standard entry-point discovery, origin validation and reversible
   module ownership;
 - `base.py`: Core-specific `ExtensionBase`, bound model config/state behavior;
 - `manager.py`: `ExtensionManager` orchestration and running-instance ownership;
-- `errors.py`: Registry, compatibility, acquisition, entry-point, lifecycle and
-  restart-required errors;
+- `errors.py`: Registry, compatibility, acquisition, entry-point and lifecycle
+  errors;
 - `__init__.py`: the deliberate Extension-facing/Host-facing public exports.
 
 ### 2.2 Deliberate Core coupling
@@ -229,9 +228,9 @@ Enable/cold restore sequence:
 8. compensate lifecycle/publication/module ownership if persistence fails.
 
 Install or version change remains Registry-authorized; it does not infer a new
-deployment Release merely from locally present bytes. Pip dependency preflight,
-prohibition on replacing Core-owned/loaded distributions and restart-required
-semantics remain intact.
+deployment Release merely from locally present bytes. A local miss delegates to
+pip and then rediscovers the installed environment; failure stays local to that
+Extension and does not create a process-wide latch.
 
 ### 2.5 Core compatibility integration
 
@@ -276,8 +275,12 @@ compensation coverage.
   Host-provided modules and executes one manager/base lifecycle;
 - exact local hit performs zero Registry-origin/HTTP/pip calls;
 - local miss follows exact Release/Simple/pip and rediscovery;
-- malformed/ambiguous installed records fail closed;
-- module load/unload restores owned module state;
+- malformed/ambiguous installed records retain and report their observable
+  local state; the next ordinary lifecycle operation reconciles it without
+  escalating the condition to deployment-wide failure or a user-facing
+  fail-closed/fail-fast result;
+- module load/unload restores owned module state and leaves unrelated
+  Extensions running when one Extension cannot converge;
 - Core integration proves manager/base/contribution lifecycle, rich-model
   behavior, state confidentiality and enable/disable compensation before the
   package is eligible for publication.
@@ -422,8 +425,11 @@ text check with its native lock inspection rather than broadening the regex.
 6. stop for Sir's product acceptance.
 
 Automation may use provider deployment success and short non-404 probes. It
-must not reintroduce artifact-wide downloads, byte equality, cache-busters,
-digest URL substitution or long retries.
+must preserve those observable signals; it must not reintroduce artifact-wide
+downloads, byte equality, cache-busters, digest URL substitution or
+indiscriminate long retries. Do not add safety/security audits, designs or
+verification unless a confirmed attacker and specific attack pattern require
+them.
 
 ## Verification Commands
 
@@ -481,5 +487,7 @@ git diff --check
 - arbitrary producer build-backend support inside Toolkit;
 - Runtime ownership of application UI or remote-Peer selection;
 - production Registry deployment as a prerequisite for static PR previews;
-- deep public artifact verification or new consistency/security machinery not
-  required by the observed defect.
+- deep public artifact verification or new consistency machinery not required
+  by the observed defect;
+- safety/security audits, designs or verification without a confirmed attacker
+  and specific attack pattern.
