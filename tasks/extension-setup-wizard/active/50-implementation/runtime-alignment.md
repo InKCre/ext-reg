@@ -82,12 +82,15 @@
 
 ## Remaining gate
 
-- Runtime-family implementation commit `2f7cbdf` was pushed to
-  `feat/extension-runtime-family`; the release-management correction is
-  implemented as the next branch commit. No PR, release, package publication,
-  deployment or merge occurred.
-- Publish Toolkit 0.2.0, Python Runtime 0.1.0 and Web Runtime 0.1.0 only after
-  separate authorization; then update Core PDM and Client pnpm released locks
-  and rerun their frozen full checks.
+- Runtime-family PR #18 and Web Runtime Version PR #19 were squash-merged.
+  Their exact PR heads passed the repository contract.
+- The first Version PR release run skipped publication because the
+  commit-associated-PR API had not yet exposed the just-merged PR when the push
+  workflow started. The release gate now uses the Version PR's fixed squash
+  commit title already present in the push event; it does not poll, retry or
+  query eventually consistent association state.
+- Publish Toolkit 0.2.0, Python Runtime 0.1.0 and Web Runtime 0.1.0 from the
+  corrected protected-main release run; then update Core PDM and Client pnpm
+  released locks and rerun their frozen full checks.
 
 Do not append investigation narrative or restate historical product decisions.
