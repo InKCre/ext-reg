@@ -118,8 +118,8 @@ jobs:
           SOURCE_DATE_EPOCH: '315532800'
         run: |
           mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-client-web
-          pdm build --project toolkit --dest release-assets/toolkit
-          pdm build --project runtimes/core-py --dest release-assets/runtime-core-py
+          pdm build --project toolkit --dest "$GITHUB_WORKSPACE/release-assets/toolkit"
+          pdm build --project runtimes/core-py --dest "$GITHUB_WORKSPACE/release-assets/runtime-core-py"
           pnpm --filter @inkcre/extension-runtime-client-web build
           pnpm --filter @inkcre/extension-runtime-client-web pack \
             --pack-destination "$GITHUB_WORKSPACE/release-assets/runtime-client-web"

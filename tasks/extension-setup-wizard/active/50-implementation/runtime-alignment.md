@@ -89,6 +89,10 @@
   workflow started. The release gate now uses the Version PR's fixed squash
   commit title already present in the push event; it does not poll, retry or
   query eventually consistent association state.
+- The corrected release reached package creation after all builds passed, then
+  exposed that PDM resolves a relative `--dest` from each selected project.
+  Python release destinations now use explicit workspace paths, matching the
+  already-correct Web pack destination and the release step's local paths.
 - Publish Toolkit 0.2.0, Python Runtime 0.1.0 and Web Runtime 0.1.0 from the
   corrected protected-main release run; then update Core PDM and Client pnpm
   released locks and rerun their frozen full checks.
