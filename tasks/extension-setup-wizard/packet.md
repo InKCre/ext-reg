@@ -20,6 +20,9 @@ Extension config/state and Source/Cron/Job ownership distinct.
   sorted exact 200 internal rewrite per Release. A two-Extension generation
   smoke and the existing repository checks pass without adding tests; Changie
   plans Toolkit 0.2.1.
+- Package publication now treats existing releases from the other independent
+  units as satisfied when their assets exist; it no longer requires unrelated
+  Runtime tags to point at a Toolkit-only release commit.
 - Re-enable acceptance exposed the next architectural defect: Core asks the
   Registry before discovering an exact wheel already present in its current
   interpreter.
