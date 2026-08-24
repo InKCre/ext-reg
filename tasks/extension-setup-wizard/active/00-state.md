@@ -24,7 +24,8 @@
 
 ## Current Gate
 
-Batches 1–3 and local package-release preparation are complete. Toolkit 0.2.0
-and both Runtime 0.1.0 packages must be committed, pushed and published before
-the Peer manifests can receive normal released dependencies and frozen locks.
-Every remote mutation remains separately gated.
+Batches 1–3 and the Python dependency-acquisition correction are locally
+complete. Core Runtime 0.1.1 must be committed, pushed and published before
+Core PR #65 can receive the released dependency and frozen lock. Its preview
+producer finalization correction is locally ready in the Core worktree. Every
+remote mutation remains separately gated.

@@ -92,6 +92,10 @@ authority. Their status and replacement are recorded in
 - Preview delivery must not use full-tree public reads, byte comparisons,
   cache-busters, digest substitutions or indiscriminate long propagation
   retries; ordinary provider signals and focused probes retain observability.
+- Python acquisition separates package authorities: the Extension Registry
+  supplies only the exact Extension wheel, while standard pip resolves its
+  ordinary Python dependencies from the normal package index. A Peer preview
+  Registry is not a PyPI mirror or an extra index for one combined resolution.
 
 ## Review/Implementation Loop
 
