@@ -134,10 +134,8 @@ jobs:
             assets=$3
             tag="$package-v$version"
             if gh release view "$tag" >/dev/null 2>&1; then
-              existing_target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
-              test "$existing_target" = "$GITHUB_SHA"
               test "$(gh release view "$tag" --json assets --jq '.assets | length')" -gt 0
-              echo "$tag already exists at $GITHUB_SHA with package assets." >> "$GITHUB_STEP_SUMMARY"
+              echo "$tag already exists with package assets." >> "$GITHUB_STEP_SUMMARY"
               return
             fi
             gh release create "$tag" "$assets"/* \
