@@ -9,35 +9,19 @@ Extension config/state and Source/Cron/Job ownership distinct.
 
 ## Current State
 
-- Product setup behavior and the Twitter wizard are implemented in Core PR #65
-  and Client PR #71 and have reached the setup popup in preview.
-- Preview delivery controllers and the multi-Extension static Registry builder
-  have landed through their own completed batches.
-- Cloudflare Pages serves a physical extensionless Release asset through its
-  SPA fallback, even though `_headers` labels the resulting HTML as JSON. The
-  isolated Toolkit correction keeps the extensionless Registry contract URL,
-  stores each inventory-derived Release at a `.json` asset, and generates one
-  sorted exact 200 internal rewrite per Release. A two-Extension generation
-  smoke and the existing repository checks pass without adding tests; Changie
-  plans Toolkit 0.2.1.
-- Package publication now treats existing releases from the other independent
-  units as satisfied when their assets exist; it no longer requires unrelated
-  Runtime tags to point at a Toolkit-only release commit.
-- Re-enable acceptance exposed the next architectural defect: Core asks the
-  Registry before discovering an exact wheel already present in its current
-  interpreter.
-- D041–D043 freeze the correction: `ext-reg` owns a per-Peer-type Extension
-  Host Runtime family; Python activation is local-first; `ExtensionManager` and
-  `ExtensionBase` belong to that Runtime; Core's rich `ExtensionModel` remains
-  the database authority; no Repository or generic Port layer is introduced.
 - Runtime-family PR #18 is merged. Toolkit 0.2.1, Core Python Runtime 0.1.1 and
   Web Runtime 0.1.0 are published through the repository release workflow.
-- Core PR #65 and Client PR #71 consume those releases through their native
-  package locks. Their repository checks and preview deliveries pass; Core is
-  live and ready, and both sibling Registry projections serve Twitter 0.2.1.
-- Final code and documentation review found no blocking defect. Sir authorized
-  squash merge after this review; production Registry publication remains a
-  later release-workflow concern.
+- Core PR #65 is squash-merged as `d0a7508`. Its main checks, first-party wheel
+  publication and production delivery pass.
+- Client PR #71 is squash-merged as `bf27db6`. Its main checks and Pages
+  delivery pass. The managed Changesets workflow opened Version PR #86 for the
+  independent Web Distribution release.
+- Cross-repository preview acceptance reached the Extension-owned Twitter setup
+  popup and Bookmark Source step. Both preview Registry projections served
+  Twitter 0.2.1; Core reported live and ready.
+- Final code and documentation review found no blocking defect. The setup-wizard
+  task is complete; production Registry publication and Client Version PR #86
+  remain ordinary release-workflow concerns.
 
 ## Current Authority
 
@@ -119,6 +103,6 @@ completed task retains these boundaries as historical process evidence.
 
 ## Current Gate
 
-Squash-merge Core PR #65, then Client PR #71. Their managed release workflows
-may subsequently publish the synchronized Twitter 0.2.1 Distributions. No
-manual production Registry mutation belongs to this task.
+None. The implementation, acceptance and ordered merges are complete. Client
+Version PR #86 and production Registry publication are independent release
+workflow follow-ups; no manual production mutation belongs to this task.
