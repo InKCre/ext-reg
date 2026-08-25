@@ -30,10 +30,14 @@ Extension config/state and Source/Cron/Job ownership distinct.
   Host Runtime family; Python activation is local-first; `ExtensionManager` and
   `ExtensionBase` belong to that Runtime; Core's rich `ExtensionModel` remains
   the database authority; no Repository or generic Port layer is introduced.
-- Local source implementation and Peer adoption checks are complete. The
-  Runtime-family commit is pushed; package release management is being aligned
-  with Changie/Changesets before PR review. Package publication,
-  released-lock normalization and remote deployment remain separately gated.
+- Runtime-family PR #18 is merged. Toolkit 0.2.1, Core Python Runtime 0.1.1 and
+  Web Runtime 0.1.0 are published through the repository release workflow.
+- Core PR #65 and Client PR #71 consume those releases through their native
+  package locks. Their repository checks and preview deliveries pass; Core is
+  live and ready, and both sibling Registry projections serve Twitter 0.2.1.
+- Final code and documentation review found no blocking defect. Sir authorized
+  squash merge after this review; production Registry publication remains a
+  later release-workflow concern.
 
 ## Current Authority
 
@@ -110,15 +114,11 @@ new chronological design essay:
 6. after authorization, record implementation evidence in `active/50-implementation/`;
 7. record black-box acceptance and remaining findings in `active/60-acceptance/`.
 
-Implementation batches do not automatically authorize the next batch. Commit,
-push, package publication, cross-repository mutation, preview deployment and
-merge remain separate authorization boundaries.
+Implementation batches do not automatically authorize the next batch. The
+completed task retains these boundaries as historical process evidence.
 
 ## Current Gate
 
-Toolkit 0.2.0 and Core Runtime 0.1.0 are Changie baselines; the pending Web
-Runtime changeset will establish 0.1.0 through a Version PR. The next Registry
-gate is reviewing the static Release-route correction, then separately
-authorizing its commit, push and Toolkit 0.2.1 publication before Peer frozen
-locks consume it and rerun preview acceptance. Publication and all
-cross-repository mutations remain separately gated.
+Squash-merge Core PR #65, then Client PR #71. Their managed release workflows
+may subsequently publish the synchronized Twitter 0.2.1 Distributions. No
+manual production Registry mutation belongs to this task.

@@ -1,6 +1,6 @@
 # Adjacent Batches — Runtime alignment
 
-- **Status:** planned; each source batch requires its own start authorization
+- **Status:** batches 1–6 complete
 - **Authority:** active Impact Handshake
 - **Supersedes:** the automatic A→G progression implied by plan `81`
 - **Evidence:** active final findings and plan

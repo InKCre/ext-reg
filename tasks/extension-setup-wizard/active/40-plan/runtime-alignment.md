@@ -1,9 +1,14 @@
 # Implementation Plan — Runtime alignment
 
-- **Status:** reviewed and ready; source not yet authorized
+- **Status:** implemented; retained as the reviewed pre-implementation plan
 - **Authority:** active Impact Handshake
 - **Supersedes:** plan `81`
-- **Evidence:** active findings, inventories `78`/`80`, accepted D043
+- **Evidence:** active implementation and acceptance results; inventories
+  `78`/`80`; accepted D043
+
+Implementation-result evidence supersedes mechanical details that changed
+during execution, notably the move to one root PDM workspace and the explicitly
+authorized removal of repository test suites.
 
 ## Goal
 
@@ -46,7 +51,7 @@ toolkit/
 src/inkcre_extension_registry/
 ```
 
-Add `runtimes/core-py` to the existing uv workspace and
+Add `runtimes/core-py` to the root PDM workspace and
 `runtimes/client-web` to the pnpm workspace. Root checks build and check all
 four units. The historical `@inkcre/extension-runtime` target/digest API remains
 retired; there is no compatibility package.

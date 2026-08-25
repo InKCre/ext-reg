@@ -1,6 +1,6 @@
 # Implementation Result — Runtime alignment
 
-- **Status:** local implementation complete; released-lock normalization blocked on publication
+- **Status:** implementation, publication and released-lock adoption complete
 - **Authority:** active implementation plan plus the latest authorized batch
 - **Supersedes:** none
 - **Evidence:** repository checks and Peer adoption checks recorded below
@@ -80,7 +80,7 @@
 - All repository, Runtime and Peer tests were explicitly deleted, including
   pytest/Vitest/Playwright dependencies, scripts, fixtures and CI test jobs.
 
-## Remaining gate
+## Release and adoption result
 
 - Runtime-family PR #18 and Web Runtime Version PR #19 were squash-merged.
   Their exact PR heads passed the repository contract.
@@ -93,9 +93,9 @@
   exposed that PDM resolves a relative `--dest` from each selected project.
   Python release destinations now use explicit workspace paths, matching the
   already-correct Web pack destination and the release step's local paths.
-- Publish Toolkit 0.2.0, Python Runtime 0.1.0 and Web Runtime 0.1.0 from the
-  corrected protected-main release run; then update Core PDM and Client pnpm
-  released locks and rerun their frozen full checks.
+- Toolkit 0.2.0/0.2.1, Python Runtime 0.1.0/0.1.1 and Web Runtime 0.1.0 were
+  published from protected main. Core PDM and Client pnpm locks consume the
+  released assets; both repository checks and previews pass.
 
 ## Python dependency acquisition correction
 

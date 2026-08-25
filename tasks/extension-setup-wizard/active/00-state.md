@@ -1,31 +1,28 @@
 # Active State — Runtime-family correction
 
-- **Status:** source implementation authorized for all planned batches
+- **Status:** implementation and preview acceptance complete; merge authorized
 - **Authority:** [D041–D043](../30-decisions-and-questions.md) plus the active
   Impact Handshake and implementation plan
 - **Supersedes:** implementation authority in `79–82`
 - **Evidence:** current inventories in `78`, `80` and Core/Client feature
   worktrees; historical files remain read-only evidence
 
-## Authorized Now
+## Completed Authority
 
-- source implementation for all local batches;
-- investigation and bounded experiments;
-- task-packet maintenance;
-- plan and readiness review.
+- source implementation, cross-repository adoption and preview delivery;
+- commits, pushes and independent package publication;
+- final task-packet maintenance and merge review.
 
-## Not Authorized Yet
+## Remaining Boundary
 
-- commits or pushes;
-- package publication;
-- further cross-repository mutation outside the authorized Core/Client adoption worktrees;
-- preview or production deployment;
-- PR merge.
+- Core PR #65 and Client PR #71 are authorized for squash merge after the final
+  review recorded in the acceptance result.
+- Production Registry publication remains owned by the normal release workflow;
+  this task does not perform a manual production mutation.
 
 ## Current Gate
 
-Batches 1–3 and the Python dependency-acquisition correction are locally
-complete. Core Runtime 0.1.1 must be committed, pushed and published before
-Core PR #65 can receive the released dependency and frozen lock. Its preview
-producer finalization correction is locally ready in the Core worktree. Every
-remote mutation remains separately gated.
+Runtime-family PR #18 is merged. Toolkit 0.2.1, Core Runtime 0.1.1 and Web
+Runtime 0.1.0 are published; Peer locks consume them. Core #65 and Client #71
+are green with successful previews. The current gate is their ordered squash
+merge: Core first, then Client.

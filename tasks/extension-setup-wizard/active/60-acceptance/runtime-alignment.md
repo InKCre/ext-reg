@@ -1,18 +1,31 @@
 # Acceptance Result — Runtime alignment
 
-- **Status:** not started
+- **Status:** complete
 - **Authority:** accepted implementation plus the Preview acceptance batch
 - **Supersedes:** none
-- **Evidence:** to be recorded after preview authorization
+- **Evidence:** ext-reg PR #18, Core PR #65, Client PR #71 and their current
+  preview deployments
 
-The acceptance record will contain:
+## Result
 
-1. Core exact installed wheel: disable, make Registry unavailable for the
-   operation, re-enable successfully;
-2. fresh Core environment: local miss resolves and acquires through its
-   configured Registry;
-3. Client Web Runtime: native MF Release loads and the Twitter setup popup
-   opens;
-4. ordinary preview provider success and HTTP non-404 probes only where useful;
-5. defects returned to `active/10-review/` as a new adjacent batch rather than
-   silently expanding the current implementation scope.
+1. ext-reg PR #18 is squash-merged. Toolkit 0.2.1, Core Runtime 0.1.1 and Web
+   Runtime 0.1.0 are published by the managed package workflow.
+2. Core PR #65 passes its repository contract and preview delivery. Its sibling
+   Registry returns `200` for the Twitter 0.2.1 Release and Python Simple index;
+   the deployed Core returns `200` from `/livez` and `/readyz` with runtime
+   phase `ready`.
+3. Client PR #71 passes all repository checks and preview delivery. Its Pages
+   origin returns `200` for the Twitter 0.2.1 Release and MF manifest.
+4. Client #71 connected to Core #65 loads the native Web Distribution and opens
+   the Extension-owned setup popup. Product acceptance reached OAuth and
+   Bookmark Source steps; the final UI corrections retain Extension-owned Close,
+   InkForm fields, direct config projection and operation loading states.
+5. An unavailable exact enabled Distribution during Core cold restore remains
+   observable in logs but no longer takes the base Peer offline or rewrites
+   deployment `enabled[]`. Management remains available for ordinary recovery.
+
+## Verdict
+
+The Extension setup wizard objective and runtime-family correction are complete.
+Final review found no blocking code, contract, documentation or delivery defect.
+Core PR #65 and Client PR #71 are ready for ordered squash merge.
