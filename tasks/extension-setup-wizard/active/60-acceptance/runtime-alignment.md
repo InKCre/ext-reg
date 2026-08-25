@@ -23,9 +23,13 @@
 5. An unavailable exact enabled Distribution during Core cold restore remains
    observable in logs but no longer takes the base Peer offline or rewrites
    deployment `enabled[]`. Management remains available for ordinary recovery.
+6. Core PR #65 squash-merged as `d0a7508`; its main checks, first-party wheel
+   publication and production delivery pass. Client PR #71 squash-merged as
+   `bf27db6`; its main checks and Pages delivery pass. Client Version PR #86 is
+   the normal independent Web Distribution release follow-up.
 
 ## Verdict
 
 The Extension setup wizard objective and runtime-family correction are complete.
 Final review found no blocking code, contract, documentation or delivery defect.
-Core PR #65 and Client PR #71 are ready for ordered squash merge.
+The ordered Core #65 and Client #71 squash merges are complete.
