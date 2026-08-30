@@ -1,6 +1,6 @@
 [project]
 name = "inkcre-extension-runtime-core-py"
-version = "0.1.1"
+version = "0.1.2"
 description = "InKCre Core Python Extension Host Runtime"
 requires-python = ">=3.12,<3.14"
 dependencies = [
