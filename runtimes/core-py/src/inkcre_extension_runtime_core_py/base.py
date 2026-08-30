@@ -112,35 +112,35 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
 
     @classmethod
     def on_start(cls, app: typing.Any) -> None:
-        """Validate config and atomically publish concrete Core contributions."""
+        """Validate config and publish concrete Core contributions."""
         import fastapi
         from app.business.peer import PeerManager
 
         from .publication import (
-            ExtensionPublicationSnapshot,
+            ExtensionPublication,
             PublicHTTPRouteClaim,
         )
 
-        snapshot = ExtensionPublicationSnapshot.capture(app)
         if cls.runtime_active():
-            snapshot.rollback()
             raise ExtensionLifecycleError(f"Extension {cls.__extid__} is already active")
-        publication = None
+        publication = ExtensionPublication(app)
         try:
             cls.__configcls__.model_validate(cls._model().config)
             router = fastapi.APIRouter(
                 prefix=f"/{cls.__extid__}", dependencies=cls.api_dependencies()
             )
             cls._register_apis(router)
-            registered_routes = tuple(router.routes)
+            route_start = len(app.router.routes)
             app.include_router(router, tags=["extension", cls.__extid__])
+            publication.routes = tuple(app.router.routes[route_start:])
             cls._init_sources()
             cls._init_resolvers()
-            for inbound in cls.peer_inbounds():
-                PeerManager.register_inbound(inbound)
-            publication = snapshot.finish()
+            inbounds = cls.peer_inbounds()
+            for inbound in inbounds:
+                if PeerManager.register_inbound(inbound):
+                    publication.peer_inbounds += (inbound.capability,)
             publication.public_http_claim = PublicHTTPRouteClaim.acquire(
-                cls.__extid__, cls.public_http_routes(), registered_routes
+                cls.__extid__, cls.public_http_routes(), publication.routes
             )
             publication.activate_source_types()
             try:
@@ -148,10 +148,7 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
             except Exception as error:
                 translate_host_model_error(error)
         except Exception:
-            if publication is None:
-                snapshot.rollback()
-            else:
-                publication.restore()
+            publication.withdraw()
             raise
         cls.__runtime_publication__ = publication
 
@@ -187,13 +184,13 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
     @classmethod
     def runtime_active(cls) -> bool:
         publication = cls.__dict__.get("__runtime_publication__")
-        return publication is not None and not publication.restored
+        return publication is not None and publication.active
 
     @classmethod
     def unpublish(cls) -> None:
         publication = cls.__dict__.get("__runtime_publication__")
         if publication is not None:
-            publication.restore()
+            publication.withdraw()
 
     @classmethod
     def release_runtime(cls) -> None:

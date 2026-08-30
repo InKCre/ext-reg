@@ -29,7 +29,6 @@ class RunningExtension:
     association: PythonReleaseDescriptor | None
     acquired: AcquiredDistribution
     extension_class: type[ExtensionBase]
-    modules: DistributionModules
     claim: typing.Any
 
 
@@ -75,7 +74,9 @@ class ExtensionManager:
             return current
         loaded = self._loaded_versions.get(name)
         if loaded is not None and loaded != version:
-            raise ExtensionStateConflictError("Cannot change the version of a running Extension")
+            raise ExtensionStateConflictError(
+                "Changing a loaded Extension version requires a process restart"
+            )
         origin = _registry_origin()
         release = RegistryReleaseClient(origin).get(name, version)
         if release.state is not ReleaseState.published:
@@ -162,11 +163,23 @@ class ExtensionManager:
                     logger.exception(
                         "Extension %s on_close failed after startup failure", model.name
                     )
-                extension_class.unbind()
-            modules.abort()
+                cleanup = (
+                    ("unpublish", extension_class.unpublish),
+                    ("unbind", extension_class.unbind),
+                    ("runtime release", extension_class.release_runtime),
+                )
+                for operation, action in cleanup:
+                    try:
+                        action()
+                    except Exception:
+                        logger.exception(
+                            "Extension %s %s failed after startup failure",
+                            model.name,
+                            operation,
+                        )
             claim.release()
             raise
-        running = RunningExtension(model, association, acquired, extension_class, modules, claim)
+        running = RunningExtension(model, association, acquired, extension_class, claim)
         self.running[model.name] = running
         self._loaded_versions[model.name] = model.version
         return running
@@ -187,11 +200,9 @@ class ExtensionManager:
         await running.extension_class.on_close()
         running.extension_class.unpublish()
         running.extension_class.unbind()
-        running.modules.unload()
         running.extension_class.release_runtime()
         running.claim.release()
         self.running.pop(running.model.name, None)
-        self._loaded_versions.pop(running.model.name, None)
 
     async def _force_stop(self, running: RunningExtension) -> None:
         try:
@@ -201,7 +212,6 @@ class ExtensionManager:
         cleanup = (
             ("unpublish", running.extension_class.unpublish),
             ("unbind", running.extension_class.unbind),
-            ("module abort", running.modules.abort),
             ("runtime release", running.extension_class.release_runtime),
             ("claim release", running.claim.release),
         )
@@ -213,7 +223,6 @@ class ExtensionManager:
                     "Extension %s %s failed during cleanup", running.model.name, operation
                 )
         self.running.pop(running.model.name, None)
-        self._loaded_versions.pop(running.model.name, None)
 
     async def startup(self, app: typing.Any, peer: typing.Any = None) -> None:
         self.fastapi_app = app
