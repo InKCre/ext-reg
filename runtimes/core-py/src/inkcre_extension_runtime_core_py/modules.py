@@ -1,9 +1,7 @@
-"""Entry-point loading with reversible module ownership."""
+"""Entry-point loading with Distribution-origin verification."""
 
 from __future__ import annotations
 
-import contextlib
-import importlib
 import sys
 import typing
 from pathlib import Path
@@ -22,8 +20,6 @@ class DistributionModules:
                 "Core Extension entry point must live in its declared extensions.<name> package"
             )
         self.package_name = ".".join(parts[:2])
-        self._previous: dict[str, typing.Any] = {}
-        self._active = False
 
     def _module_names(self) -> tuple[str, ...]:
         prefix = self.package_name + "."
@@ -32,20 +28,11 @@ class DistributionModules:
         )
 
     def load(self, base: type[typing.Any]) -> type[typing.Any]:
-        if self._active:
-            raise ExtensionEntryPointError("Extension Distribution is already loaded")
-        self._previous = {name: sys.modules[name] for name in self._module_names()}
-        for name in self._previous:
-            sys.modules.pop(name, None)
-        importlib.invalidate_caches()
         try:
             loaded = self.acquired.entry_point.load()
         except Exception as error:
-            self.abort()
             raise ExtensionEntryPointError("Extension entry point could not be loaded") from error
-        self._active = True
         if not isinstance(loaded, type) or not issubclass(loaded, base):
-            self.abort()
             raise ExtensionEntryPointError("Extension entry point is not an ExtensionBase subclass")
         self.assert_origins()
         return loaded
@@ -61,20 +48,6 @@ class DistributionModules:
         for module_name in names:
             module_file = getattr(sys.modules[module_name], "__file__", None)
             if module_file is None or Path(module_file).resolve() not in files:
-                self.abort()
                 raise ExtensionEntryPointError(
                     "Extension imported a module outside its Distribution ownership"
                 )
-
-    def unload(self) -> None:
-        if self._active:
-            self.assert_origins()
-        self.abort()
-
-    def abort(self) -> None:
-        with contextlib.suppress(Exception):
-            for name in self._module_names():
-                sys.modules.pop(name, None)
-            sys.modules.update(self._previous)
-            importlib.invalidate_caches()
-            self._active = False

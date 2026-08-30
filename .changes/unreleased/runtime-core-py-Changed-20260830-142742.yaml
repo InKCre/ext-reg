@@ -1,0 +1,4 @@
+project: runtime-core-py
+kind: Changed
+body: Keep imported capability type registrations process-monotonic while withdrawing only exact Extension routes, Peer inbounds, and public claims on stop.
+time: 2026-08-30T14:27:42.71129+08:00
