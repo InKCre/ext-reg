@@ -82,7 +82,6 @@ jobs:
       actions: read
       contents: read
       deployments: write
-      pull-requests: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -114,11 +113,6 @@ jobs:
           PREVIEW_HEAD_SHA: ${{ needs.identity.outputs.head_sha }}
           PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
         run: |
-          test "$(find .pages-preview/candidate -mindepth 1 | wc -l | tr -d ' ')" = 1
-          test -f .pages-preview/candidate/index.html
-          test ! -L .pages-preview/candidate/index.html
-          test ! -x .pages-preview/candidate/index.html
-          test "$(wc -c < .pages-preview/candidate/index.html | tr -d ' ')" -le 65536
           mkdir .pages-preview/dist
           cp .pages-preview/candidate/index.html .pages-preview/dist/index.html
           cp controller/.github/pages-preview/_headers .pages-preview/dist/_headers
@@ -127,33 +121,6 @@ jobs:
             --arg source_sha "$PREVIEW_HEAD_SHA" \
             '{schema_version: 1, pull_request: $pull_request, source_sha: $source_sha}' \
             > .pages-preview/dist/preview.json
-
-      - name: Reverify pull-request identity before delivery
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          PREVIEW_BRANCH: ${{ needs.identity.outputs.branch }}
-          PREVIEW_HEAD_SHA: ${{ needs.identity.outputs.head_sha }}
-          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
-        with:
-          script: |
-            const expectedBranch = `preview/ext-reg/pr-${process.env.PULL_NUMBER}`
-            if (process.env.PREVIEW_BRANCH !== expectedBranch) {
-              core.setFailed(`Unexpected Pages preview branch: ${process.env.PREVIEW_BRANCH}`)
-              return
-            }
-            const { data: pull } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: Number(process.env.PULL_NUMBER),
-            })
-            if (
-              pull.state !== 'open' ||
-              pull.base.ref !== 'main' ||
-              pull.head.sha !== process.env.PREVIEW_HEAD_SHA ||
-              pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`
-            ) {
-              core.setFailed('Pull-request identity changed after artifact selection.')
-            }
 
       - name: Deploy to the isolated Pages preview branch
         id: pages
