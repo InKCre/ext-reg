@@ -21,6 +21,9 @@ Distribution hosting, and the independent Extension Developer Toolkit.
 
 ## Working Rules
 
+- Never edit `docs/_shared/**` from this Spoke. Use
+  `.agents/skills/edit-svc-shared-docs/` to change the Hub source first and bump
+  the local shared reference separately.
 - Default to Python. Use TypeScript only at a browser or `client-web` seam.
 - Keep manifest and protocol truth language-neutral.
 - Preserve Registry Release, deployment `installed`, Peer `enabled`, and

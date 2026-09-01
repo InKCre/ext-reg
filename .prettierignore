@@ -1,8 +1,10 @@
 .agents/skills/svc/SKILL.md
+.agents/skills/edit-svc-shared-docs/SKILL.md
 .wrangler/
 AGENTS.md
 contracts/
 docs/index.md
+docs/_shared/
 dist/
 node_modules/
 pnpm-lock.yaml

@@ -14,6 +14,17 @@ pnpm install --frozen-lockfile
 pnpm check
 ```
 
+Shared InKCre product truth and cross-unit contracts are mounted read-only from
+`InKCre/docs`. Initialize the pinned reference after cloning:
+
+```bash
+git submodule update --init --recursive docs/_shared
+```
+
+Do not edit `docs/_shared/**` from this repository. The repo-root
+`.agents/skills/edit-svc-shared-docs` wrapper points coding Agents to the
+canonical Hub-first edit and isolated ref-bump workflow.
+
 `pnpm check` verifies generated contracts, formatting, lint, types,
 the Registry packages, and the real Pyodide Worker build. To update an executable
 contract intentionally:
