@@ -1,0 +1,3 @@
+[submodule "docs/_shared"]
+	path = docs/_shared
+	url = https://github.com/InKCre/docs.git
