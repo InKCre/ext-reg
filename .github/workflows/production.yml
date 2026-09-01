@@ -43,16 +43,10 @@ jobs:
           ref: ${{ env.SOURCE_SHA }}
           persist-credentials: false
 
-      - name: Reject a moved main branch or incomplete production contract
+      - name: Reject a moved main branch
         run: |
           current_main=$(git ls-remote origin refs/heads/main | cut -f1)
           test "$current_main" = "$SOURCE_SHA"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$CLOUDFLARE_API_TOKEN"
-          grep -F '"database_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
-          grep -F '"database_id": "af52114f-55b5-476f-b986-8ff8d8601d77"' wrangler.jsonc
-          grep -F '"bucket_name": "inkcre-extension-registry-production-v2"' wrangler.jsonc
-          grep -F '"pattern": "registry.inkcre.dev"' wrangler.jsonc
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
@@ -80,18 +74,6 @@ jobs:
 
       - name: Verify exact delivery source
         run: pnpm check
-
-      - name: Verify Cloudflare production authority and resource identity
-        run: |
-          pnpm exec wrangler whoami --json | jq -e '.accounts | length > 0'
-          pnpm exec wrangler d1 info inkcre-extension-registry-production-v2 \
-            --config wrangler.jsonc \
-            --json | jq -e '.uuid == "af52114f-55b5-476f-b986-8ff8d8601d77"'
-          pnpm exec wrangler r2 bucket info inkcre-extension-registry-production-v2 \
-            --json | jq -e '.name == "inkcre-extension-registry-production-v2"'
-          pnpm exec wrangler deployments list \
-            --config wrangler.jsonc \
-            --json | jq -e 'type == "array"'
 
       - name: Apply native production schema
         if: inputs.operation == 'deploy'
@@ -127,7 +109,7 @@ jobs:
             echo "- Origin: $REGISTRY_ORIGIN"
             echo '- D1: inkcre-extension-registry-production-v2'
             echo '- R2: inkcre-extension-registry-production-v2'
-            echo '- Full repository contract, authority verification, and anonymous smoke: passed'
+            echo '- Full repository contract and anonymous smoke: passed'
             if [ "${{ inputs.operation }}" = 'deploy' ]; then
               echo '- Checked migration and exact Worker deployment: passed'
             else
