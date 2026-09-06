@@ -34,7 +34,8 @@ The protected GitHub `preview` environment supplies:
   not a per-Worker boundary; only the trusted controller receives this token.
   A separate account can provide stronger infrastructure isolation.
 - `REGISTRY_PREVIEW_PUBLISHER_TOKEN`: a random token of at least 32 characters,
-  used only for the disposable `demo` namespace. Reviewers obtain it through
+  used only for the isolated `demo` publisher namespace; it creates no sample
+  Extensions or Releases. Reviewers obtain it through
   the operator, not logs, workflow summaries, or public artifacts.
 
 The deployed application receives only its own DB, ARTIFACTS, and PUBLIC_ORIGIN.
@@ -45,13 +46,15 @@ account-level deployment authority.
 ## State and retirement
 
 Updates apply the candidate's checked-in migrations and retain that PR's data.
-The controller refreshes the hashed demo credential and creates a few real Web
-releases through the normal prepare/upload/publish APIs. Existing published or
-yanked samples are preserved. Demo assets are test fixtures, not production
-Extensions. Reviewers can upload their own snapshots and exercise lifecycle
-changes. The deployment log records the source SHA, Worker Version, URL, and
-anonymous/read-after-write smoke results; identity is deployment evidence, not
-an endpoint or badge added to the product.
+The controller configures the publisher credential independently of catalog data.
+Deployment never creates Extensions, Releases, or sample artifacts, and its read
+checks work with an empty catalog. Reviewers upload the actual Extensions they
+want to evaluate through Publisher or the Toolkit. Temporary acceptance data is
+removed after testing; it is not a retained preview dataset.
+
+The deployment log records the source SHA, Worker Version, URL, and anonymous
+read checks; identity is deployment evidence, not an endpoint or badge added to
+the product.
 
 Deploy and cleanup share one per-PR concurrency group without interrupting
 active resource operations. Closing an internal PR runs the default-branch

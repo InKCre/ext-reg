@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
 import os
 import re
@@ -16,7 +15,6 @@ import secrets
 import subprocess
 import tempfile
 import time
-import zipfile
 from pathlib import Path
 
 import httpx
@@ -68,66 +66,6 @@ def wait_for(origin: str, path: str, expected: int = 200, **kwargs) -> httpx.Res
     raise RuntimeError(f"Preview did not become ready: {origin}{path}")
 
 
-def seed(origin: str, token: str) -> None:
-    """Small real releases, admitted through the same public publisher API."""
-    snapshot = io.BytesIO()
-    with zipfile.ZipFile(snapshot, "w") as archive:
-        archive.writestr(
-            "mf-manifest.json",
-            json.dumps(
-                {
-                    "id": "registry-sample",
-                    "name": "registry-sample",
-                    "metaData": {
-                        "publicPath": "./",
-                        "remoteEntry": {"name": "remoteEntry.js", "path": "", "type": "module"},
-                    },
-                    "exposes": [],
-                    "shared": [],
-                }
-            ),
-        )
-        archive.writestr(
-            "remoteEntry.js", "export const get = () => {}; export const init = () => {};"
-        )
-    with httpx.Client(
-        base_url=origin, headers={"Authorization": f"Bearer {token}"}, timeout=60
-    ) as publisher:
-        for slug, nickname in [
-            ("github", "GitHub"),
-            ("rss", "RSS / Atom Feeds"),
-            ("memos", "Memos"),
-        ]:
-            for version in ["1.0.0", "1.10.0", "2.0.0-rc.1"] if slug == "github" else ["1.0.0"]:
-                base = f"/v1/extensions/demo/{slug}/releases"
-                # Preserve reviewer edits on redeploy; only seed absent releases.
-                existing = publisher.get(base + "/" + version)
-                if existing.status_code == 200:
-                    continue
-                if existing.status_code != 404:
-                    existing.raise_for_status()
-                response = publisher.post(
-                    base,
-                    json={
-                        "nickname": nickname,
-                        "version": version,
-                        "module_federation": {
-                            "host_sdk": "@inkcre/core",
-                            "host_sdk_version": "^0.1.0",
-                            "source_repository": "https://github.com/InKCre/ext-reg",
-                            "source_revision": "registry-preview-fixture-v1",
-                        },
-                    },
-                )
-                response.raise_for_status()
-                response = publisher.post(
-                    base + f"/{version}/module-federation",
-                    files={"content": ("snapshot.zip", snapshot.getvalue(), "application/zip")},
-                )
-                response.raise_for_status()
-                publisher.post(base + f"/{version}/publish").raise_for_status()
-
-
 def deploy(client: httpx.Client, name: str, origin: str, artifact: Path, revision: str) -> None:
     token = os.environ["REGISTRY_PREVIEW_PUBLISHER_TOKEN"]
     if len(token) < 32:
@@ -175,14 +113,10 @@ def deploy(client: httpx.Client, name: str, origin: str, artifact: Path, revisio
     )
     assert wait_for(origin, "/livez").json()["status"] == "ok"
     wait_for(origin, "/v1/extensions")
-    seed(origin, token)
     assert "Extension Registry" in wait_for(origin, "/").text
-    wait_for(origin, "/explore/demo/github")
     wait_for(origin, "/publish")
     wait_for(origin, "/v1/publisher", expected=401)
     wait_for(origin, "/simple/")
-    manifest = wait_for(origin, "/extensions/demo/github/1.10.0/module-federation/mf-manifest.json")
-    assert origin in manifest.text
     print(f"Preview: {origin}\nSource: {revision}\nD1/R2/Worker: {name}")
     if os.environ.get("GITHUB_OUTPUT"):
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:

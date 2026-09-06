@@ -176,7 +176,7 @@ jobs:
                 pull.head.sha !== process.env.SOURCE_SHA) {
               throw new Error('PR closed or moved; no preview mutation is allowed.')
             }
-      - name: Apply migrations, deploy isolated bindings, and verify real journeys
+      - name: Apply migrations, deploy isolated bindings, and verify reads
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
