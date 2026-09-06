@@ -16,7 +16,8 @@ project `inkcre-extension-registry-ui-preview` on
 `preview/ext-reg/pr-<number>`. Protected-main code adds source identity and
 noindex, no-store, CSP, nosniff, and no-referrer policy. The Pages project has
 no Git provider, custom domain, Functions, Worker, D1, R2, or production token.
-Its links point to production public reads; it never claims to host candidate
+Its Extension links point to production public API metadata, and Publisher
+links open the Toolkit guide; it never claims to host candidate
 Registry APIs.
 
 Closing an internal PR deploys the checked-in tombstone, verifies the stable

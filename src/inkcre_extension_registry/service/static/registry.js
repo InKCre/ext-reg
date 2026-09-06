@@ -88,6 +88,7 @@ if ($('#connect-form')) {
     for (const dialog of document.querySelectorAll('dialog')) dialog.close()
   }
   async function api(path, { method = 'GET', body } = {}) {
+    const current = connection
     const headers = { Authorization: `Bearer ${credential}` }
     if (body && !(body instanceof FormData)) {
       headers['Content-Type'] = 'application/json'
@@ -110,6 +111,9 @@ if ($('#connect-form')) {
       )
     }
     const data = await response.json().catch(() => null)
+    if (current !== connection || current.signal.aborted) {
+      throw new DOMException('Publisher disconnected', 'AbortError')
+    }
     if (!response.ok) {
       if (response.status === 401) {
         disconnect()
@@ -331,11 +335,11 @@ if ($('#connect-form')) {
       if (dialog.querySelector('[aria-busy="true"]')) event.preventDefault()
     })
   }
-  async function updateAfterChange(message) {
+  async function updateAfterChange(message, pageOffset = offset) {
     announce(message)
     status('#workspace-status', message)
     try {
-      await refresh()
+      await refresh(pageOffset)
     } catch (error) {
       if (error.name !== 'AbortError')
         status(
@@ -365,7 +369,7 @@ if ($('#connect-form')) {
         },
       })
       $('#release-dialog').close()
-      await updateAfterChange('Release prepared. Upload your Web ZIP, then publish when ready.')
+      await updateAfterChange('Release prepared. Upload your Web ZIP, then publish when ready.', 0)
     })
   })
   $('#action-form').addEventListener('submit', (event) => {

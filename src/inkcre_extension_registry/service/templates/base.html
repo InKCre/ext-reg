@@ -1,30 +1,83 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Discover and publish extensions for your InKCre workspace.">
-    {% if noindex %}<meta name="robots" content="noindex,nofollow">{% endif %}
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Discover and publish extensions for your InKCre workspace." />
+    {% if noindex %}
+    <meta name="robots" content="noindex,nofollow" />
+    {% endif %}
     <title>{{ title }} · InKCre Extension Registry</title>
     <style>{{ styles | safe }}</style>
-    {% if not preview %}<script src="/assets/registry.js" defer></script>{% endif %}
+    {% if not preview %}
+    <script src="/assets/registry.js" defer></script>
+    {% endif %}
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="header-inner">
-        <a class="brand" href="{{ origin }}/" aria-label="InKCre Registry home"><span class="brand-mark" aria-hidden="true">i<span>k</span></span><span>InKCre <span class="brand-label">Registry</span></span></a>
+        <a class="brand" href="{{ origin }}/" aria-label="InKCre Registry home">
+          <span class="brand-mark" aria-hidden="true">
+            i
+            <span>k</span>
+          </span>
+          <span>
+            InKCre
+            <span class="brand-label">Registry</span>
+          </span>
+        </a>
         <nav aria-label="Main navigation">
-          <a href="{{ origin }}/" {% if active == 'catalog' %}aria-current="page"{% endif %}>Explore</a>
-          <a href="{{ origin }}/publish" {% if active == 'publish' %}aria-current="page"{% endif %}>Publish</a>
-          <a class="docs-link" href="https://github.com/InKCre/ext-reg/tree/main/docs">Docs <span aria-hidden="true">↗</span></a>
+          <a
+            href="{{ origin }}/"
+            {% if active == 'catalog' %}
+            aria-current="page"
+            {% endif %}
+          >
+            Explore
+          </a>
+          <a
+            href="{% if preview %}https://github.com/InKCre/ext-reg/tree/main/toolkit{% else %}/publish{% endif %}"
+            {% if active == 'publish' %}
+            aria-current="page"
+            {% endif %}
+          >
+            Publish
+          </a>
+          <a class="docs-link" href="https://github.com/InKCre/ext-reg/tree/main/docs">
+            Docs
+            <span aria-hidden="true">↗</span>
+          </a>
         </nav>
-        {% if not preview %}<button class="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme"><span aria-hidden="true">◐</span></button>{% endif %}
+        {% if not preview %}
+        <button
+          class="theme-button"
+          type="button"
+          aria-label="Switch color theme"
+          title="Switch color theme"
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
+        {% endif %}
       </div>
     </header>
-    {% if preview %}<div class="preview-banner">Design preview · Sample catalog. Extension links open the live Registry.</div>{% endif %}
+    {% if preview %}
+    <div class="preview-banner">
+      Design preview · Sample catalog. Extension links open live API metadata; Publish opens the
+      Toolkit guide.
+    </div>
+    {% endif %}
     <main id="main">{% block content %}{% endblock %}</main>
-    <footer class="site-footer"><div><a class="footer-wordmark" href="{{ origin }}/">InKCre</a><span>A little more possible.</span></div><div><a href="{{ origin }}/v1/extensions">Registry API ↗</a><a href="https://github.com/InKCre/ext-reg">Source ↗</a></div></footer>
+    <footer class="site-footer">
+      <div>
+        <a class="footer-wordmark" href="{{ origin }}/">InKCre</a>
+        <span>A little more possible.</span>
+      </div>
+      <div>
+        <a href="{{ origin }}/v1/extensions">Registry API ↗</a>
+        <a href="https://github.com/InKCre/ext-reg">Source ↗</a>
+      </div>
+    </footer>
     <div id="announcement" class="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

@@ -1,4 +1,12 @@
 @use 'pkg:@inkcre/ui-web/styles';
+@use 'pkg:@inkcre/ui-web/tokens/sys' as sys;
+@use 'pkg:@inkcre/ui-web/styles/functions' as tokens;
+
+// The package's automatic dark palette follows the OS; also support explicit selection.
+html[data-theme='dark'] {
+  color-scheme: dark;
+  @include tokens.emit-css-variables(sys.$color-dark, 'sys', 'color');
+}
 
 :root {
   --page-width: 1160px;
