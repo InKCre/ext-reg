@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -17,21 +16,6 @@ TEMPLATES = Environment(
 )
 STYLES = (ROOT / "static" / "registry.css").read_text()
 SCRIPT = (ROOT / "static" / "registry.js").read_text()
-
-
-def _canonical_api_origin(value: str) -> str:
-    parsed = urlsplit(value)
-    if (
-        parsed.scheme != "https"
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.path
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise ValueError("api_origin must be a canonical absolute HTTPS origin")
-    return value
 
 
 def page(template: str, **context: object) -> str:
@@ -80,9 +64,7 @@ def extension_catalog_html(
     )
 
 
-def _detail_context(
-    extension: ExtensionRecord, version: str | None = None
-) -> dict[str, object] | None:
+def extension_detail_html(extension: ExtensionRecord, version: str | None = None) -> str | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
     if not releases:
         return None
@@ -95,38 +77,12 @@ def _detail_context(
         release = next(
             (item for item in releases if not Version(item.version).prerelease), releases[0]
         )
-    return dict(
+    return page(
+        "detail.html",
+        title=extension.nickname,
+        active="catalog",
         extension=extension,
         release=release,
         releases=releases,
         publisher=extension.name.split("/")[0],
-    )
-
-
-def extension_detail_html(extension: ExtensionRecord, version: str | None = None) -> str | None:
-    context = _detail_context(extension, version)
-    if context is None:
-        return None
-    return page("detail.html", title=extension.nickname, active="catalog", **context)
-
-
-def extension_preview_html(extensions: Sequence[ExtensionRecord], *, api_origin: str) -> str:
-    """Render the catalog and sample release views within the bounded Pages document."""
-    _canonical_api_origin(api_origin)
-    details = []
-    for extension in extensions:
-        default = _detail_context(extension)
-        if default is None:
-            raise ValueError("preview extensions require a release")
-        details.append({**default, "default": True})
-        for release in extension.releases:
-            details.append({**default, "release": release, "default": False})
-    return page(
-        "preview.html",
-        title="Registry preview",
-        active="catalog",
-        preview=True,
-        extensions=extensions,
-        details=details,
-        total=len(extensions),
     )

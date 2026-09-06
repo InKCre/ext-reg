@@ -4,47 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="InKCre Extension Registry" />
-    {% if preview or noindex %}
+    {% if noindex %}
     <meta name="robots" content="noindex,nofollow" />
     {% endif %}
     <title>{{ title }} · InKCre Registry</title>
     <style>{{ styles | safe }}</style>
-    {% if not preview %}
     <script src="/assets/registry.js" defer></script>
-    {% endif %}
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
-      <a
-        class="brand"
-        href="{% if preview %}#catalog{% else %}/{% endif %}"
-        aria-label="InKCre Registry home"
-      >
+      <a class="brand" href="/" aria-label="InKCre Registry home">
         <span aria-hidden="true">{% include "brand.html" %}</span>
         <span>InKCre</span>
       </a>
       <nav aria-label="Main navigation">
-        <a
-          href="{% if preview %}#catalog{% else %}/{% endif %}"
-          {% if active == 'catalog' %}
-          aria-current="page"
-          {% endif %}
-        >
-          Registry
-        </a>
-        {% if preview %}
-        <span class="preview-label" title="Sample data; publishing requires the Registry service">
-          Preview
-        </span>
-        {% else %}
+        <a href="/" {% if active == 'catalog' %} aria-current="page" {% endif %}>Registry</a>
         <a href="/publish" {% if active == 'publish' %} aria-current="page" {% endif %}>
           Publisher
         </a>
         <button class="theme-button icon-button" type="button" aria-label="Switch color theme">
           ◐
         </button>
-        {% endif %}
       </nav>
     </header>
     <main id="main">{% block content %}{% endblock %}</main>

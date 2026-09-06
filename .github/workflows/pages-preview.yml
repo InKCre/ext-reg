@@ -116,13 +116,12 @@ jobs:
         with:
           node-version-file: controller/package.json
 
-      - name: Build the exact-head Extension-list preview
+      - name: Build exact-head product page samples
         working-directory: candidate
         run: >-
           pdm run python scripts/build_ui_preview.py
           --fixture .github/pages-preview/extensions.json
           --output "$GITHUB_WORKSPACE/.pages-preview/candidate"
-          --api-origin https://registry.inkcre.dev
 
       - name: Prepare the bounded static deployment
         env:
@@ -187,6 +186,6 @@ jobs:
             echo
             echo "- Source: \`${{ needs.identity.outputs.head_sha }}\`"
             echo "- Preview: $PREVIEW_URL"
-            echo '- Surface: static Extension list only'
+            echo '- Surface: non-interactive product page samples'
             echo '- Registry API and production data: unchanged'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -126,7 +126,6 @@ code,
   }
 }
 
-.preview-label,
 .count,
 .extension-name,
 .field-help {
@@ -443,19 +442,6 @@ dialog {
   padding: var(--sys-space-sm) var(--sys-space-md);
   border: 1px solid var(--sys-color-border-base);
   background: var(--sys-color-surface-subtle);
-}
-
-// The existing Pages controller delivers one HTML file with no script permission.
-.preview-detail {
-  display: none;
-
-  &:target {
-    display: block;
-  }
-}
-
-main:has(> .preview-detail:target) > #catalog {
-  display: none;
 }
 
 @media (max-width: 768px) {

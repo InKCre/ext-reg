@@ -1,8 +1,18 @@
 # Pull-Request Previews
 
-Pull-request Preview covers the read-only catalog and Extension release details. Registry
-APIs, publishing, native Distribution consumption, installation, and runtime
-behavior remain local black-box responsibilities.
+Pages hosts non-interactive samples of the catalog and Extension detail pages.
+The build command invokes the same Python renderers used by the Worker, with
+explicit fixture data. It preserves product controls and URLs and embeds the
+rendered bodies as inert samples. The external sample selector is evidence UI,
+not Registry navigation. The builder namespaces element IDs solely to embed
+independent documents in one carrier.
+
+Full product journeys run on the real Python Worker with isolated D1/R2 state,
+as described in [Local Development](local-development.md). Preview limitations
+must not introduce environment switches, alternative routes, hidden controls,
+or preview renderers into product code. A fully interactive remote preview
+would require the same Worker and isolated bindings; static Pages samples do
+not establish that capability.
 
 Every pull request runs secret-free checks. Fork pull requests receive no remote
 Preview authority. For an eligible same-repository pull request, the trusted
@@ -16,13 +26,12 @@ project `inkcre-extension-registry-ui-preview` on
 `preview/ext-reg/pr-<number>`. Protected-main code adds source identity and
 noindex, no-store, CSP, nosniff, and no-referrer policy. The Pages project has
 no Git provider, custom domain, Functions, Worker, D1, R2, or production token.
-The fixture includes explicitly sampled published release descriptors. Catalog
-links open details and version links select release views inside that same
-HTML document, using URL fragments and CSS without scripts. Both surfaces
-reuse the Worker's templates. The header marks the document as Preview; native
-artifact links and Publisher controls are omitted because they require the
-Registry service. No sample version is sent to a production endpoint.
-The existing 64 KiB bound applies to the entire document.
+The fixture contains sample published release descriptors. The builder owns its
+64 KiB document bound, static navigation and inert behavior under `scripts/`;
+the Worker package owns none of them. Controller-added headers disable scripts
+and requests in this evidence document. The default-branch controller's legacy
+`--api-origin` argument remains accepted during its transition, but it no longer
+rewrites product links.
 
 Closing an internal PR deploys the checked-in tombstone, verifies the stable
 alias, and deletes older deployments only for that project and branch. The

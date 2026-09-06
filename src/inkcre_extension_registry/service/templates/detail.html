@@ -1,1 +1,93 @@
-{% extends "base.html" %} {% block content %}{% include "detail-content.html" %}{% endblock %}
+{% extends "base.html" %} {% block content %}
+<div class="detail-page">
+  <a class="back-link" href="/">← Extensions</a>
+  <header class="detail-heading">
+    <div>
+      <h1>{{ extension.nickname }}</h1>
+      <p class="extension-name">{{ extension.name }}</p>
+    </div>
+    <button type="button" class="button copy-button" data-copy="{{ extension.name }}">
+      Copy ID
+    </button>
+  </header>
+  <div class="detail-layout">
+    <article class="detail-content">
+      <div class="section-heading">
+        <h2>Distributions</h2>
+        <code>{{ release.version }}</code>
+      </div>
+      {% if release.python %}
+      <section class="distribution-panel">
+        <h3>Python</h3>
+        <dl class="metadata">
+          <div>
+            <dt>Package</dt>
+            <dd><code>{{ release.python.project }}</code></dd>
+          </div>
+          <div>
+            <dt>Host SDK</dt>
+            <dd><code>{{ release.python.host_sdk }} {{ release.python.host_sdk_version }}</code></dd>
+          </div>
+          <div>
+            <dt>Entry point</dt>
+            <dd><code>{{ release.python.entry_point.object }}</code></dd>
+          </div>
+        </dl>
+        <a class="button" href="{{ release.python.simple_url }}">Package files ↗</a>
+      </section>
+      {% endif %} {% if release.module_federation %}
+      <section class="distribution-panel">
+        <h3>Web</h3>
+        <dl class="metadata">
+          <div>
+            <dt>Format</dt>
+            <dd>Module Federation</dd>
+          </div>
+          <div>
+            <dt>Host SDK</dt>
+            <dd><code>{{ release.module_federation.host_sdk }} {{ release.module_federation.host_sdk_version }}</code></dd>
+          </div>
+        </dl>
+        <a class="button" href="{{ release.module_federation.manifest_url }}">Manifest ↗</a>
+      </section>
+      {% endif %}
+    </article>
+    <aside class="detail-sidebar">
+      <section class="sidebar-panel">
+        <h2>
+          Versions
+          <span class="count">{{ releases | length }}</span>
+        </h2>
+        <ul class="version-list">
+          {% for item in releases %}
+          <li>
+            <a
+              href="/explore/{{ extension.name }}?version={{ item.version }}"
+              {% if item.version == release.version %}
+              aria-current="true"
+              {% endif %}
+            >
+              <code>{{ item.version }}</code>
+              {% if '-' in item.version %}
+              <span>Pre-release</span>
+              {% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      <dl class="metadata publisher-meta">
+        <div>
+          <dt>Publisher</dt>
+          <dd>
+            <a href="/?publisher={{ publisher }}">{{ publisher }}</a>
+          </dd>
+        </div>
+      </dl>
+      <a href="/v1/extensions/{{ extension.name }}/releases/{{ release.version }}">
+        Release metadata ↗
+      </a>
+    </aside>
+  </div>
+</div>
+{% endblock %}

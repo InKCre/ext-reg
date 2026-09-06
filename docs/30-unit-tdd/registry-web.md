@@ -68,7 +68,13 @@ is no Registry copy of the token source or a competing design package.
 and checks browser JavaScript syntax. Committing generated CSS makes Python wheel
 and static-preview builds self-contained; it is never edited manually. Wrangler
 Text rules explicitly include CSS and JavaScript in the Python module filesystem.
-The same catalog and detail templates supply the read-only Pages preview.
+Rendering depends on product data, selected release, and the current route.
+Templates, links, controls, and browser styles contain no preview/production
+switch. Instance origin and storage bindings belong to runtime configuration.
+
+The external page-sample builder calls the same catalog/detail renderers. Its
+navigation and static carrier live under `scripts/` and do not enter the Worker
+package. The product does not know whether its HTML is used as acceptance evidence.
 
 Registry follows the client-web product surface: the 32px geometric InKCre logo,
 InkHeader spacing and typography, square InkButton-style controls, bordered
