@@ -66,15 +66,15 @@ is no Registry copy of the token source or a competing design package.
 `pnpm web:build` compiles the pinned package and local Sass into the committed
 `service/static/registry.css`. `pnpm web:check` compares it to a fresh compilation
 and checks browser JavaScript syntax. Committing generated CSS makes Python wheel
-and static-preview builds self-contained; it is never edited manually. Wrangler
+and Worker builds self-contained; it is never edited manually. Wrangler
 Text rules explicitly include CSS and JavaScript in the Python module filesystem.
 Rendering depends on product data, selected release, and the current route.
 Templates, links, controls, and browser styles contain no preview/production
 switch. Instance origin and storage bindings belong to runtime configuration.
 
-The external page-sample builder calls the same catalog/detail renderers. Its
-navigation and static carrier live under `scripts/` and do not enter the Worker
-package. The product does not know whether its HTML is used as acceptance evidence.
+Remote previews run the same Python Worker with isolated D1/R2 bindings. Their
+resource lifecycle and source identity belong to the delivery controller; see
+[Pull-Request Previews](../40-deployment/pull-request-previews.md).
 
 Registry follows the client-web product surface: the 32px geometric InKCre logo,
 InkHeader spacing and typography, square InkButton-style controls, bordered

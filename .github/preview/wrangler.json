@@ -1,0 +1,14 @@
+{
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/service/static/registry.css", "**/service/static/registry.js"],
+      "fallthrough": true
+    }
+  ]
+}

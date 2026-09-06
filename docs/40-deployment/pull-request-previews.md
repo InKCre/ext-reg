@@ -1,40 +1,83 @@
 # Pull-Request Previews
 
-Pages hosts non-interactive samples of the catalog and Extension detail pages.
-The build command invokes the same Python renderers used by the Worker, with
-explicit fixture data. It preserves product controls and URLs and embeds the
-rendered bodies as inert samples. The external sample selector is evidence UI,
-not Registry navigation. The builder namespaces element IDs solely to embed
-independent documents in one carrier.
+A PR preview runs the same built Python Worker as production: catalog, Extension
+details, Publisher, Registry API, Python index/files, and Module Federation
+assets. It has its own Worker, D1 database, and private R2 bucket, all named
+`inkcre-ext-reg-pr-<number>`. Its origin is the account's corresponding
+`workers.dev` URL. No custom domain or production binding is inherited.
 
-Full product journeys run on the real Python Worker with isolated D1/R2 state,
-as described in [Local Development](local-development.md). Preview limitations
-must not introduce environment switches, alternative routes, hidden controls,
-or preview renderers into product code. A fully interactive remote preview
-would require the same Worker and isolated bindings; static Pages samples do
-not establish that capability.
+The existing `pnpm build` / `pnpm worker:build` commands build the application.
+A separate runner uploads those modules with the same pinned Wrangler used by
+pywrangler; it does not rebuild Python or introduce a frontend release unit.
+The deployment template keeps the production compatibility date, flags, CSS/JS
+module rules, and observability. Only resource bindings and origin differ.
+Product routes, renderers, styles, and controls have no environment branches.
 
-Every pull request runs secret-free checks. Fork pull requests receive no remote
-Preview authority. For an eligible same-repository pull request, the trusted
-default-branch `workflow_run` controller verifies the successful checks run,
-open PR, same-repository origin, and exact current head. The protected Preview
-job checks out and builds that head without provider credentials, then exposes
-the Pages credential only to the delivery step.
+## Delivery authority
 
-The controller deploys only the bounded document to the fixed Cloudflare Pages
-project `inkcre-extension-registry-ui-preview` on
-`preview/ext-reg/pr-<number>`. Protected-main code adds source identity and
-noindex, no-store, CSP, nosniff, and no-referrer policy. The Pages project has
-no Git provider, custom domain, Functions, Worker, D1, R2, or production token.
-The fixture contains sample published release descriptors. The builder owns its
-64 KiB document bound, static navigation and inert behavior under `scripts/`;
-the Worker package owns none of them. Controller-added headers disable scripts
-and requests in this evidence document. The default-branch controller's legacy
-`--api-origin` argument remains accepted during its transition, but it no longer
-rewrites product links.
+`registry-preview.yml` runs from the default branch after successful Registry
+checks. Its controller verifies the workflow path, same-repository origin,
+exact current head, and open PR targeting main. Forks receive checks only.
+The candidate build has no deployment credentials. A separate delivery runner
+checks out only the trusted controller and downloads this run's built modules
+and SQL migrations. The controller writes the entire deployment configuration;
+candidate build hooks, configuration, and commands never run with credentials.
+It checks the current PR again after the build and concurrency queue.
 
-Closing an internal PR deploys the checked-in tombstone, verifies the stable
-alias, and deletes older deployments only for that project and branch. The
-latest tombstone remains because Pages cannot delete the latest branch
-deployment. If provider delivery or authority boundaries fail, disable remote
-Preview; do not create a second topology.
+The protected GitHub `preview` environment supplies:
+
+- `CLOUDFLARE_ACCOUNT_ID`: target account variable (may override the repository
+  variable when using a separate preview account).
+- `CLOUDFLARE_PREVIEW_API_TOKEN`: a dedicated token with Workers Scripts Edit,
+  D1 Edit, and Workers R2 Storage Write for that account. Do not reuse the
+  production secret. Cloudflare's account-level control-plane permissions are
+  not a per-Worker boundary; only the trusted controller receives this token.
+  A separate account can provide stronger infrastructure isolation.
+- `REGISTRY_PREVIEW_PUBLISHER_TOKEN`: a random token of at least 32 characters,
+  used only for the disposable `demo` namespace. Reviewers obtain it through
+  the operator, not logs, workflow summaries, or public artifacts.
+
+The deployed application receives only its own DB, ARTIFACTS, and PUBLIC_ORIGIN.
+It never receives Cloudflare credentials. This confines candidate application
+code and namespace callers to that PR's data, while the controller retains
+account-level deployment authority.
+
+## State and retirement
+
+Updates apply the candidate's checked-in migrations and retain that PR's data.
+The controller refreshes the hashed demo credential and creates a few real Web
+releases through the normal prepare/upload/publish APIs. Existing published or
+yanked samples are preserved. Demo assets are test fixtures, not production
+Extensions. Reviewers can upload their own snapshots and exercise lifecycle
+changes. The deployment log records the source SHA, Worker Version, URL, and
+anonymous/read-after-write smoke results; identity is deployment evidence, not
+an endpoint or badge added to the product.
+
+Deploy and cleanup share one per-PR concurrency group without interrupting
+active resource operations. Closing an internal PR runs the default-branch
+cleanup controller; manual cleanup accepts only a closed eligible PR. Cleanup
+replaces that PR's Worker with a small trusted retirement program, stopping
+application writes. Using the native R2 binding, it drains batches of objects,
+deletes the bucket, then deletes the Worker and D1 database. The temporary
+program is deployment tooling and never ships in the Registry package. Wrangler
+has no object-list command, and R2 requires an empty bucket before deletion;
+this avoids separate S3 credentials or a product maintenance endpoint.
+Interrupted cleanup is rerunnable, including resources created by a partially
+failed deployment. A failed cleanup remains visible in Actions and must be
+rerun; there is no silent expiry or production fallback.
+
+The controller must first land on protected main before `workflow_run` can
+activate it. During bootstrap an operator can use the same command with local
+Wrangler authentication and an artifact prepared exactly as in the workflow:
+
+```bash
+pdm run python scripts/registry_preview.py deploy \
+  --pull-number 33 --source-sha <exact-40-character-sha> --artifact /tmp/registry-worker
+pdm run python scripts/registry_preview.py retire --pull-number 33
+```
+
+Set the account and publisher token through the environment. These commands
+create/delete only deterministic preview resources; they are not production
+commands. Retire only after closing the PR (or when deliberately resetting its
+disposable acceptance data). The obsolete Pages workflows, static samples,
+fixture carrier, and preview-specific renderer have been removed.

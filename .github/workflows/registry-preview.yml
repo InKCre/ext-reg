@@ -1,0 +1,204 @@
+name: Registry preview
+
+on:
+  workflow_run:
+    workflows:
+      - Registry checks
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  identity:
+    name: Resolve trusted preview identity
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      head_sha: ${{ steps.identity.outputs.head_sha }}
+      pull_number: ${{ steps.identity.outputs.pull_number }}
+    steps:
+      - name: Resolve exact internal pull request
+        id: identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            })
+            if (run.name !== 'Registry checks' || run.path !== '.github/workflows/ci.yml') {
+              core.setFailed('Preview must be orchestrated by the trusted Registry checks workflow.')
+              return
+            }
+            if (run.conclusion !== 'success' || run.event !== 'pull_request') {
+              core.setFailed('Preview delivery requires a successful pull-request check run.')
+              return
+            }
+            if (run.head_repository?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed('Fork pull requests are not eligible for preview delivery.')
+              return
+            }
+
+            const pulls = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: run.head_sha,
+            })
+            const eligible = pulls.data.filter((pull) =>
+              pull.state === 'open' &&
+              pull.base.ref === 'main' &&
+              pull.head.sha === run.head_sha &&
+              pull.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`
+            )
+            if (eligible.length !== 1) {
+              core.setFailed('Run must be the exact head of one eligible internal pull request.')
+              return
+            }
+
+            const pull = eligible[0]
+            core.setOutput('head_sha', run.head_sha)
+            core.setOutput('pull_number', String(pull.number))
+
+  build:
+    name: Build exact-head Python Worker
+    needs: identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact PR head without deployment authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.identity.outputs.head_sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+      - name: Install PDM
+        run: python -m pip install pdm==2.28.0
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - name: Build the existing Python Worker
+        run: |
+          pdm install --frozen-lockfile
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm worker:build
+          mkdir -p artifact/src
+          cp dist/worker/worker.py artifact/src/
+          cp -R dist/worker/inkcre_extension_registry artifact/src/
+          cp -R dist/worker/python_modules artifact/
+          cp -R migrations artifact/
+      - name: Transfer modules and SQL to a separate delivery runner
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: registry-worker
+          path: artifact/
+          include-hidden-files: true
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: ext-reg preview
+    needs: [identity, build]
+    concurrency:
+      group: registry-preview-ext-reg-${{ needs.identity.outputs.pull_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+      deployments: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: preview
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout only the trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+      - name: Install PDM
+        run: python -m pip install pdm==2.28.0
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - name: Install frozen trusted tooling
+        run: |
+          pdm install --frozen-lockfile
+          pnpm install --frozen-lockfile
+      - name: Download this run's Python Worker
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: registry-worker
+          path: ${{ runner.temp }}/registry-worker
+      - name: Recheck PR identity after build and concurrency queue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        with:
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PULL_NUMBER),
+            })
+            if (pull.state !== 'open' || pull.base.ref !== 'main' ||
+                pull.head.repo?.full_name !== process.env.GITHUB_REPOSITORY ||
+                pull.head.sha !== process.env.SOURCE_SHA) {
+              throw new Error('PR closed or moved; no preview mutation is allowed.')
+            }
+      - name: Apply migrations, deploy isolated bindings, and verify real journeys
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          REGISTRY_PREVIEW_PUBLISHER_TOKEN: ${{ secrets.REGISTRY_PREVIEW_PUBLISHER_TOKEN }}
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        run: >-
+          pdm run python scripts/registry_preview.py deploy
+          --pull-number "$PULL_NUMBER"
+          --source-sha "$SOURCE_SHA"
+          --artifact "$RUNNER_TEMP/registry-worker"
+      - name: Record interactive preview evidence
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        run: |
+          {
+            echo '## Registry PR 预览'
+            echo
+            echo "- 来源：\`$SOURCE_SHA\`"
+            echo "- 完整预览：$PREVIEW_URL"
+            echo '- 目录、详情、Publisher 与原生分发运行同一 Python Worker。'
+            echo '- 每 PR 独立 D1/R2；发布测试使用 demo 命名空间和专用预览凭据。'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,100 @@
+name: Registry preview cleanup
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Closed pull request whose preview should be retired
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  cleanup:
+    name: ext-reg preview cleanup
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.base.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    concurrency:
+      group: registry-preview-ext-reg-${{ github.event.pull_request.number || inputs.pull_number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: preview
+    steps:
+      - name: Checkout the trusted cleanup controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.11.0
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version-file: .python-version
+      - name: Install frozen trusted tooling
+        run: |
+          python -m pip install pdm==2.28.0
+          pdm install --frozen-lockfile
+          pnpm install --frozen-lockfile
+      - name: Resolve the closed pull request
+        id: identity
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          REQUESTED_PULL_NUMBER: ${{ github.event.pull_request.number || inputs.pull_number }}
+        with:
+          script: |
+            const pullNumber = Number(process.env.REQUESTED_PULL_NUMBER)
+            if (!Number.isInteger(pullNumber) || pullNumber < 1) {
+              core.setFailed('A positive pull-request number is required.')
+              return
+            }
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            })
+            if (
+              pull.state !== 'closed' ||
+              pull.base.ref !== 'main' ||
+              pull.base.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` ||
+              pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`
+            ) {
+              core.setFailed('Cleanup only accepts a closed same-repository pull request targeting main.')
+              return
+            }
+            core.setOutput('pull_number', String(pullNumber))
+
+      - name: Retire the closed PR Worker and delete its D1/R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          PULL_NUMBER: ${{ steps.identity.outputs.pull_number }}
+        run: pdm run python scripts/registry_preview.py retire --pull-number "$PULL_NUMBER"
