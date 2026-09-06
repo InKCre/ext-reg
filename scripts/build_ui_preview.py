@@ -7,8 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from inkcre_extension_registry.contracts.models import ExtensionSummary
-from inkcre_extension_registry.service.ui import extension_catalog_html
+from inkcre_extension_registry.contracts.models import ExtensionRecord
+from inkcre_extension_registry.service.ui import extension_preview_html
 
 MAX_DOCUMENT_BYTES = 64 * 1024
 
@@ -17,16 +17,25 @@ class PreviewFixture(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: Literal[1]
-    extensions: tuple[ExtensionSummary, ...]
+    extensions: tuple[ExtensionRecord, ...]
 
     @field_validator("extensions")
     @classmethod
     def extension_names_are_unique(
-        cls, extensions: tuple[ExtensionSummary, ...]
-    ) -> tuple[ExtensionSummary, ...]:
+        cls, extensions: tuple[ExtensionRecord, ...]
+    ) -> tuple[ExtensionRecord, ...]:
         names = [extension.name for extension in extensions]
         if len(names) != len(set(names)):
             raise ValueError("extension names must be unique")
+        for extension in extensions:
+            if not extension.releases or any(
+                release.name != extension.name or release.state != "published"
+                for release in extension.releases
+            ):
+                raise ValueError("preview details must be published releases of their extension")
+            versions = [release.version for release in extension.releases]
+            if len(versions) != len(set(versions)):
+                raise ValueError("preview release versions must be unique")
         return extensions
 
 
@@ -36,10 +45,9 @@ def build_preview(*, fixture_path: Path, output_directory: Path, api_origin: str
         raise ValueError("output directory must be empty")
     output_directory.mkdir(parents=True, exist_ok=True)
 
-    document = extension_catalog_html(
+    document = extension_preview_html(
         fixture.extensions,
         api_origin=api_origin,
-        noindex=True,
     ).encode()
     if len(document) > MAX_DOCUMENT_BYTES:
         raise ValueError(f"preview document exceeds {MAX_DOCUMENT_BYTES} bytes")
@@ -50,7 +58,9 @@ def build_preview(*, fixture_path: Path, output_directory: Path, api_origin: str
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build the static Extension-list PR preview")
+    parser = argparse.ArgumentParser(
+        description="Build the static Registry catalog and detail PR preview"
+    )
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--api-origin", required=True)

@@ -68,4 +68,11 @@ is no Registry copy of the token source or a competing design package.
 and checks browser JavaScript syntax. Committing generated CSS makes Python wheel
 and static-preview builds self-contained; it is never edited manually. Wrangler
 Text rules explicitly include CSS and JavaScript in the Python module filesystem.
-The same HTML renderer supplies the existing read-only Pages catalog preview.
+The same catalog and detail templates supply the read-only Pages preview.
+
+Registry follows the client-web product surface: the 32px geometric InKCre logo,
+InkHeader spacing and typography, square InkButton-style controls, bordered
+extension rows, and compact metadata. `templates/brand.html` contains the SVG
+from client-web's `apps/client-web/public/logo/32.svg`. Page content consists of
+catalog, release metadata, and publishing controls; it has no marketing hero,
+illustration, promotional footer, or persistent tutorial panels.

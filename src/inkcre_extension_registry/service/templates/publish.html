@@ -1,14 +1,6 @@
 {% extends "base.html" %} {% block content %}
 <div class="page-container publisher-page">
-  <header class="publisher-heading">
-    <p class="eyebrow">THE PUBLISHER WORKSPACE</p>
-    <h1>
-      Made by you.
-      <br />
-      <span>Ready for everyone.</span>
-    </h1>
-    <p class="lead">Take your extension from a local idea to a published release.</p>
-  </header>
+  <header class="section-heading"><h1>Publisher</h1></header>
   <noscript>
     <p class="info-note">
       The publisher workspace needs JavaScript. You can also publish with the
@@ -18,9 +10,6 @@
   </noscript>
   <section id="connect-panel" class="connect-layout">
     <div class="connect-card">
-      <p class="eyebrow">YOUR WORKSPACE</p>
-      <h2>Connect as a publisher</h2>
-      <p>Use the credential issued for your publisher namespace.</p>
       <form id="connect-form">
         <label for="token">Publisher credential</label>
         <input
@@ -34,49 +23,16 @@
           autocomplete="off"
           spellcheck="false"
         />
-        <p class="field-help">Kept in this tab’s memory. Reloading or disconnecting clears it.</p>
-        <button class="button button-primary" type="submit">
-          Connect workspace
-          <span aria-hidden="true">→</span>
-        </button>
+
+        <button class="button button-primary" type="submit">Connect</button>
         <p id="connect-status" class="form-status" role="status"></p>
       </form>
     </div>
-    <div class="publish-intro">
-      <p class="eyebrow">A CLEAR PATH TO PUBLISHED</p>
-      <ol class="steps">
-        <li>
-          <span>01</span>
-          <div>
-            <h3>Prepare a release</h3>
-            <p>Give your extension a name, version, and source.</p>
-          </div>
-        </li>
-        <li>
-          <span>02</span>
-          <div>
-            <h3>Add your distribution</h3>
-            <p>Upload a Web snapshot here, or use the Toolkit for Python.</p>
-          </div>
-        </li>
-        <li>
-          <span>03</span>
-          <div>
-            <h3>Make it discoverable</h3>
-            <p>Review and publish. Manage your releases in one place.</p>
-          </div>
-        </li>
-      </ol>
-      <p class="field-help">
-        New publisher?
-        <a href="https://github.com/InKCre/ext-reg/issues/new">Request a namespace ↗</a>
-      </p>
-    </div>
+    <a href="https://github.com/InKCre/ext-reg/issues/new">Request a namespace ↗</a>
   </section>
   <section id="workspace" hidden aria-label="Publisher workspace">
     <div class="workspace-heading">
       <div>
-        <p class="eyebrow">CONNECTED NAMESPACE</p>
         <h2 id="namespace-name"></h2>
       </div>
       <button id="disconnect" class="button" type="button">Disconnect</button>
@@ -89,7 +45,7 @@
       <div>
         <button id="refresh" class="button" type="button">Refresh</button>
         <button id="new-release" class="button button-primary" type="button">
-          + New Web release
+          New Web release
         </button>
       </div>
     </div>
@@ -100,21 +56,12 @@
       <span id="page-position"></span>
       <button id="next-page" type="button" class="button">Next →</button>
     </nav>
-    <aside class="info-note">
-      <strong>Publishing a Python extension?</strong>
-      <p>
-        Use the
-        <a href="https://github.com/InKCre/ext-reg/tree/main/toolkit">Developer Toolkit</a>
-        to prepare and upload your wheel through the native Python protocol. Your release will
-        appear here so you can publish, withdraw, or restore it.
-      </p>
-    </aside>
+    <a href="https://github.com/InKCre/ext-reg/tree/main/toolkit">Python upload · Toolkit ↗</a>
   </section>
   <dialog id="release-dialog" aria-labelledby="release-dialog-title">
     <div class="dialog-heading">
       <div>
-        <p class="eyebrow">NEW WEB RELEASE</p>
-        <h2 id="release-dialog-title">Give your idea a home.</h2>
+        <h2 id="release-dialog-title">New Web release</h2>
       </div>
       <button class="icon-button close-dialog" type="button" aria-label="Close new release">
         ×
@@ -132,7 +79,6 @@
             maxlength="64"
             placeholder="my-extension"
           />
-          <p class="field-help">Lowercase letters, numbers, and hyphens.</p>
         </div>
         <div>
           <label for="nickname">Display name</label>
@@ -147,12 +93,10 @@
         <div>
           <label for="version">Version</label>
           <input id="version" name="version" required maxlength="128" placeholder="1.0.0" />
-          <p class="field-help">SemVer, such as 1.0.0 or 1.0.0-rc.1.</p>
         </div>
         <div>
-          <label for="host-range">Host SDK version</label>
+          <label for="host-range">@inkcre/core version range</label>
           <input id="host-range" name="host_range" required maxlength="256" placeholder="^0.1.0" />
-          <p class="field-help">Supported @inkcre/core SemVer range.</p>
         </div>
         <div class="full-width">
           <label for="repository">Source repository</label>
@@ -176,13 +120,9 @@
           />
         </div>
       </div>
-      <p class="info-note">
-        Preparing reserves this version and its source metadata. Upload a ZIP with
-        <code>mf-manifest.json</code>
-        at its root next. You’ll publish in a separate step.
-      </p>
+
       <p id="release-status" class="form-status" role="status"></p>
-      <button class="button button-primary" type="submit">Prepare release →</button>
+      <button class="button button-primary" type="submit">Prepare release</button>
     </form>
   </dialog>
   <dialog id="action-dialog" aria-labelledby="action-title">
@@ -199,13 +139,13 @@
           name="reason"
           maxlength="400"
           rows="3"
-          placeholder="Let consumers know why this version is being withdrawn."
+          placeholder="Withdrawal reason"
         ></textarea>
       </div>
       <div id="upload-field" hidden>
         <label for="snapshot">Web snapshot (.zip)</label>
         <input id="snapshot" name="content" type="file" accept=".zip,application/zip" />
-        <p class="field-help">ZIP rooted at mf-manifest.json. Total upload limit: 20 MiB.</p>
+        <p class="field-help">mf-manifest.json at ZIP root · Up to 20 MiB</p>
       </div>
       <p id="action-status" class="form-status" role="status"></p>
       <button id="confirm-action" class="button button-primary" type="submit">Confirm</button>

@@ -1,0 +1,67 @@
+<section id="catalog" class="catalog-section" aria-labelledby="catalog-heading">
+  <div class="section-heading">
+    <h1 id="catalog-heading">
+      Extensions
+      <span class="count">{{ extensions | length }}</span>
+    </h1>
+    {% if not preview %}
+    <a class="button" href="/publish">Publish</a>
+    {% endif %}
+  </div>
+  {% if not preview %}
+  <form class="search-form" role="search" method="get" action="/">
+    <label class="sr-only" for="search">Search extensions</label>
+    <input
+      id="search"
+      type="search"
+      name="q"
+      value="{{ query }}"
+      placeholder="Search extensions"
+      maxlength="200"
+      autocomplete="off"
+    />
+    <label class="sr-only" for="publisher-filter">Publisher</label>
+    <select id="publisher-filter" name="publisher">
+      <option value="">All publishers</option>
+      {% for publisher in publishers %}
+      <option
+        value="{{ publisher }}"
+        {% if publisher == namespace %}
+        selected
+        {% endif %}
+      >
+        {{ publisher }}
+      </option>
+      {% endfor %}
+    </select>
+    <button class="button" type="submit">Search</button>
+  </form>
+  {% if query or namespace %}
+  <p class="search-summary"><a href="/">Clear filters</a></p>
+  {% endif %} {% endif %} {% if extensions %}
+  <ul class="catalog-list" aria-label="Published extensions">
+    {% for extension in extensions %}
+    <li>
+      <a
+        class="extension-card"
+        href="{% if preview %}#extension-{{ extension.name }}{% else %}/explore/{{ extension.name }}{% endif %}"
+      >
+        <div>
+          <h2>{{ extension.nickname }}</h2>
+          <p class="extension-name">{{ extension.name }}</p>
+        </div>
+        <span class="card-action">
+          Details
+          <span aria-hidden="true">→</span>
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">
+    {% if total %}No matching extensions.{% else %}No published
+    extensions.{% endif %}
+  </p>
+  {% endif %}
+</section>

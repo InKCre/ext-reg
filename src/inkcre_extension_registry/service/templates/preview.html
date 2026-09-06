@@ -1,0 +1,8 @@
+{% extends "base.html" %} {% block content %} {% for detail in details %}
+<section
+  class="preview-detail"
+  id="extension-{{ detail.extension.name }}{% if not detail.default %}-{{ detail.release.version }}{% endif %}"
+>
+  {% with extension=detail.extension, release=detail.release, releases=detail.releases, publisher=detail.publisher %} {% include "detail-content.html" %} {% endwith %}
+</section>
+{% endfor %} {% include "catalog-content.html" %} {% endblock %}

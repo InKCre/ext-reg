@@ -1,11 +1,163 @@
 {
   "schema_version": 1,
   "extensions": [
-    { "name": "inkcre/github", "nickname": "GitHub" },
-    { "name": "inkcre/learn-english", "nickname": "Learn English" },
-    { "name": "inkcre/mail", "nickname": "Mail" },
-    { "name": "inkcre/rss", "nickname": "RSS/Atom Feeds" },
-    { "name": "inkcre/telegram", "nickname": "Telegram" },
-    { "name": "inkcre/twitter", "nickname": "Twitter" }
+    {
+      "name": "inkcre/github",
+      "nickname": "GitHub",
+      "releases": [
+        {
+          "name": "inkcre/github",
+          "nickname": "GitHub",
+          "version": "1.1.0",
+          "state": "published",
+          "python": {
+            "project": "inkcre-ext-github",
+            "simple_url": "https://registry.example/simple/inkcre-ext-github/",
+            "host_sdk": "core-py",
+            "host_sdk_version": "^0.1.0",
+            "entry_point": {
+              "group": "inkcre.extensions",
+              "name": "github",
+              "object": "inkcre_ext_github:extension"
+            }
+          },
+          "module_federation": {
+            "manifest_url": "https://registry.example/extensions/inkcre/github/1.1.0/mf-manifest.json",
+            "host_sdk": "@inkcre/core",
+            "host_sdk_version": "^0.1.2"
+          }
+        },
+        {
+          "name": "inkcre/github",
+          "nickname": "GitHub",
+          "version": "1.0.0",
+          "state": "published",
+          "python": {
+            "project": "inkcre-ext-github",
+            "simple_url": "https://registry.example/simple/inkcre-ext-github/",
+            "host_sdk": "core-py",
+            "host_sdk_version": "^0.1.0",
+            "entry_point": {
+              "group": "inkcre.extensions",
+              "name": "github",
+              "object": "inkcre_ext_github:extension"
+            }
+          },
+          "module_federation": {
+            "manifest_url": "https://registry.example/extensions/inkcre/github/1.0.0/mf-manifest.json",
+            "host_sdk": "@inkcre/core",
+            "host_sdk_version": "^0.1.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "inkcre/learn-english",
+      "nickname": "Learn English",
+      "releases": [
+        {
+          "name": "inkcre/learn-english",
+          "nickname": "Learn English",
+          "version": "1.0.0",
+          "state": "published",
+          "module_federation": {
+            "manifest_url": "https://registry.example/extensions/inkcre/learn-english/1.0.0/mf-manifest.json",
+            "host_sdk": "@inkcre/core",
+            "host_sdk_version": "^0.1.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "inkcre/mail",
+      "nickname": "Mail",
+      "releases": [
+        {
+          "name": "inkcre/mail",
+          "nickname": "Mail",
+          "version": "1.0.0",
+          "state": "published",
+          "python": {
+            "project": "inkcre-ext-mail",
+            "simple_url": "https://registry.example/simple/inkcre-ext-mail/",
+            "host_sdk": "core-py",
+            "host_sdk_version": "^0.1.0",
+            "entry_point": {
+              "group": "inkcre.extensions",
+              "name": "mail",
+              "object": "inkcre_ext_mail:extension"
+            }
+          },
+          "module_federation": {
+            "manifest_url": "https://registry.example/extensions/inkcre/mail/1.0.0/mf-manifest.json",
+            "host_sdk": "@inkcre/core",
+            "host_sdk_version": "^0.1.2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "inkcre/rss",
+      "nickname": "RSS/Atom Feeds",
+      "releases": [
+        {
+          "name": "inkcre/rss",
+          "nickname": "RSS/Atom Feeds",
+          "version": "1.0.0",
+          "state": "published",
+          "python": {
+            "project": "inkcre-ext-rss",
+            "simple_url": "https://registry.example/simple/inkcre-ext-rss/",
+            "host_sdk": "core-py",
+            "host_sdk_version": "^0.1.0",
+            "entry_point": {
+              "group": "inkcre.extensions",
+              "name": "rss",
+              "object": "inkcre_ext_rss:extension"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "inkcre/telegram",
+      "nickname": "Telegram",
+      "releases": [
+        {
+          "name": "inkcre/telegram",
+          "nickname": "Telegram",
+          "version": "1.0.0",
+          "state": "published",
+          "python": {
+            "project": "inkcre-ext-telegram",
+            "simple_url": "https://registry.example/simple/inkcre-ext-telegram/",
+            "host_sdk": "core-py",
+            "host_sdk_version": "^0.1.0",
+            "entry_point": {
+              "group": "inkcre.extensions",
+              "name": "telegram",
+              "object": "inkcre_ext_telegram:extension"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "inkcre/twitter",
+      "nickname": "Twitter",
+      "releases": [
+        {
+          "name": "inkcre/twitter",
+          "nickname": "Twitter",
+          "version": "1.0.0",
+          "state": "published",
+          "module_federation": {
+            "manifest_url": "https://registry.example/extensions/inkcre/twitter/1.0.0/mf-manifest.json",
+            "host_sdk": "@inkcre/core",
+            "host_sdk_version": "^0.1.2"
+          }
+        }
+      ]
+    }
   ]
 }

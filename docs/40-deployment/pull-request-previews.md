@@ -1,6 +1,6 @@
 # Pull-Request Previews
 
-Pull-request Preview covers only the read-only Extension-list page. Registry
+Pull-request Preview covers the read-only catalog and Extension release details. Registry
 APIs, publishing, native Distribution consumption, installation, and runtime
 behavior remain local black-box responsibilities.
 
@@ -16,9 +16,13 @@ project `inkcre-extension-registry-ui-preview` on
 `preview/ext-reg/pr-<number>`. Protected-main code adds source identity and
 noindex, no-store, CSP, nosniff, and no-referrer policy. The Pages project has
 no Git provider, custom domain, Functions, Worker, D1, R2, or production token.
-Its Extension links point to production public API metadata, and Publisher
-links open the Toolkit guide; it never claims to host candidate
-Registry APIs.
+The fixture includes explicitly sampled published release descriptors. Catalog
+links open details and version links select release views inside that same
+HTML document, using URL fragments and CSS without scripts. Both surfaces
+reuse the Worker's templates. The header marks the document as Preview; native
+artifact links and Publisher controls are omitted because they require the
+Registry service. No sample version is sent to a production endpoint.
+The existing 64 KiB bound applies to the entire document.
 
 Closing an internal PR deploys the checked-in tombstone, verifies the stable
 alias, and deletes older deployments only for that project and branch. The

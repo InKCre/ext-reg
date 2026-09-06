@@ -139,11 +139,7 @@ if ($('#connect-form')) {
   function openAction(release, kind) {
     action = { release, kind }
     const descriptions = {
-      publish: [
-        'Publish this release?',
-        'This version will be public and appear in the catalog. At least one distribution must have been uploaded successfully.',
-        'Publish release',
-      ],
+      publish: ['Publish this release?', 'This version will become public.', 'Publish release'],
       yank: [
         'Withdraw this release?',
         'This version will leave the catalog and new discovery. Existing distribution URLs remain available; withdrawal does not uninstall it from anyone’s workspace.',
@@ -156,7 +152,7 @@ if ($('#connect-form')) {
       ],
       'module-federation': [
         'Upload a Web snapshot',
-        'Upload the built ZIP for this exact version. An identical retry is safe; different bytes need a new version.',
+        'Different bytes require a new version.',
         'Upload snapshot',
       ],
     }
@@ -186,13 +182,7 @@ if ($('#connect-form')) {
     list.replaceChildren()
     if (!data.releases.length) {
       const empty = element('div', null, 'empty-state')
-      empty.append(
-        element('h3', 'Your next release starts here.'),
-        element(
-          'p',
-          'Prepare a Web release here, or publish a Python distribution with the Toolkit.',
-        ),
-      )
+      empty.append(element('p', 'No releases.'))
       list.append(empty)
     }
     for (const release of data.releases) {
@@ -336,7 +326,6 @@ if ($('#connect-form')) {
     })
   }
   async function updateAfterChange(message, pageOffset = offset) {
-    announce(message)
     status('#workspace-status', message)
     try {
       await refresh(pageOffset)
@@ -369,7 +358,7 @@ if ($('#connect-form')) {
         },
       })
       $('#release-dialog').close()
-      await updateAfterChange('Release prepared. Upload your Web ZIP, then publish when ready.', 0)
+      await updateAfterChange('Release prepared.', 0)
     })
   })
   $('#action-form').addEventListener('submit', (event) => {

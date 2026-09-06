@@ -58,12 +58,9 @@ def html_response(document: str, *, status_code: int = 200) -> HTMLResponse:
 def extension_catalog_html(
     extensions: Sequence[ExtensionSummary],
     *,
-    api_origin: str | None = None,
-    noindex: bool = False,
     query: str = "",
     namespace: str = "",
 ) -> str:
-    origin = _canonical_api_origin(api_origin) if api_origin is not None else ""
     publishers = sorted({extension.name.split("/")[0] for extension in extensions})
     filtered = [
         extension
@@ -75,9 +72,6 @@ def extension_catalog_html(
         "catalog.html",
         title="Extensions",
         active="catalog",
-        origin=origin,
-        noindex=noindex,
-        preview=api_origin is not None,
         extensions=filtered,
         total=len(extensions),
         publishers=publishers,
@@ -86,8 +80,12 @@ def extension_catalog_html(
     )
 
 
-def extension_detail_html(extension: ExtensionRecord, version: str | None = None) -> str | None:
+def _detail_context(
+    extension: ExtensionRecord, version: str | None = None
+) -> dict[str, object] | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
+    if not releases:
+        return None
     release: ReleaseRecord | None = next(
         (item for item in releases if item.version == version), None
     )
@@ -97,12 +95,38 @@ def extension_detail_html(extension: ExtensionRecord, version: str | None = None
         release = next(
             (item for item in releases if not Version(item.version).prerelease), releases[0]
         )
-    return page(
-        "detail.html",
-        title=extension.nickname,
-        active="catalog",
+    return dict(
         extension=extension,
         release=release,
         releases=releases,
         publisher=extension.name.split("/")[0],
+    )
+
+
+def extension_detail_html(extension: ExtensionRecord, version: str | None = None) -> str | None:
+    context = _detail_context(extension, version)
+    if context is None:
+        return None
+    return page("detail.html", title=extension.nickname, active="catalog", **context)
+
+
+def extension_preview_html(extensions: Sequence[ExtensionRecord], *, api_origin: str) -> str:
+    """Render the catalog and sample release views within the bounded Pages document."""
+    _canonical_api_origin(api_origin)
+    details = []
+    for extension in extensions:
+        default = _detail_context(extension)
+        if default is None:
+            raise ValueError("preview extensions require a release")
+        details.append({**default, "default": True})
+        for release in extension.releases:
+            details.append({**default, "release": release, "default": False})
+    return page(
+        "preview.html",
+        title="Registry preview",
+        active="catalog",
+        preview=True,
+        extensions=extensions,
+        details=details,
+        total=len(extensions),
     )
