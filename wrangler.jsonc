@@ -5,6 +5,13 @@
   "compatibility_date": "2026-07-28",
   "compatibility_flags": ["python_workers"],
   "workers_dev": false,
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/service/static/registry.css", "**/service/static/registry.js"],
+      "fallthrough": true,
+    },
+  ],
   "routes": [
     {
       "pattern": "registry.inkcre.dev",

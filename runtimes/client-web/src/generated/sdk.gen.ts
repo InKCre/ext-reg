@@ -22,6 +22,9 @@ import type {
   PrepareReleaseV1ExtensionsNamespaceNameReleasesPostData,
   PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors,
   PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses,
+  PublisherWorkspaceV1PublisherGetData,
+  PublisherWorkspaceV1PublisherGetErrors,
+  PublisherWorkspaceV1PublisherGetResponses,
   PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostData,
   PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors,
   PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses,
@@ -311,3 +314,19 @@ export const yankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPost = <
       ...options.headers,
     },
   })
+
+/**
+ * Publisher Workspace
+ */
+export const publisherWorkspaceV1PublisherGet = <ThrowOnError extends boolean = false>(
+  options?: Options<PublisherWorkspaceV1PublisherGetData, ThrowOnError>,
+): RequestResult<
+  PublisherWorkspaceV1PublisherGetResponses,
+  PublisherWorkspaceV1PublisherGetErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    PublisherWorkspaceV1PublisherGetResponses,
+    PublisherWorkspaceV1PublisherGetErrors,
+    ThrowOnError
+  >({ url: '/v1/publisher', ...options })

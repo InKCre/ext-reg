@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, constr
+from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
 
 class ExtensionSummary(BaseModel):
@@ -41,6 +41,13 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: str = Field(..., title="Manifest Url")
 
 
+class State(Enum):
+    preparing = "preparing"
+    published = "published"
+    yanked = "yanked"
+    blocked = "blocked"
+
+
 class PythonEntryPoint(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -60,13 +67,6 @@ class PythonEntryPoint(BaseModel):
         min_length=1,
         max_length=256,
     ) = Field(..., title="Object")
-
-
-class State(Enum):
-    preparing = "preparing"
-    published = "published"
-    yanked = "yanked"
-    blocked = "blocked"
 
 
 class ValidationError(BaseModel):
@@ -165,3 +165,37 @@ class PrepareReleaseRequest(BaseModel):
         min_length=5,
         max_length=128,
     ) = Field(..., title="Version")
+
+
+class PublisherRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    module_federation: ModuleFederationDistribution | None = None
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: PythonDistribution | None = None
+    python_uploaded: bool = Field(..., title="Python Uploaded")
+    state: State = Field(..., title="State")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+    web_uploaded: bool = Field(..., title="Web Uploaded")
+
+
+class PublisherWorkspace(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    namespace: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$", min_length=1, max_length=64
+    ) = Field(..., title="Namespace")
+    next_offset: conint(ge=0) | None = Field(..., title="Next Offset")
+    offset: conint(ge=0) = Field(..., title="Offset")
+    releases: list[PublisherRelease] = Field(..., title="Releases")

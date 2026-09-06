@@ -107,6 +107,60 @@ export type PrepareReleaseRequest = {
 }
 
 /**
+ * PublisherRelease
+ */
+export type PublisherRelease = {
+  module_federation?: ModuleFederationDistribution | null
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  python?: PythonDistribution | null
+  /**
+   * Python Uploaded
+   */
+  python_uploaded: boolean
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Version
+   */
+  version: string
+  /**
+   * Web Uploaded
+   */
+  web_uploaded: boolean
+}
+
+/**
+ * PublisherWorkspace
+ */
+export type PublisherWorkspace = {
+  /**
+   * Namespace
+   */
+  namespace: string
+  /**
+   * Next Offset
+   */
+  next_offset: number | null
+  /**
+   * Offset
+   */
+  offset: number
+  /**
+   * Releases
+   */
+  releases: Array<PublisherRelease>
+}
+
+/**
  * PythonAssociationInput
  */
 export type PythonAssociationInput = {
@@ -740,3 +794,41 @@ export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses
 
 export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponse =
   YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses[keyof YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses]
+
+export type PublisherWorkspaceV1PublisherGetData = {
+  body?: never
+  headers?: {
+    /**
+     * Authorization
+     */
+    authorization?: string | null
+  }
+  path?: never
+  query?: {
+    /**
+     * Offset
+     */
+    offset?: number
+  }
+  url: '/v1/publisher'
+}
+
+export type PublisherWorkspaceV1PublisherGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type PublisherWorkspaceV1PublisherGetError =
+  PublisherWorkspaceV1PublisherGetErrors[keyof PublisherWorkspaceV1PublisherGetErrors]
+
+export type PublisherWorkspaceV1PublisherGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: PublisherWorkspace
+}
+
+export type PublisherWorkspaceV1PublisherGetResponse =
+  PublisherWorkspaceV1PublisherGetResponses[keyof PublisherWorkspaceV1PublisherGetResponses]

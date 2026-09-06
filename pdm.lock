@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:9c15c6aa65161bee06ed785cbc2ac4aca50ccc54d9499125ba51b417d027fb96"
+content_hash = "sha256:8567468fc6bef4e8051d0184e013c914ae91fd9b9fae670a03d6524fb7765eae"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.14"
@@ -333,7 +333,7 @@ files = [
 
 [[package]]
 name = "inkcre-extension-runtime-core-py"
-version = "0.1.0"
+version = "0.1.2"
 requires_python = ">=3.12,<3.14"
 editable = true
 path = "./runtimes/core-py"
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "inkcre-extension-toolkit"
-version = "0.2.0"
+version = "0.2.1"
 requires_python = ">=3.12,<3.14"
 editable = true
 path = "./toolkit"
@@ -380,7 +380,7 @@ name = "jinja2"
 version = "3.1.6"
 requires_python = ">=3.7"
 summary = "A very fast and expressive template engine."
-groups = ["dev"]
+groups = ["default", "dev"]
 dependencies = [
     "MarkupSafe>=2.0",
 ]
@@ -408,7 +408,7 @@ name = "markupsafe"
 version = "3.0.3"
 requires_python = ">=3.9"
 summary = "Safely add untrusted strings to HTML/XML markup."
-groups = ["dev"]
+groups = ["default", "dev"]
 files = [
     {file = "markupsafe-3.0.3-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:d53197da72cc091b024dd97249dfc7794d6a56530370992a5e1a08983ad9230e"},
     {file = "markupsafe-3.0.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1872df69a4de6aead3491198eaf13810b565bdbeec3ae2dc8780f14458ec73ce"},

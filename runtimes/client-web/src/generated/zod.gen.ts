@@ -100,6 +100,44 @@ export const zPythonDistribution = z.object({
 })
 
 /**
+ * PublisherRelease
+ */
+export const zPublisherRelease = z.object({
+  module_federation: zModuleFederationDistribution.nullish(),
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  python: zPythonDistribution.nullish(),
+  python_uploaded: z.boolean(),
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+  web_uploaded: z.boolean(),
+})
+
+/**
+ * PublisherWorkspace
+ */
+export const zPublisherWorkspace = z.object({
+  namespace: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  next_offset: z.int().gte(0).nullable(),
+  offset: z.int().gte(0),
+  releases: z.array(zPublisherRelease),
+})
+
+/**
  * ReleaseRecord
  */
 export const zReleaseRecord = z.object({
@@ -402,3 +440,16 @@ export const zYankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostPath = 
  * Successful Response
  */
 export const zYankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponse = zReleaseRecord
+
+export const zPublisherWorkspaceV1PublisherGetHeaders = z.object({
+  authorization: z.string().nullish(),
+})
+
+export const zPublisherWorkspaceV1PublisherGetQuery = z.object({
+  offset: z.int().gte(0).lte(100000).optional().default(0),
+})
+
+/**
+ * Successful Response
+ */
+export const zPublisherWorkspaceV1PublisherGetResponse = zPublisherWorkspace

@@ -9,3 +9,5 @@ dist/
 node_modules/
 pnpm-lock.yaml
 tasks/
+src/inkcre_extension_registry/service/templates/
+src/inkcre_extension_registry/service/static/registry.css

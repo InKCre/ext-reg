@@ -8,7 +8,7 @@ import re
 from typing import Annotated, Any
 from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from packaging.version import InvalidVersion
@@ -21,6 +21,7 @@ from ..contracts.models import (
     ExtensionRecord,
     ExtensionSummary,
     PrepareReleaseRequest,
+    PublisherWorkspace,
     PythonEntryPoint,
     RegistrySegment,
     ReleaseRecord,
@@ -58,7 +59,7 @@ from .simple import (
     root_html,
     root_json,
 )
-from .ui import extension_catalog_html
+from .ui import SCRIPT, extension_catalog_html, extension_detail_html, html_response, page
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES + 1
@@ -232,7 +233,7 @@ def create_app() -> FastAPI:
                     content={"detail": "multipart upload exceeds 20 MiB"},
                 )
         response = await call_next(request)
-        if response.status_code in {
+        if request.url.path == "/v1/publisher" or response.status_code in {
             status.HTTP_404_NOT_FOUND,
             status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
         }:
@@ -244,17 +245,64 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def extension_catalog(request: Request) -> HTMLResponse:
+    async def extension_catalog(
+        request: Request,
+        q: Annotated[str, Query(max_length=200)] = "",
+        publisher: Annotated[str, Query(max_length=64)] = "",
+    ) -> HTMLResponse:
         extensions = await _repository(request).list_extensions()
-        response = HTMLResponse(extension_catalog_html(extensions))
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
-            "form-action 'none'; frame-ancestors 'none'"
+        return html_response(
+            extension_catalog_html(extensions, query=q.strip(), namespace=publisher)
         )
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response
+
+    @app.get("/assets/registry.js", include_in_schema=False)
+    async def registry_script() -> Response:
+        return Response(
+            SCRIPT,
+            media_type="text/javascript",
+            headers={
+                "Cache-Control": "public, max-age=0, must-revalidate",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    @app.get("/explore/{namespace}/{name}", response_class=HTMLResponse, include_in_schema=False)
+    async def extension_detail(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        request: Request,
+        version: Annotated[str | None, Query(max_length=128)] = None,
+    ) -> HTMLResponse:
+        extension_name = _validate_identity(namespace, name)
+        extension = await _repository(request).get_extension(extension_name)
+        document = extension_detail_html(extension, version) if extension else None
+        if document is None:
+            return html_response(
+                page(
+                    "error.html",
+                    title="This release isn't available.",
+                    code="404",
+                    message="It may be unpublished, withdrawn, or no longer available. "
+                    "Explore the catalog to find a published version.",
+                    active="catalog",
+                ),
+                status_code=404,
+            )
+        return html_response(document)
+
+    @app.get("/publish", response_class=HTMLResponse, include_in_schema=False)
+    async def publisher_page() -> HTMLResponse:
+        return html_response(page("publish.html", title="Publish", active="publish", noindex=True))
+
+    @app.get("/v1/publisher", response_model=PublisherWorkspace)
+    async def publisher_workspace(
+        request: Request,
+        response: Response,
+        namespace: Annotated[str, Depends(_publisher_namespace)],
+        offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+    ) -> PublisherWorkspace:
+        response.headers["Cache-Control"] = "no-store"
+        return await _repository(request).publisher_workspace(namespace, offset)
 
     @app.get("/v1/extensions", response_model=list[ExtensionSummary])
     async def list_extensions(request: Request, response: Response) -> list[ExtensionSummary]:

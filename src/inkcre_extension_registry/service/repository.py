@@ -12,6 +12,8 @@ from ..contracts.models import (
     ModuleFederationAssociationInput,
     ModuleFederationDistribution,
     PrepareReleaseRequest,
+    PublisherRelease,
+    PublisherWorkspace,
     PythonAssociationInput,
     PythonDistribution,
     PythonEntryPoint,
@@ -373,6 +375,47 @@ class RegistryRepository:
             state=state,
             python=python,
             module_federation=module_federation,
+        )
+
+    async def publisher_workspace(self, namespace: str, offset: int) -> PublisherWorkspace:
+        # Ten records keep the existing descriptor reads within D1's per-request query budget.
+        result = (
+            await self.db.prepare(
+                "SELECT r.extension_name, r.version, "
+                "EXISTS (SELECT 1 FROM python_distributions pd JOIN python_files pf "
+                "ON pf.normalized_project = pd.normalized_project AND pf.project_version = "
+                "pd.project_version WHERE pd.extension_name = r.extension_name "
+                "AND pd.release_version = r.version) AS python_uploaded, "
+                "EXISTS (SELECT 1 FROM module_federation_distributions mf "
+                "WHERE mf.extension_name = r.extension_name AND mf.release_version = r.version "
+                "AND mf.manifest_r2_key IS NOT NULL) AS web_uploaded "
+                "FROM releases r JOIN extensions e ON e.name = r.extension_name "
+                "WHERE e.namespace = ?1 ORDER BY r.created_at DESC, "
+                "r.extension_name, r.version DESC "
+                "LIMIT 11 OFFSET ?2"
+            )
+            .bind(namespace, offset)
+            .all()
+        )
+        rows = _results(result)
+        releases = []
+        for row in rows[:10]:
+            release = await self.get_release(
+                _column(row, "extension_name"), _column(row, "version"), public=False
+            )
+            if release is not None:
+                releases.append(
+                    PublisherRelease(
+                        **release.model_dump(),
+                        python_uploaded=bool(_column(row, "python_uploaded")),
+                        web_uploaded=bool(_column(row, "web_uploaded")),
+                    )
+                )
+        return PublisherWorkspace(
+            namespace=namespace,
+            releases=tuple(releases),
+            offset=offset,
+            next_offset=offset + 10 if len(rows) > 10 else None,
         )
 
     async def list_extensions(self) -> list[ExtensionSummary]:
