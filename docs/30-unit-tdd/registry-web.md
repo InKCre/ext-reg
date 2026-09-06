@@ -56,8 +56,10 @@ management. Namespace and credential issuance remains an operator responsibility
 ## Design ownership
 
 `@inkcre/ui-web` is the existing package released by the sibling `design`
-repository (`InKCre/ui`). Registry imports its public Sass styles, token maps,
-and functions. Colors, typography families, and common spacing/radius vocabulary
+repository (`InKCre/ui`). Registry installs the package from its immutable public release commit
+using pnpm’s Git subdirectory support, and imports its public Sass styles, token maps,
+and functions. This avoids requiring private GitHub Packages access in public CI;
+compiled Vue exports are not part of this consumer contract. Colors, typography families, and common spacing/radius vocabulary
 remain design-owned; `web/registry.scss` owns Registry page composition. There
 is no Registry copy of the token source or a competing design package.
 

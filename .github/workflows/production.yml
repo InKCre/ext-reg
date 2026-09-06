@@ -18,7 +18,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: registry-production
@@ -67,12 +66,8 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@inkcre'
 
       - name: Install frozen delivery dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile

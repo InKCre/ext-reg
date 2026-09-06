@@ -6,7 +6,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: registry-checks-${{ github.workflow }}-${{ github.ref }}
@@ -53,12 +52,8 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@inkcre'
 
       - name: Install frozen dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile

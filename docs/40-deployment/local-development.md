@@ -35,11 +35,15 @@ existing Release. Registry Worker deployment remains a separate workflow.
 ## Registry Web development
 
 Use Node 22 as declared by `package.json`; newer Node majors may not support the
-Wasm stack-switching flag required by the locked Pyodide toolchain. Dependencies
-include `@inkcre/ui-web@1.4.0` from GitHub Packages. Local npm authentication needs
-`read:packages`; never commit a token to `.npmrc`. CI uses its workflow token with
-`packages: read`, and the design package must admit this repository for Actions
-reads. Browser users need no package credentials: compiled CSS ships in the Worker.
+Wasm stack-switching flag required by the locked Pyodide toolchain. Registry
+consumes only the public Sass exports of `@inkcre/ui-web`. pnpm installs
+`packages/web` from the public `InKCre/ui` Git repository at commit
+`4eceec4c60345a52a08545555ebce9ab95053beb` (release `@inkcre/ui-web@1.4.0`).
+The immutable commit and subdirectory are pinned in the manifest and lockfile;
+no GitHub Packages credential or additional release workflow is needed.
+The source package is suitable for Sass consumption; its Vue runtime/dist
+exports are not used by Registry. To upgrade, select the next protected-main
+release commit, update the dependency, and rebuild/review the CSS.
 
 Edit `web/registry.scss`, then run `pnpm web:build`. Generated CSS is committed and
 verified by `pnpm web:check`. Templates and browser JavaScript live under

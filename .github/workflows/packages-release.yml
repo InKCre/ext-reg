@@ -17,7 +17,6 @@ jobs:
     name: Reconcile Web Runtime release plan
     permissions:
       contents: write
-      packages: read
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
@@ -36,12 +35,8 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@inkcre'
 
       - name: Install the frozen JavaScript workspace
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Create or update the package Version PR
@@ -61,7 +56,6 @@ jobs:
     if: "${{ startsWith(github.event.head_commit.message, 'chore(release): version Extension packages') }}"
     permissions:
       contents: write
-      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -101,12 +95,8 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@inkcre'
 
       - name: Install frozen dependencies
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile

@@ -24,7 +24,7 @@
   "devDependencies": {
     "@changesets/cli": "3.0.0",
     "@hey-api/openapi-ts": "0.99.0",
-    "@inkcre/ui-web": "1.4.0",
+    "@inkcre/ui-web": "github:InKCre/ui#4eceec4c60345a52a08545555ebce9ab95053beb&path:/packages/web",
     "prettier": "3.6.2",
     "sass": "1.94.2",
     "typescript": "5.9.3",

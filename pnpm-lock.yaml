@@ -18,8 +18,8 @@ importers:
         specifier: 0.99.0
         version: 0.99.0(typescript@5.9.3)
       '@inkcre/ui-web':
-        specifier: 1.4.0
-        version: 1.4.0
+        specifier: github:InKCre/ui#4eceec4c60345a52a08545555ebce9ab95053beb&path:/packages/web
+        version: https://codeload.github.com/InKCre/ui/tar.gz/4eceec4c60345a52a08545555ebce9ab95053beb#path:/packages/web
       prettier:
         specifier: 3.6.2
         version: 3.6.2
@@ -549,8 +549,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@inkcre/ui-web@1.4.0':
-    resolution: {integrity: sha512-Sq5f/hFpOtuGNZwVB36JuMPoAJUvkWvrHogl/PauI4OuV2M/qExdVXrEZa76pbbn35Ic/dleEPyze6lJghxI5w==, tarball: https://npm.pkg.github.com/download/@inkcre/ui-web/1.4.0/356469307437642b43b7e67e82c9b60e52d4f926}
+  '@inkcre/ui-web@https://codeload.github.com/InKCre/ui/tar.gz/4eceec4c60345a52a08545555ebce9ab95053beb#path:/packages/web':
+    resolution: {gitHosted: true, integrity: sha512-DGaEKHQhalTLpClcIyTYBvCugpkb5uYHcyOhWCUuujGoPLj0ICvOrjkfxgE8sXJuhQhTT+VXzbiEOXsLMxH79w==, path: /packages/web, tarball: https://codeload.github.com/InKCre/ui/tar.gz/4eceec4c60345a52a08545555ebce9ab95053beb}
+    version: 1.4.0
     peerDependencies:
       '@codemirror/autocomplete': ^6.20.0
       '@codemirror/commands': ^6.10.0
@@ -565,6 +566,11 @@ packages:
       vscode-languageserver-textdocument: ^1.0.12
       vue: ^3.0.0
       vue-router: ^4.0.0
+    peerDependenciesMeta:
+      unocss:
+        optional: true
+      vue-router:
+        optional: true
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1850,7 +1856,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.2':
     optional: true
 
-  '@inkcre/ui-web@1.4.0':
+  '@inkcre/ui-web@https://codeload.github.com/InKCre/ui/tar.gz/4eceec4c60345a52a08545555ebce9ab95053beb#path:/packages/web':
     dependencies:
       '@vue/shared': 3.5.25
 
