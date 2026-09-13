@@ -4,7 +4,7 @@
 
 ## 01 方案与授权（完成）
 
-Sir 已确认 CPython / Neon 方向并授权实施。采用 Tortoise 的异步 ORM、asyncpg 和内置迁移，独立内部主键配合业务唯一约束；FastAPI / Jinja 与 boto3 在同一 CPython 服务中运行。部署采用与 core-py 一致的 OCI / Heroku 方式，Registry 拥有独立 Neon 项目和 R2 存储权限。
+Sir 已确认 CPython / Neon 方向并授权实施。采用 Tortoise 的异步 ORM、asyncpg 和内置迁移，独立内部主键配合业务唯一约束；FastAPI / Jinja 与 boto3 在同一 CPython 服务中运行。当前部署实现使用 OCI / Heroku，Registry 拥有独立 Neon 项目和 R2 存储权限。Heroku 托管选择已重新提交 Sir 确认；它不由 Neon / ORM 选择自动决定。
 
 不引入 Django、不自写模板渲染器，不恢复 D1 手写业务 SQL，不复制生产数据到预览。生产切换采用明确的暂停写入、最终快照、导入核验和切流窗口，不建设双写同步系统。长期事实已经写入源码和 Unit / Deployment 文档。
 
@@ -17,7 +17,7 @@ Sir 已确认 CPython / Neon 方向并授权实施。采用 Tortoise 的异步 O
 ## 03 迁移演练、远程预览与 PR（进行中）
 
 1. 完成最终检查后提交并推送 Registry 与配套治理变更，更新 PR 描述，以最终 CPython / Neon 实现为准。分别保留各仓库的提交边界。
-2. 恢复 Heroku 登录并配置 Cloudflare preview 控制 token。Neon 项目、空基础分支、PR 分支和 GitHub 项目范围凭据已创建。
+2. 明确应用托管平台并完成对应凭据配置；沿用当前实现需要有效 Heroku 凭据和 Cloudflare preview 控制 token。Neon 项目、空基础分支、PR 分支和 GitHub 项目范围凭据已创建。等待期间补齐一次性分支上的本地浏览器验收，不能将其记作远程预览通过。
 3. 用同一镜像迁移和部署 PR 33，核验空目录、详情 / Publisher、公开读取与认证、文件协议及重新部署保留数据。完整发布数据仅在一次性数据库和桶内生成并清理，不把验收 fixture 固化到共享预览。
 4. 核验清理控制器仅能停止和删除对应 closed PR 的 app、branch、bucket 及对象凭据；记录实际来源 SHA、镜像和 URL。没有远程实证的部分继续标记未验证。
 5. 完善 `production-registry.md` 的切换操作，明确真实 D1 来源、目标库、保全点、写入暂停、最终导入、切流及失败恢复条件。新库接收写入后不能把旧 Worker 回退当作无损恢复。

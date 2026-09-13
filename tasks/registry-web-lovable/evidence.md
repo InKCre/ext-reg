@@ -77,3 +77,19 @@ Cloudflare 的 PostgreSQL 接入主要展示 JavaScript 驱动；仅换 Neon 不
 
 - `7ea304e` 的 [CI](https://github.com/InKCre/ext-reg/actions/runs/34736306427) 全部通过，包含依赖审查、PostgreSQL 17 行为验收、容器构建与实际 HTTP 启动。后续收尾给健康探测增加镜像内的 revision 校验；新提交的结果以 PR checks 为准。
 - PR 33 与一次性测试分支均通过正式 Neon API 完成独立角色密码轮换，控制器的分支查询、操作等待与连接 URI 读取已在真实 API 验证；这些密码不再继承根分支。Heroku / R2 部署仍未验证。
+
+## 2026-09-13 浏览器验收与远程阻塞复核
+
+源码提交 `4d7987488865cf3f17f3fd6f47769112b698c470` 的 [CI](https://github.com/InKCre/ext-reg/actions/runs/34736919622) 全部通过，镜像实际启动检查包含构建提交号匹配。本轮没有修改产品源码或部署实现。
+
+本地实际启动 CPython / Uvicorn，经 Chromium 的真实 HTTP 与页面操作完成验收。数据库为一次性 Neon 分支 `br-dry-meadow-awo759yq`，对象存储为本地 Moto S3；没有拦截浏览器请求或替换页面数据。该结果证明页面与当前服务、PostgreSQL 的组合行为，不证明真实 R2 或远程容器平台已通过。
+
+- 空目录、无效凭据反馈、Publisher 登录和空工作区通过。
+- 使用 Publisher 表单准备、上传 ZIP 并发布 `1.0.0` 和 `1.1.0`；上传前发布按钮禁用。
+- 目录进入详情、版本切换、复制 ID、manifest 与文件 GET / HEAD 通过。
+- 撤回后版本退出详情列表，恢复后重新出现；搜索无结果、发布者筛选、键盘搜索快捷键及退出登录通过。
+- 桌面 `1365 × 950` 和手机 `390 × 844` 检查没有页面横向溢出；主题切换与重载保持通过。观察期间没有页面脚本异常或 HTTP 5xx。
+
+已检查并保存[空目录手机截图](browser-acceptance/catalog-empty-mobile.png)、[详情桌面截图](browser-acceptance/detail-desktop.png)、[详情深色手机截图](browser-acceptance/detail-dark-mobile.png)和 [Publisher 手机截图](browser-acceptance/publisher-mobile.png)。截图中的 `acceptance/browser-check` 只存在于一次性测试分支；验收服务停止时已删除对应凭据及所有测试业务行，并停止本地 Moto。清理后分别读取测试分支和共享 PR 33，确认两者的七张业务表均为空。
+
+本机 Heroku 登录仍无效，GitHub preview 仍缺 `HEROKU_API_KEY` 与 `CLOUDFLARE_PREVIEW_API_TOKEN`；已补齐 `CLOUDFLARE_ACCOUNT_ID` variable。托管平台选择另待 Sir 确认。没有部署新的远程 CPython 服务，没有修改生产资源，也没有将旧 Worker 预览记作本次验收。
