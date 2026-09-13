@@ -1,4 +1,4 @@
-/* Browser enhancements share the Python Worker's origin and release API. */
+/* Browser enhancements share the Registry service's origin and release API. */
 const $ = (selector) => document.querySelector(selector)
 const announce = (message) => {
   $('#announcement').textContent = message
@@ -275,6 +275,9 @@ if ($('#connect-form')) {
       }
     })
   })
+  // Enable only after native form submission has been replaced. The credential
+  // also has no form name, so it cannot enter a URL if the script fails to load.
+  $('#connect-form [type="submit"]').disabled = false
   $('#disconnect').addEventListener('click', () => {
     disconnect()
     status('#connect-status', 'Disconnected. Credential cleared.')

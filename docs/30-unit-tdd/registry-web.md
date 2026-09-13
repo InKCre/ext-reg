@@ -32,6 +32,8 @@ memory. A reload, navigation away, or disconnect clears it. Credentials are
 sent in Authorization headers to the same origin, never in URLs, local storage,
 HTML, or logs. Only the theme preference is persisted in local storage.
 
+Publisher 的 Connect 按钮在提交处理器绑定后才启用。凭据输入框没有原生表单字段名，因此脚本加载延迟或失败时，浏览器不能把凭据作为 URL 查询参数提交；认证仅由脚本通过 Authorization 发出。
+
 `GET /v1/publisher?offset=0` authenticates through the existing namespace
 credential dependency and returns only that namespace's releases, including
 preparing, withdrawn, and operator-blocked releases. Pages contain at most ten

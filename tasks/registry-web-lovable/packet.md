@@ -35,7 +35,7 @@ Sir 已重新确认完整部署方案及权限、缓存调整，并明确要求 
 
 Heroku 登录已恢复，`HEROKU_API_KEY` 与新建的 `CLOUDFLARE_PREVIEW_API_TOKEN` 已配置到 GitHub preview。Cloudflare 控制 token 仅包含本账户的 Workers R2 Storage Write 与 Account API Tokens Write，已验证令牌、PR 桶查询和桶权限组 API。Docker / Colima 已就绪，可以在本机构建 linux/amd64 镜像；没有增加产品部署流程。
 
-`c1ba81e` 的完整 CI、镜像构建与 HTTP 启动检查，以及一次性 Neon 分支上的本地 Chromium 验收已通过。新增授权与缓存变更正在重新验证；真实 Eco 远程预览尚未完成，不能用旧 Worker 或本地结果替代。
+`c1ba81e` 的完整 CI、镜像构建与 HTTP 启动检查，以及一次性 Neon 分支上的本地 Chromium 验收已通过。`fe48360` 的完整 CI、普通账号 Neon 验收及远程 Eco / R2 协议验收已通过，PR 33 已上线。浏览器验收发现脚本尚未完成加载时，Publisher 原生表单会把凭据放入 URL。当前补充修复范围仅为 Connect 的就绪状态与凭据表单字段：初始可提交 → 绑定脚本后启用，带 name 的密码输入 → 仅按 id 供脚本读取。保持现有认证 API 和视觉布局；用延迟 / 阻断脚本加载验证无凭据导航，再完成浏览器发布流程。已使用的预览凭据正在轮换。
 
 Registry 专属 Neon 项目为 `wandering-base-13707928`，PostgreSQL 17、aws-us-east-1、database `registry`。根分支 `br-muddy-term-aw4iive7` 保持空库，未导入生产数据；无 compute 的空基础分支为 `br-polished-mode-awi5dixy`。PR 33 分支为 `br-falling-breeze-awj9y9ao`，一次性验证分支为 `br-dry-meadow-awo759yq`，后两者到期日为 2026-09-20。后续 PR 从空基础分支建库并运行提交中的迁移，避免把生产数据引入预览。
 

@@ -93,3 +93,13 @@ Cloudflare 的 PostgreSQL 接入主要展示 JavaScript 驱动；仅换 Neon 不
 已检查并保存[空目录手机截图](browser-acceptance/catalog-empty-mobile.png)、[详情桌面截图](browser-acceptance/detail-desktop.png)、[详情深色手机截图](browser-acceptance/detail-dark-mobile.png)和 [Publisher 手机截图](browser-acceptance/publisher-mobile.png)。截图中的 `acceptance/browser-check` 只存在于一次性测试分支；验收服务停止时已删除对应凭据及所有测试业务行，并停止本地 Moto。清理后分别读取测试分支和共享 PR 33，确认两者的七张业务表均为空。
 
 本机 Heroku 登录仍无效，GitHub preview 仍缺 `HEROKU_API_KEY` 与 `CLOUDFLARE_PREVIEW_API_TOKEN`；已补齐 `CLOUDFLARE_ACCOUNT_ID` variable。托管平台选择另待 Sir 确认。没有部署新的远程 CPython 服务，没有修改生产资源，也没有将旧 Worker 预览记作本次验收。
+
+## 2026-09-13 Eco 预览与缓存、权限验证
+
+`fe483609e06d04b71216135149691b1e841e0097` 已部署到 [PR 33 CPython 预览](https://inkcre-ext-reg-pr-33-02f4786fe565.herokuapp.com)。Heroku API 确认 web formation 为 Eco、quantity 为 1；`/livez` 返回相同 SHA。[完整 CI](https://github.com/InKCre/ext-reg/actions/runs/34740527800) 通过，包括依赖审查、真实 PostgreSQL 17 上从空库迁移与完整业务验收、镜像构建与 HTTP 启动。
+
+普通 `registry_app` 角色通过了真实 Neon 发布、并发、D1 导入保真及 ETag / blocked 检查；创建表、修改业务表、删除迁移记录及创建角色均被拒绝。PR Heroku 配置只含普通应用连接和单桶 S3 凭据，不含 owner 连接及云平台控制令牌。PR 桶对象数为 0，其 S3 凭据读取独立验收桶返回 403。PR 只登记 reviewer namespace 和凭据，无扩展、版本或文件。
+
+临时 app `inkcre-ext-reg-qa-33`、Neon `br-plain-wildflower-awu0s6yy` 与同名 R2 桶执行了完整远程 HTTP 发布演练，使用 Eco、真实 Neon 普通账号和 R2；包含双类型上传、幂等与并发冲突、发布、撤回恢复、缺失对象、条件 GET / HEAD 和 blocked 拒绝。该环境仅用于本次验收，结束后删除。
+
+浏览器检查复现了脚本加载竞态：在 defer 脚本尚未返回时提交 Connect，浏览器会进行原生 GET 导航。使用无效 canary 证实查询参数携带输入内容；此前验收用过的 PR 凭据已轮换，旧凭据返回 401，新凭据返回 200。受影响资产是审阅凭据，路径是浏览器 URL / 路由日志；没有证据显示凭据被第三方使用，也不涉及生产或云平台控制令牌。修复移除输入框的原生表单字段名，并在提交处理器绑定后才启用 Connect；用延迟和阻断脚本加载的 Chromium 检查验证，不增加产品提示或新的部署流程。
