@@ -46,15 +46,15 @@ Cloudflare 的 PostgreSQL 接入主要展示 JavaScript 驱动；仅换 Neon 不
 
 来源：[Cloudflare PostgreSQL](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/)、[Python 包](https://developers.cloudflare.com/workers/languages/python/packages/)、[Django 后端事务](https://developers.cloudflare.com/workers/languages/python/packages/django/)、[R2 boto3](https://developers.cloudflare.com/r2/examples/aws/boto3/)。
 
-## 尚待获得的证据
+## 证据边界
 
 | 主张 | 当前证据边界 | 应在哪一步获得 |
 | --- | --- | --- |
 | ORM 关系、事务和迁移 | Tortoise 在真实 Neon 的发布验收已通过 | 最终 CI 持续验证 |
-| CPython 单一产物 | 实现和本地行为已验证，镜像与远程预览待验收 | 02 CI 镜像、03 远程预览 |
+| CPython 单一产物 | 同一镜像的 CI、Eco 部署及远程浏览器验收已通过 | 02 CI 镜像、03 远程预览 |
 | D1 导入保真 | 一次性 SQLite → Neon 演练已通过，真实生产来源尚未核验 | 04 最终来源核验 |
-| 新预览隔离、更新保留数据、无部署 demo | 新控制器已实现，尚未获得远程生命周期证据 | 03 预览生命周期验证 |
-| 公开协议、视觉、权限和失败语义保持 | Worker 基线已有部分证据，新实现须重验 | 02 行为检查、03 浏览器与协议验收 |
+| 新预览隔离、更新保留数据、无部署 demo | 真实隔离、重部署保留数据和临时资源清理已通过 | 03 预览生命周期验证 |
+| 公开协议、视觉、权限和失败语义保持 | CPython / Neon / R2 协议与 Chromium 验收已通过 | 02 行为检查、03 浏览器与协议验收 |
 | 生产已使用 Neon，旧写入路径已停止 | 没有生产变更或切换证据 | 04 获准切流及观察 |
 
 后续每次更新记录具体提交 / 产物、目标环境、执行结果及剩余事项。生产数据、原始凭据、数据库连接串与导出文件不得写入 packet、Git 或测试日志。
@@ -103,3 +103,20 @@ Cloudflare 的 PostgreSQL 接入主要展示 JavaScript 驱动；仅换 Neon 不
 临时 app `inkcre-ext-reg-qa-33`、Neon `br-plain-wildflower-awu0s6yy` 与同名 R2 桶执行了完整远程 HTTP 发布演练，使用 Eco、真实 Neon 普通账号和 R2；包含双类型上传、幂等与并发冲突、发布、撤回恢复、缺失对象、条件 GET / HEAD 和 blocked 拒绝。该环境仅用于本次验收，结束后删除。
 
 浏览器检查复现了脚本加载竞态：在 defer 脚本尚未返回时提交 Connect，浏览器会进行原生 GET 导航。使用无效 canary 证实查询参数携带输入内容；此前验收用过的 PR 凭据已轮换，旧凭据返回 401，新凭据返回 200。受影响资产是审阅凭据，路径是浏览器 URL / 路由日志；没有证据显示凭据被第三方使用，也不涉及生产或云平台控制令牌。修复移除输入框的原生表单字段名，并在提交处理器绑定后才启用 Connect；用延迟和阻断脚本加载的 Chromium 检查验证，不增加产品提示或新的部署流程。
+
+## 远程浏览器与生命周期验收完成
+
+功能验收最终提交为 `a86549309726c713f1ea10e6f6636c42ffcddeff`，[对应完整 CI](https://github.com/InKCre/ext-reg/actions/runs/34741279081) 全部通过。本机通过仓库 Dockerfile 构建 linux/amd64 镜像，manifest digest 为 `sha256:db7322cb0051c55f22cea5f0418cf5582249feb9631501edae3370ee5ebb6583`；Heroku `/livez` 确认相同源码 SHA，两个实例均为一个 Eco dyno。
+
+真实 Chromium 先验证 PR 的空目录、reviewer 登录空态、移动布局和断开，再在临时环境完成两个 Web 版本的准备、ZIP 上传和发布。详情与版本切换、复制 ID、manifest、原始文件 GET / HEAD、主题持久化、移动端无横向溢出、撤回恢复、搜索和 publisher 筛选均通过，没有页面异常或 HTTP 5xx。浏览器检查等待复制完成提示后再读取剪贴板。延迟和阻断脚本加载验证了 Connect 不进行原生凭据导航；延迟加载也证明复制和主题按钮在处理器绑定后才可操作。
+
+携带双版本数据重新部署临时实例后，公开 ExtensionRecord 全部内容与部署前相等，包括时间戳、provenance 和文件身份；新版本仍能读取实际 R2 内容。之后通过仓库 cleanup 控制器停止并删除临时 app、全部桶对象、桶及对象 token、Neon 分支，API 确认 app / bucket / branch 均不存在。单独的迁移检查分支也已删除。这里验证的是控制器真实资源生命周期；GitHub closed-PR 触发条件仍由工作流检查，它须在可信默认分支落地后启用。
+
+截图中的扩展仅是已删除的临时验收记录，未写入共享 PR 预览：
+
+- [共享预览空目录](browser-acceptance/remote-preview-empty.png)与[reviewer 空工作区](browser-acceptance/remote-preview-publisher.png)。
+- [扩展详情与版本](browser-acceptance/remote-detail-desktop.png)、[暗色移动详情](browser-acceptance/remote-detail-dark-mobile.png)与[Publisher 双版本](browser-acceptance/remote-publisher-desktop.png)。
+
+本机补充检查已通过。曾有一次本地完整命令在临时 PostgreSQL 镜像尚未拉取完成时连接失败；此前格式、契约、类型与构建阶段均通过，随后相同源码的 GitHub PostgreSQL 17 完整检查通过。镜像拉取的另一次 TLS 超时在原命令重试后恢复，没有因此改变产品实现或降低验收范围。
+
+生产仍未变更，真实生产 D1 导入与公开域名切换不属于本次预览通过的结论。自动预览尚待合并可信控制器，本次发布使用其同一实现从本机执行。

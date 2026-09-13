@@ -4,7 +4,7 @@
 
 完成 Registry 的 minimum lovable product：目录、扩展详情和 Publisher 对齐 client-web，复用 design 的公开样式包；由一个 Python 服务交付 Web、API 和静态资源。服务从 Python Workers / D1 迁到常规 CPython / Neon PostgreSQL，保留 R2 与公开协议，减少特殊运行时适配和两套数据库技术的维护成本。
 
-**2026-09-13，Sir 在确认方向、要求先更新 packet 后，明确授权“开始实施”，并允许通过 Neon CLI 创建项目和数据库分支。** CPython / FastAPI / Jinja、Tortoise / asyncpg、boto3 和单一 OCI 服务已实现。真实 Neon 上的发布流程、D1 导入保真和完整 `pnpm check` 已通过；容器 CI 的提交结果由 PR checks 记录，远程预览正在配置，生产尚未切换。
+**2026-09-13，Sir 已确认完整方案与相应调整，授权继续 preview，并明确要求 Heroku Eco。** 单一 CPython 服务、普通数据库角色、文件重验证及浏览器就绪修复已交付。完整 CI、真实 Eco / Neon / R2 协议、浏览器与重部署保留数据验收已通过；临时验收资源已清理。生产尚未切换。
 
 本 packet 是父任务唯一的工作控制入口，保存目标、决策、执行位置和证据边界，不拥有长期架构事实，也不代替 Sir 的验收。[计划](plan.md)拥有推进顺序；[证据](evidence.md)区分当前结果、旧 Worker 基线与待验证事项。父任务关闭前保留整个 packet。
 
@@ -31,15 +31,15 @@
 
 ## 执行位置与下一步
 
-Sir 已重新确认完整部署方案及权限、缓存调整，并明确要求 Heroku 使用 Eco dyno，授权继续预览部署。当前变更范围为：运行服务的 owner 数据库连接改为普通 `registry_app` 角色，owner 仅用于交付迁移；扩展文件的一年 immutable 缓存改为逐次状态校验和 ETag 重验证；部署配置统一为 `web=1:eco`。影响数据库授权、文件 GET / HEAD、部署控制器及相应文档，不改变扩展业务身份、发布协议或视觉实现。验证覆盖应用角色业务写入成功而 DDL 被拒绝、条件读取及 blocked 状态、真实 Eco / R2 部署和更新保留数据。PostgreSQL 角色与 GRANT 属于原生权限 DDL，业务查询继续由 ORM 实现。
+当前在计划 03 的交付收尾；[PR 33 预览](https://inkcre-ext-reg-pr-33-02f4786fe565.herokuapp.com) 已运行单个 Eco dyno。功能验收提交为 `a86549309726c713f1ea10e6f6636c42ffcddeff`；后续证据提交只更新文档和截图，发布后以 `/livez` 核对最终 PR head。完整结果和截图见[证据](evidence.md)。
 
-Heroku 登录已恢复，`HEROKU_API_KEY` 与新建的 `CLOUDFLARE_PREVIEW_API_TOKEN` 已配置到 GitHub preview。Cloudflare 控制 token 仅包含本账户的 Workers R2 Storage Write 与 Account API Tokens Write，已验证令牌、PR 桶查询和桶权限组 API。Docker / Colima 已就绪，可以在本机构建 linux/amd64 镜像；没有增加产品部署流程。
+应用使用普通 `registry_app`，owner 仅用于交付迁移；文件每次先检查 release 状态，再依据 ETag 返回内容或 304。真实浏览器暴露的脚本就绪竞态也已修复：Connect、复制 ID 和主题按钮等待事件处理器；凭据输入没有原生表单字段名。已轮换验收中使用过的 PR 凭据，旧凭据被拒绝。
 
-`c1ba81e` 的完整 CI、镜像构建与 HTTP 启动检查，以及一次性 Neon 分支上的本地 Chromium 验收已通过。`fe48360` 的完整 CI、普通账号 Neon 验收及远程 Eco / R2 协议验收已通过，PR 33 已上线。浏览器验收发现脚本尚未完成加载时，Publisher 原生表单会把凭据放入 URL。当前补充修复范围仅为 Connect 的就绪状态与凭据表单字段：初始可提交 → 绑定脚本后启用，带 name 的密码输入 → 仅按 id 供脚本读取。保持现有认证 API 和视觉布局；用延迟 / 阻断脚本加载验证无凭据导航，再完成浏览器发布流程。已使用的预览凭据已轮换，旧凭据被拒绝。后续详情验收也复现了脚本加载前复制按钮丢失点击；同一就绪规则扩展到复制和主题按钮。
+GitHub preview 的 Heroku、Cloudflare、Neon 与 reviewer 凭据及变量均已配置。Cloudflare 控制 token 只有当前账户的 R2 存储与账户 token 管理权限；应用只拿所属桶的对象 token。主工作流的可信控制器尚未合入默认分支，本次通过本机执行仓库同一 Dockerfile 和控制器完成 pre-merge 验收，没有增加产品交付流程。
 
-Registry 专属 Neon 项目为 `wandering-base-13707928`，PostgreSQL 17、aws-us-east-1、database `registry`。根分支 `br-muddy-term-aw4iive7` 保持空库，未导入生产数据；无 compute 的空基础分支为 `br-polished-mode-awi5dixy`。PR 33 分支为 `br-falling-breeze-awj9y9ao`，一次性验证分支为 `br-dry-meadow-awo759yq`，后两者到期日为 2026-09-20。后续 PR 从空基础分支建库并运行提交中的迁移，避免把生产数据引入预览。
+Registry Neon 项目为 `wandering-base-13707928`。根分支 `br-muddy-term-aw4iive7` 保持空库，无 compute 的空基础分支为 `br-polished-mode-awi5dixy`；PR 33 使用 `br-falling-breeze-awj9y9ao`。PR 只登记 reviewer namespace 和凭据，没有扩展、版本或文件。临时远程验收 app / bucket `inkcre-ext-reg-qa-33`、Neon `br-plain-wildflower-awu0s6yy` 和迁移检查分支 `br-dry-meadow-awo759yq` 已删除并确认不存在。
 
-完成实现交付需要同一提交的完整检查、镜像、真实远程预览和产品 / 协议验收证据。缺少远程验收时不能写作“实现已验收”。生产迁移另需真实来源核验、公开域名验收与旧写入停止证据；不能因代码或 PR 完成便关闭父任务。
+下一阶段是单独获准的生产切换：核验真实来源、停止旧写入、导入并核对最终快照、切换公开路由。操作及恢复条件已在 `production-registry.md` 准备好。未合并 PR，也未修改生产 D1 / R2 / Worker / 公开域名；父任务保留到生产行为与最终验收完成，不能因 preview 通过便关闭 packet。
 
 ## 工作坐标
 
