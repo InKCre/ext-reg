@@ -78,6 +78,9 @@ def smoke(origin: str, revision: str) -> None:
                 assert client.get("/livez").json() == {"status": "ok", "revision": revision}
                 for path in ("/", "/publish", "/v1/extensions", "/simple/"):
                     client.get(path).raise_for_status()
+                redirect = client.get("/simple")
+                assert redirect.status_code == 307
+                assert redirect.headers["location"] == f"{origin}/simple/"
                 assert client.get("/v1/publisher").status_code == 401
             return
         except (httpx.HTTPError, AssertionError, ValueError):
@@ -200,6 +203,8 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
         )
     config.update(
         PUBLIC_ORIGIN=origin,
+        # Heroku's router is the dyno's HTTP ingress; preserve the external scheme.
+        FORWARDED_ALLOW_IPS="*",
         S3_BUCKET=name,
         S3_ENDPOINT_URL=f"https://{os.environ['CLOUDFLARE_ACCOUNT_ID']}.r2.cloudflarestorage.com",
         # The image owns revision; a config change must not relabel an old process.

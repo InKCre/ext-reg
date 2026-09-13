@@ -8,7 +8,7 @@ PR 预览使用 `Dockerfile` 构建的 CPython 服务镜像，覆盖目录、扩
 
 可信控制器使用 Docker / Heroku CLI 交付镜像，使用官方 REST API 配置分支、app 和 R2 凭据。REST 调用只覆盖 CLI 不适合保密结构化配置的部分，数据库业务仍由包内 ORM 命令执行。角色密码使用交付端 psycopg 的 SQL 字面量编码设置；Neon 不接受 libpq 预先散列的密码。psycopg 只属于开发和交付依赖，不进入服务镜像。Neon 分支密码更换与 R2 桶授权分别约束数据库和对象存储的访问范围。
 
-Heroku 始终配置 `web=1:eco`。Eco 的休眠与唤醒由平台管理；健康探测允许启动等待，不在页面中加入环境提示或改变产品流程。
+Heroku 始终配置 `web=1:eco` 和 Uvicorn 的 `FORWARDED_ALLOW_IPS=*`，让平台 HTTP 入口传递外部协议。部署 smoke 会检查 `/simple` 的补斜杠跳转仍保持当前 origin 的 HTTPS；转发头不用于 publisher 授权。Eco 的休眠与唤醒由平台管理；健康探测允许启动等待，不在页面中加入环境提示或改变产品流程。
 
 GitHub `preview` 环境需要：
 
