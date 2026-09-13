@@ -31,6 +31,7 @@ themeButton?.addEventListener('click', () => {
     /* Theme still works for this page. */
   }
 })
+if (themeButton) themeButton.disabled = false
 document.addEventListener('keydown', (event) => {
   if (
     event.key === '/' &&
@@ -52,6 +53,7 @@ for (const button of document.querySelectorAll('.copy-button')) {
       announce('Couldn’t copy. Select the extension ID above to copy it manually.')
     }
   })
+  button.disabled = false
 }
 
 if ($('#connect-form')) {
