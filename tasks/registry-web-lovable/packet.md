@@ -25,7 +25,21 @@ Sir 要求改善 Registry Web，可加入 Publisher；对齐 client-web 与 desi
 - 清理前核对 source_repository/source_revision、snapshot hash 和 asset paths；只删除上述记录及对应 keys，不重置数据库。数据库 UUID `7d67ae5e-c0b3-4fca-841c-4c4c7661dd73` 未变；命名空间、凭据和迁移记录数保持不变，外键检查通过。
 - Publisher 登录配置独立保留；没有扩展时使用现有空态，实际需要验收的扩展由 Publisher/Toolkit 上传。临时验收数据不再作为常驻预览数据。
 
-## 验证与交付
+## 当前增量：移除手写业务 SQL
+
+Sir 明确不能接受手写 SQL，授权将数据库访问交给 SQLAlchemy 等专门工具；模板继续使用现有 Jinja2。
+
+- From → To：Repository 的 SQL 字符串与位置参数 → SQLAlchemy Core 表定义、查询表达式及 SQLite 编译器；D1 binding 只执行编译结果，并保留原生 batch 原子性。
+- 已检查 `sqlalchemy-cloudflare-d1` 0.3.11 源码：Worker 路径使用同步 `run_sync`，且 commit/rollback 为空操作，无法承接当前批内失败回滚。采用 SQLAlchemy Core 而非在业务中模拟 ORM Session 事务。
+- 影响范围：Registry 数据访问、依赖、维护脚本及本地技术文档。保持既有表结构、数据库资源、公共契约、凭证范围、发布状态转换、R2 staging 与幂等语义；不引入数据库复制或额外迁移治理。
+- 验证：真实本地 Worker/D1/R2 的发布旅程与原子写入失败，完整 `pnpm check`，再更新 PR 和现有隔离预览。临时验收数据只存在一次性本地数据库。
+- 已替换 Repository 的 27 处 SQL 及预览凭证维护 SQL。SQLAlchemy 2.0.52 的 pure-Python wheel 已在当前 Pyodide Worker 中运行；PDM 与 Worker lock 同版本。
+- `scripts/check_registry.py` 首次成功完成真实本地 Worker/D1/R2 验收，包括关联插入故障后扩展与版本记录均回滚；已纳入 `pnpm check`。这条测试保护持久化语义，不断言 SQL 字符串或模拟数据库调用顺序。
+- 安全验证对象：发布者凭证只能操作所属 namespace，匿名调用只可读取已公开的分发；查询重写不得令其他 namespace 的 release 或 private/blocked bytes 越过 API 边界。共享安全模型已从 core-py 只读挂载核对，Registry 实现真相归本地 control-plane 文档。
+- 完整 `pnpm check` 已通过；追加另一个发布者的空工作区读取后，验收再次通过。已逐条核对重写差异并检查业务 SQL 字符串均已移除。最终 CI 与 Worker 版本统一记录于 PR。
+- 此次预览更新仅替换已配置的 Worker 代码，保留现有 D1/R2 和 Publisher 凭据；不运行凭据初始化或上传验收数据。本地测试与预览部署仍使用原有单一 Python Worker 构建。
+
+## 已有交付证据
 
 - 本轮完整 `pnpm check` 通过；远程目录已为空，旧 demo 详情返回 404，Publisher 仍可登录且 release 列表为空。最终提交重部署及 CI 结果记录于 PR。
 - 既往真实 Worker 已验证详情/版本、Web/Python 发布、撤回恢复、私有分页、命名空间隔离、重复部署和带对象清理；验收数据现已删除。

@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from inkcre_extension_toolkit.simple import PythonFileRecord
+from sqlalchemy import case, func, or_, select, update
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy.sql import ClauseElement
 
 from ..contracts.models import (
     ExtensionRecord,
@@ -21,6 +24,7 @@ from ..contracts.models import (
     normalize_project_name,
     python_project_version,
 )
+from . import database as db
 
 
 class RegistryConflictError(RuntimeError):
@@ -111,68 +115,67 @@ class RegistryRepository:
         self.db = env.DB
         self.artifacts = env.ARTIFACTS
 
+    def _prepare(self, statement: ClauseElement) -> Any:
+        sql, parameters = db.compile_d1(statement)
+        prepared = self.db.prepare(sql)
+        return prepared.bind(*parameters) if parameters else prepared
+
     async def authenticate(self, token_hash: str) -> str | None:
-        row = (
-            await self.db.prepare(
-                "SELECT c.namespace FROM credentials c JOIN namespaces n "
-                "ON n.name = c.namespace WHERE c.token_hash = ?1 "
-                "AND c.disabled = 0 AND n.status = 'active'"
+        row = await self._prepare(
+            select(db.credentials.c.namespace)
+            .join(db.namespaces)
+            .where(
+                db.credentials.c.token_hash == token_hash,
+                db.credentials.c.disabled == 0,
+                db.namespaces.c.status == "active",
             )
-            .bind(token_hash)
-            .first()
-        )
+        ).first()
         return _column(row, "namespace")
 
     async def _extension_row(self, extension_name: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT name, namespace, nickname FROM extensions WHERE name = ?1"
+        return await self._prepare(
+            select(db.extensions.c.name, db.extensions.c.namespace, db.extensions.c.nickname).where(
+                db.extensions.c.name == extension_name
             )
-            .bind(extension_name)
-            .first()
-        )
+        ).first()
 
     async def _release_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT e.nickname, r.extension_name, r.version, r.state, r.yank_reason, "
-                "r.created_at "
-                "FROM releases r JOIN extensions e ON e.name = r.extension_name "
-                "WHERE r.extension_name = ?1 AND r.version = ?2"
+        return await self._prepare(
+            select(
+                db.extensions.c.nickname,
+                db.releases.c.extension_name,
+                db.releases.c.version,
+                db.releases.c.state,
+                db.releases.c.yank_reason,
+                db.releases.c.created_at,
             )
-            .bind(extension_name, version)
-            .first()
-        )
+            .select_from(db.releases.join(db.extensions))
+            .where(db.releases.c.extension_name == extension_name, db.releases.c.version == version)
+        ).first()
 
     async def _python_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM python_distributions WHERE extension_name = ?1 "
-                "AND release_version = ?2"
+        return await self._prepare(
+            select(db.python_distributions).where(
+                db.python_distributions.c.extension_name == extension_name,
+                db.python_distributions.c.release_version == version,
             )
-            .bind(extension_name, version)
-            .first()
-        )
+        ).first()
 
     async def _module_federation_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM module_federation_distributions WHERE extension_name = ?1 "
-                "AND release_version = ?2"
+        return await self._prepare(
+            select(db.module_federation_distributions).where(
+                db.module_federation_distributions.c.extension_name == extension_name,
+                db.module_federation_distributions.c.release_version == version,
             )
-            .bind(extension_name, version)
-            .first()
-        )
+        ).first()
 
     async def _python_project_owner(self, normalized_project: str, version: str) -> str | None:
-        row = (
-            await self.db.prepare(
-                "SELECT extension_name FROM python_distributions "
-                "WHERE normalized_project = ?1 AND project_version = ?2"
+        row = await self._prepare(
+            select(db.python_distributions.c.extension_name).where(
+                db.python_distributions.c.normalized_project == normalized_project,
+                db.python_distributions.c.project_version == version,
             )
-            .bind(normalized_project, version)
-            .first()
-        )
+        ).first()
         return _column(row, "extension_name")
 
     @staticmethod
@@ -245,52 +248,50 @@ class RegistryRepository:
                 raise RegistryStateError(f"cannot append an association to a {state} release")
 
         statements = [
-            self.db.prepare(
-                "INSERT INTO extensions(name, namespace, nickname) VALUES (?1, ?2, ?3) "
-                "ON CONFLICT(name) DO NOTHING"
-            ).bind(extension_name, namespace, request.nickname),
-            self.db.prepare(
-                "INSERT INTO releases(extension_name, version) VALUES (?1, ?2) "
-                "ON CONFLICT(extension_name, version) DO NOTHING"
-            ).bind(extension_name, request.version),
+            self._prepare(
+                insert(db.extensions)
+                .values(name=extension_name, namespace=namespace, nickname=request.nickname)
+                .on_conflict_do_nothing(index_elements=[db.extensions.c.name])
+            ),
+            self._prepare(
+                insert(db.releases)
+                .values(extension_name=extension_name, version=request.version)
+                .on_conflict_do_nothing(
+                    index_elements=[db.releases.c.extension_name, db.releases.c.version]
+                )
+            ),
         ]
         if adds_python and request.python is not None:
             statements.append(
-                self.db.prepare(
-                    "INSERT INTO python_distributions(extension_name, release_version, "
-                    "normalized_project, project_version, host_sdk, host_sdk_range, "
-                    "entry_group, entry_name, entry_object, source_repository, "
-                    "source_revision, build_id) "
-                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
-                ).bind(
-                    extension_name,
-                    request.version,
-                    normalize_project_name(request.python.project),
-                    python_project_version(request.version),
-                    request.python.host_sdk,
-                    request.python.host_sdk_version,
-                    request.python.entry_point.group,
-                    request.python.entry_point.name,
-                    request.python.entry_point.object,
-                    request.python.source_repository,
-                    request.python.source_revision,
-                    request.python.build_id,
+                self._prepare(
+                    insert(db.python_distributions).values(
+                        extension_name=extension_name,
+                        release_version=request.version,
+                        normalized_project=normalize_project_name(request.python.project),
+                        project_version=python_project_version(request.version),
+                        host_sdk=request.python.host_sdk,
+                        host_sdk_range=request.python.host_sdk_version,
+                        entry_group=request.python.entry_point.group,
+                        entry_name=request.python.entry_point.name,
+                        entry_object=request.python.entry_point.object,
+                        source_repository=request.python.source_repository,
+                        source_revision=request.python.source_revision,
+                        build_id=request.python.build_id,
+                    )
                 )
             )
         if adds_mf and request.module_federation is not None:
             statements.append(
-                self.db.prepare(
-                    "INSERT INTO module_federation_distributions(extension_name, "
-                    "release_version, host_sdk, host_sdk_range, source_repository, "
-                    "source_revision, build_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
-                ).bind(
-                    extension_name,
-                    request.version,
-                    request.module_federation.host_sdk,
-                    request.module_federation.host_sdk_version,
-                    request.module_federation.source_repository,
-                    request.module_federation.source_revision,
-                    request.module_federation.build_id,
+                self._prepare(
+                    insert(db.module_federation_distributions).values(
+                        extension_name=extension_name,
+                        release_version=request.version,
+                        host_sdk=request.module_federation.host_sdk,
+                        host_sdk_range=request.module_federation.host_sdk_version,
+                        source_repository=request.module_federation.source_repository,
+                        source_revision=request.module_federation.source_revision,
+                        build_id=request.module_federation.build_id,
+                    )
                 )
             )
         try:
@@ -328,17 +329,15 @@ class RegistryRepository:
 
         python_row = await self._python_row(extension_name, version)
         if public and python_row is not None:
-            file_row = (
-                await self.db.prepare(
-                    "SELECT 1 AS ready FROM python_files WHERE normalized_project = ?1 "
-                    "AND project_version = ?2 LIMIT 1"
+            file_row = await self._prepare(
+                select(db.python_files.c.filename)
+                .where(
+                    db.python_files.c.normalized_project
+                    == _column(python_row, "normalized_project"),
+                    db.python_files.c.project_version == _column(python_row, "project_version"),
                 )
-                .bind(
-                    _column(python_row, "normalized_project"),
-                    _column(python_row, "project_version"),
-                )
-                .first()
-            )
+                .limit(1)
+            ).first()
             if file_row is None:
                 python_row = None
         mf_row = await self._module_federation_row(extension_name, version)
@@ -379,24 +378,38 @@ class RegistryRepository:
 
     async def publisher_workspace(self, namespace: str, offset: int) -> PublisherWorkspace:
         # Ten records keep the existing descriptor reads within D1's per-request query budget.
-        result = (
-            await self.db.prepare(
-                "SELECT r.extension_name, r.version, "
-                "EXISTS (SELECT 1 FROM python_distributions pd JOIN python_files pf "
-                "ON pf.normalized_project = pd.normalized_project AND pf.project_version = "
-                "pd.project_version WHERE pd.extension_name = r.extension_name "
-                "AND pd.release_version = r.version) AS python_uploaded, "
-                "EXISTS (SELECT 1 FROM module_federation_distributions mf "
-                "WHERE mf.extension_name = r.extension_name AND mf.release_version = r.version "
-                "AND mf.manifest_r2_key IS NOT NULL) AS web_uploaded "
-                "FROM releases r JOIN extensions e ON e.name = r.extension_name "
-                "WHERE e.namespace = ?1 ORDER BY r.created_at DESC, "
-                "r.extension_name, r.version DESC "
-                "LIMIT 11 OFFSET ?2"
+        result = await self._prepare(
+            select(
+                db.releases.c.extension_name,
+                db.releases.c.version,
+                select(db.python_files.c.filename)
+                .select_from(db.python_distributions.join(db.python_files))
+                .where(
+                    db.python_distributions.c.extension_name == db.releases.c.extension_name,
+                    db.python_distributions.c.release_version == db.releases.c.version,
+                )
+                .exists()
+                .label("python_uploaded"),
+                select(db.module_federation_distributions.c.extension_name)
+                .where(
+                    db.module_federation_distributions.c.extension_name
+                    == db.releases.c.extension_name,
+                    db.module_federation_distributions.c.release_version == db.releases.c.version,
+                    db.module_federation_distributions.c.manifest_r2_key.is_not(None),
+                )
+                .exists()
+                .label("web_uploaded"),
             )
-            .bind(namespace, offset)
-            .all()
-        )
+            .select_from(db.releases.join(db.extensions))
+            .where(db.extensions.c.namespace == namespace)
+            .order_by(
+                db.releases.c.created_at.desc(),
+                db.releases.c.extension_name,
+                db.releases.c.version.desc(),
+            )
+            .limit(11)
+            .offset(offset)
+        ).all()
         rows = _results(result)
         releases = []
         for row in rows[:10]:
@@ -419,10 +432,17 @@ class RegistryRepository:
         )
 
     async def list_extensions(self) -> list[ExtensionSummary]:
-        result = await self.db.prepare(
-            "SELECT e.name, e.nickname FROM extensions e "
-            "WHERE EXISTS (SELECT 1 FROM releases r WHERE r.extension_name = e.name "
-            "AND r.state = 'published') ORDER BY e.name"
+        result = await self._prepare(
+            select(db.extensions.c.name, db.extensions.c.nickname)
+            .where(
+                select(db.releases.c.extension_name)
+                .where(
+                    db.releases.c.extension_name == db.extensions.c.name,
+                    db.releases.c.state == "published",
+                )
+                .exists()
+            )
+            .order_by(db.extensions.c.name)
         ).all()
         return [
             ExtensionSummary(name=_column(row, "name"), nickname=_column(row, "nickname"))
@@ -433,14 +453,14 @@ class RegistryRepository:
         extension = await self._extension_row(extension_name)
         if extension is None:
             return None
-        versions = (
-            await self.db.prepare(
-                "SELECT version FROM releases WHERE extension_name = ?1 AND state = 'published' "
-                "ORDER BY created_at DESC, version DESC"
+        versions = await self._prepare(
+            select(db.releases.c.version)
+            .where(
+                db.releases.c.extension_name == extension_name,
+                db.releases.c.state == "published",
             )
-            .bind(extension_name)
-            .all()
-        )
+            .order_by(db.releases.c.created_at.desc(), db.releases.c.version.desc())
+        ).all()
         releases: list[ReleaseRecord] = []
         for row in _results(versions):
             release = await self.get_release(extension_name, _column(row, "version"))
@@ -466,22 +486,36 @@ class RegistryRepository:
                 raise RegistryStateError(
                     "Release native Distribution objects are not completely available"
                 )
-            result = (
-                await self.db.prepare(
-                    "UPDATE releases SET state = 'published', yank_reason = NULL, "
-                    "published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP "
-                    "WHERE extension_name = ?1 AND version = ?2 AND state = 'preparing' "
-                    "AND (EXISTS (SELECT 1 FROM python_distributions pd JOIN python_files pf "
-                    "ON pf.normalized_project = pd.normalized_project "
-                    "AND pf.project_version = pd.project_version "
-                    "WHERE pd.extension_name = ?1 AND pd.release_version = ?2) "
-                    "OR EXISTS (SELECT 1 FROM module_federation_distributions mf "
-                    "WHERE mf.extension_name = ?1 AND mf.release_version = ?2 "
-                    "AND mf.manifest_r2_key IS NOT NULL))"
+            result = await self._prepare(
+                update(db.releases)
+                .values(
+                    state="published",
+                    yank_reason=None,
+                    published_at=func.current_timestamp(),
+                    updated_at=func.current_timestamp(),
                 )
-                .bind(extension_name, version)
-                .run()
-            )
+                .where(
+                    db.releases.c.extension_name == extension_name,
+                    db.releases.c.version == version,
+                    db.releases.c.state == "preparing",
+                    or_(
+                        select(db.python_files.c.filename)
+                        .select_from(db.python_distributions.join(db.python_files))
+                        .where(
+                            db.python_distributions.c.extension_name == extension_name,
+                            db.python_distributions.c.release_version == version,
+                        )
+                        .exists(),
+                        select(db.module_federation_distributions.c.extension_name)
+                        .where(
+                            db.module_federation_distributions.c.extension_name == extension_name,
+                            db.module_federation_distributions.c.release_version == version,
+                            db.module_federation_distributions.c.manifest_r2_key.is_not(None),
+                        )
+                        .exists(),
+                    ),
+                )
+            ).run()
             if int(_column(_column(result, "meta"), "changes", 0)) != 1:
                 raise RegistryStateError(
                     "Release requires at least one validated native Distribution"
@@ -492,17 +526,16 @@ class RegistryRepository:
         return published
 
     async def _release_objects_available(self, extension_name: str, version: str) -> bool:
-        python_result = (
-            await self.db.prepare(
-                "SELECT pf.r2_key, pf.metadata_r2_key, pf.size FROM python_files pf "
-                "JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version "
-                "WHERE pd.extension_name = ?1 AND pd.release_version = ?2"
+        python_result = await self._prepare(
+            select(
+                db.python_files.c.r2_key, db.python_files.c.metadata_r2_key, db.python_files.c.size
             )
-            .bind(extension_name, version)
-            .all()
-        )
+            .join(db.python_distributions)
+            .where(
+                db.python_distributions.c.extension_name == extension_name,
+                db.python_distributions.c.release_version == version,
+            )
+        ).all()
         python_rows = _results(python_result)
         for row in python_rows:
             archive = await self.artifacts.head(_column(row, "r2_key"))
@@ -532,15 +565,15 @@ class RegistryRepository:
             if _column(row, "yank_reason") != reason:
                 raise RegistryConflictError("Yank reason conflicts with the existing yank")
         elif state == "published":
-            await (
-                self.db.prepare(
-                    "UPDATE releases SET state = 'yanked', yank_reason = ?3, "
-                    "updated_at = CURRENT_TIMESTAMP WHERE extension_name = ?1 "
-                    "AND version = ?2 AND state = 'published'"
+            await self._prepare(
+                update(db.releases)
+                .values(state="yanked", yank_reason=reason, updated_at=func.current_timestamp())
+                .where(
+                    db.releases.c.extension_name == extension_name,
+                    db.releases.c.version == version,
+                    db.releases.c.state == "published",
                 )
-                .bind(extension_name, version, reason)
-                .run()
-            )
+            ).run()
         else:
             raise RegistryStateError(f"cannot yank a {state} Release")
         yanked = await self.get_release(extension_name, version)
@@ -554,15 +587,15 @@ class RegistryRepository:
             raise RegistryNotFoundError("Release does not exist")
         state = _column(row, "state")
         if state == "yanked":
-            await (
-                self.db.prepare(
-                    "UPDATE releases SET state = 'published', yank_reason = NULL, "
-                    "updated_at = CURRENT_TIMESTAMP WHERE extension_name = ?1 "
-                    "AND version = ?2 AND state = 'yanked'"
+            await self._prepare(
+                update(db.releases)
+                .values(state="published", yank_reason=None, updated_at=func.current_timestamp())
+                .where(
+                    db.releases.c.extension_name == extension_name,
+                    db.releases.c.version == version,
+                    db.releases.c.state == "yanked",
                 )
-                .bind(extension_name, version)
-                .run()
-            )
+            ).run()
         elif state != "published":
             raise RegistryStateError(f"cannot unyank a {state} Release")
         published = await self.get_release(extension_name, version)
@@ -573,47 +606,40 @@ class RegistryRepository:
     async def prepared_python_distribution(
         self, namespace: str, normalized_project: str, project_version: str
     ) -> PreparedPythonDistribution | None:
-        row = (
-            await self.db.prepare(
-                "SELECT pd.*, r.state FROM python_distributions pd "
-                "JOIN releases r ON r.extension_name = pd.extension_name "
-                "AND r.version = pd.release_version "
-                "JOIN extensions e ON e.name = pd.extension_name "
-                "WHERE e.namespace = ?1 AND pd.normalized_project = ?2 "
-                "AND pd.project_version = ?3"
+        row = await self._prepare(
+            select(db.python_distributions, db.releases.c.state)
+            .select_from(db.python_distributions.join(db.releases).join(db.extensions))
+            .where(
+                db.extensions.c.namespace == namespace,
+                db.python_distributions.c.normalized_project == normalized_project,
+                db.python_distributions.c.project_version == project_version,
             )
-            .bind(namespace, normalized_project, project_version)
-            .first()
-        )
+        ).first()
         return _prepared_python(row) if row is not None else None
 
     async def prepared_python_distributions(
         self, namespace: str, normalized_project: str
     ) -> list[PreparedPythonDistribution]:
-        result = (
-            await self.db.prepare(
-                "SELECT pd.*, r.state FROM python_distributions pd "
-                "JOIN releases r ON r.extension_name = pd.extension_name "
-                "AND r.version = pd.release_version "
-                "JOIN extensions e ON e.name = pd.extension_name "
-                "WHERE e.namespace = ?1 AND pd.normalized_project = ?2"
+        result = await self._prepare(
+            select(db.python_distributions, db.releases.c.state)
+            .select_from(db.python_distributions.join(db.releases).join(db.extensions))
+            .where(
+                db.extensions.c.namespace == namespace,
+                db.python_distributions.c.normalized_project == normalized_project,
             )
-            .bind(namespace, normalized_project)
-            .all()
-        )
+        ).all()
         return [_prepared_python(row) for row in _results(result)]
 
     async def _python_file_row(
         self, normalized_project: str, project_version: str, filename: str
     ) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM python_files WHERE normalized_project = ?1 "
-                "AND project_version = ?2 AND filename = ?3"
+        return await self._prepare(
+            select(db.python_files).where(
+                db.python_files.c.normalized_project == normalized_project,
+                db.python_files.c.project_version == project_version,
+                db.python_files.c.filename == filename,
             )
-            .bind(normalized_project, project_version, filename)
-            .first()
-        )
+        ).first()
 
     async def put_python_file(
         self,
@@ -681,26 +707,20 @@ class RegistryRepository:
                 httpMetadata={"contentType": "application/octet-stream"},
             )
         try:
-            await (
-                self.db.prepare(
-                    "INSERT INTO python_files(normalized_project, project_version, filename, "
-                    "sha256, size, filetype, requires_python, core_metadata_sha256, r2_key, "
-                    "metadata_r2_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
+            await self._prepare(
+                insert(db.python_files).values(
+                    normalized_project=distribution.normalized_project,
+                    project_version=distribution.project_version,
+                    filename=filename,
+                    sha256=sha256,
+                    size=len(content),
+                    filetype=filetype,
+                    requires_python=requires_python,
+                    core_metadata_sha256=metadata_sha256,
+                    r2_key=r2_key,
+                    metadata_r2_key=metadata_r2_key,
                 )
-                .bind(
-                    distribution.normalized_project,
-                    distribution.project_version,
-                    filename,
-                    sha256,
-                    len(content),
-                    filetype,
-                    requires_python,
-                    metadata_sha256,
-                    r2_key,
-                    metadata_r2_key,
-                )
-                .run()
-            )
+            ).run()
         except Exception as error:
             raced = await self._python_file_row(
                 distribution.normalized_project, distribution.project_version, filename
@@ -725,30 +745,30 @@ class RegistryRepository:
         return _python_file(row)
 
     async def simple_projects(self) -> list[str]:
-        result = await self.db.prepare(
-            "SELECT DISTINCT pd.normalized_project FROM python_distributions pd "
-            "JOIN releases r ON r.extension_name = pd.extension_name "
-            "AND r.version = pd.release_version JOIN python_files pf "
-            "ON pf.normalized_project = pd.normalized_project "
-            "AND pf.project_version = pd.project_version "
-            "WHERE r.state IN ('published', 'yanked') ORDER BY pd.normalized_project"
+        result = await self._prepare(
+            select(db.python_distributions.c.normalized_project)
+            .distinct()
+            .select_from(db.python_distributions.join(db.releases).join(db.python_files))
+            .where(db.releases.c.state.in_(("published", "yanked")))
+            .order_by(db.python_distributions.c.normalized_project)
         ).all()
         return [_column(row, "normalized_project") for row in _results(result)]
 
     async def simple_files(self, normalized_project: str) -> list[PythonFileRecord]:
-        result = (
-            await self.db.prepare(
-                "SELECT pf.*, CASE WHEN r.state = 'yanked' THEN r.yank_reason ELSE NULL END "
-                "AS yank_reason FROM python_files pf JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version JOIN releases r "
-                "ON r.extension_name = pd.extension_name AND r.version = pd.release_version "
-                "WHERE pf.normalized_project = ?1 AND r.state IN ('published', 'yanked') "
-                "ORDER BY pf.filename"
+        result = await self._prepare(
+            select(
+                db.python_files,
+                case(
+                    (db.releases.c.state == "yanked", db.releases.c.yank_reason), else_=None
+                ).label("yank_reason"),
             )
-            .bind(normalized_project)
-            .all()
-        )
+            .select_from(db.python_files.join(db.python_distributions).join(db.releases))
+            .where(
+                db.python_files.c.normalized_project == normalized_project,
+                db.releases.c.state.in_(("published", "yanked")),
+            )
+            .order_by(db.python_files.c.filename)
+        ).all()
         return [_python_file(row) for row in _results(result)]
 
     async def python_public_file(
@@ -759,18 +779,16 @@ class RegistryRepository:
         *,
         metadata: bool = False,
     ) -> PublicObject | None:
-        row = (
-            await self.db.prepare(
-                "SELECT pf.*, r.state FROM python_files pf JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version JOIN releases r "
-                "ON r.extension_name = pd.extension_name AND r.version = pd.release_version "
-                "WHERE pf.normalized_project = ?1 AND pf.project_version = ?2 "
-                "AND pf.filename = ?3 AND r.state IN ('published', 'yanked', 'blocked')"
+        row = await self._prepare(
+            select(db.python_files, db.releases.c.state)
+            .select_from(db.python_files.join(db.python_distributions).join(db.releases))
+            .where(
+                db.python_files.c.normalized_project == normalized_project,
+                db.python_files.c.project_version == project_version,
+                db.python_files.c.filename == filename,
+                db.releases.c.state.in_(("published", "yanked", "blocked")),
             )
-            .bind(normalized_project, project_version, filename)
-            .first()
-        )
+        ).first()
         if row is None:
             return None
         if _column(row, "state") == "blocked":
@@ -840,23 +858,20 @@ class RegistryRepository:
                 httpMetadata={"contentType": media_types[relative_path]},
             )
         manifest_key = prefix + "mf-manifest.json"
-        result = (
-            await self.db.prepare(
-                "UPDATE module_federation_distributions SET manifest_r2_key = ?3, "
-                "asset_paths_json = ?4, internal_snapshot_hash = ?5, "
-                "uploaded_at = CURRENT_TIMESTAMP "
-                "WHERE extension_name = ?1 AND release_version = ?2 "
-                "AND manifest_r2_key IS NULL"
+        result = await self._prepare(
+            update(db.module_federation_distributions)
+            .values(
+                manifest_r2_key=manifest_key,
+                asset_paths_json=json.dumps(sorted(files), separators=(",", ":")),
+                internal_snapshot_hash=snapshot_hash,
+                uploaded_at=func.current_timestamp(),
             )
-            .bind(
-                extension_name,
-                version,
-                manifest_key,
-                json.dumps(sorted(files), separators=(",", ":")),
-                snapshot_hash,
+            .where(
+                db.module_federation_distributions.c.extension_name == extension_name,
+                db.module_federation_distributions.c.release_version == version,
+                db.module_federation_distributions.c.manifest_r2_key.is_(None),
             )
-            .run()
-        )
+        ).run()
         if int(_column(_column(result, "meta"), "changes", 0)) != 1:
             raced = await self._module_federation_row(extension_name, version)
             if _column(raced, "internal_snapshot_hash") != snapshot_hash:
@@ -871,19 +886,21 @@ class RegistryRepository:
     async def module_federation_public_file(
         self, extension_name: str, version: str, relative_path: str, media_type: str
     ) -> PublicObject | None:
-        row = (
-            await self.db.prepare(
-                "SELECT mf.manifest_r2_key, mf.asset_paths_json, "
-                "mf.internal_snapshot_hash, r.state "
-                "FROM module_federation_distributions mf JOIN releases r "
-                "ON r.extension_name = mf.extension_name AND r.version = mf.release_version "
-                "WHERE mf.extension_name = ?1 AND mf.release_version = ?2 "
-                "AND mf.manifest_r2_key IS NOT NULL "
-                "AND r.state IN ('published', 'yanked', 'blocked')"
+        row = await self._prepare(
+            select(
+                db.module_federation_distributions.c.manifest_r2_key,
+                db.module_federation_distributions.c.asset_paths_json,
+                db.module_federation_distributions.c.internal_snapshot_hash,
+                db.releases.c.state,
             )
-            .bind(extension_name, version)
-            .first()
-        )
+            .select_from(db.module_federation_distributions.join(db.releases))
+            .where(
+                db.module_federation_distributions.c.extension_name == extension_name,
+                db.module_federation_distributions.c.release_version == version,
+                db.module_federation_distributions.c.manifest_r2_key.is_not(None),
+                db.releases.c.state.in_(("published", "yanked", "blocked")),
+            )
+        ).first()
         if row is None:
             return None
         if _column(row, "state") == "blocked":

@@ -20,6 +20,23 @@ UV_FIND_LINKS="$PWD/dist" pdm run pywrangler dev --port 8791 \
 `.wrangler/`, virtual environments, `python_modules/`, dependency directories,
 build output, and secrets are local state and must remain uncommitted.
 
+`pnpm check` finishes with `pnpm registry:check`. This acceptance journey runs the
+built Python Worker on loopback against a temporary D1 database and R2 bucket,
+applies the real migrations, and exercises authenticated preparation, native
+uploads, publication, withdrawal/restoration, private pagination, and public
+reads. It also injects an association-insert failure to prove the identity batch
+rolls back. These persistence behaviors cannot be established by types or SQL
+compilation alone, and errors can expose private releases or strand immutable
+identities. This check belongs to the Registry control plane; retain it while
+the D1 binding integration owns these semantics.
+
+Run `pnpm worker:build && pnpm registry:check` to repeat this journey in isolation.
+The script accepts no remote target or credentials, creates its fixtures only
+in a temporary directory, stops its local Worker, and removes all database and
+object state on exit. Schema fault injection is confined to that disposable
+database. SQLAlchemy 2.0.52 is locked for both normal Python and the Worker; the
+Worker uses its pure-Python wheel without a native asynchronous ORM driver.
+
 ## Package release intent
 
 The Python Toolkit and Core Runtime use the pinned Changie configuration and

@@ -37,6 +37,23 @@ models, routes, generated contracts, and build checks are the exact executable i
 
 ## Persistence and Security
 
+D1 queries and writes use SQLAlchemy Core table mappings and expressions in
+`service/database.py` and `service/repository.py`. SQLAlchemy's SQLite compiler
+generates SQL and ordered bound parameters, including expanded `IN` predicates.
+The Repository passes these directly to the asynchronous D1 binding and retains
+native `batch()` for atomic identity and association creation. It does not use
+an ORM Session or emulate connection transactions: the evaluated
+`sqlalchemy-cloudflare-d1` Worker driver implements commit and rollback as no-ops.
+The binding bridge owns only compilation and execution, not a query language,
+DBAPI driver, identity map, or transaction engine.
+
+Checked-in migrations remain the schema authority. Core mappings describe the
+existing columns and foreign-key joins; the service never calls `create_all()`
+or changes the schema at startup. Ordinary service and maintenance queries must
+use expressions instead of handwritten SQL. Persisted text and integer columns
+use native scalar values; additional database types require verifying their
+binding and result conversion at the D1 boundary.
+
 D1 owns identity, lifecycle, association metadata, and hashed namespace
 credentials. R2 owns immutable private bytes. Admission writes staging bytes
 before a conditional D1 exposure transition; unreachable staging objects are

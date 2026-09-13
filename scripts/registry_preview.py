@@ -18,6 +18,10 @@ import time
 from pathlib import Path
 
 import httpx
+from sqlalchemy import delete
+from sqlalchemy.dialects.sqlite import insert
+
+from inkcre_extension_registry.service.database import compile_d1, credentials, namespaces
 
 ROOT = Path(__file__).resolve().parents[1]
 WRANGLER = ["pnpm", "exec", "wrangler"]
@@ -91,15 +95,18 @@ def deploy(client: httpx.Client, name: str, origin: str, artifact: Path, revisio
     config_path = artifact / "wrangler.json"
     config_path.write_text(json.dumps(config))
     wrangler("d1", "migrations", "apply", "DB", "--remote", "--config", str(config_path))
-    for sql, params in [
-        ("INSERT OR IGNORE INTO namespaces(name) VALUES ('demo')", []),
-        ("DELETE FROM credentials WHERE namespace = 'demo' AND label = 'PR reviewer'", []),
-        (
-            "INSERT INTO credentials(token_hash, namespace, label) "
-            "VALUES (?, 'demo', 'PR reviewer')",
-            [hashlib.sha256(token.encode()).hexdigest()],
+    for statement in [
+        insert(namespaces).values(name="demo").on_conflict_do_nothing(),
+        delete(credentials).where(
+            credentials.c.namespace == "demo", credentials.c.label == "PR reviewer"
+        ),
+        insert(credentials).values(
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            namespace="demo",
+            label="PR reviewer",
         ),
     ]:
+        sql, params = compile_d1(statement)
         api(client, "POST", f"d1/database/{db['uuid']}/query", json={"sql": sql, "params": params})
     print(
         wrangler(
