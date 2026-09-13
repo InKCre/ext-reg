@@ -16,7 +16,7 @@ pdm run python -m inkcre_extension_registry
 
 默认监听 8000，平台通过 `PORT` 指定端口。`/`、`/explore/<namespace>/<name>`、`/publish` 和全部 API 使用同一服务。新库显示真实空态；启动和迁移不会创建示例数据。运维可通过 `pdm run python -m inkcre_extension_registry.admin grant <namespace> --label <label>` 从标准输入登记随机 token，通过 `revoke` 按 namespace 和 label 撤销。不要把 token 写进命令行、日志或仓库。
 
-修改模型后运行 `pnpm db:makemigrations`，审查生成的迁移。Tortoise 1.1 的 `CreateModel` 不会把 `Meta.constraints` 写入数据库，因此新表的 CHECK 约束须使用原生 `AddConstraint` 操作显式添加，参照初始迁移；真实 PostgreSQL 的非法数据验收用于防止约束仅存在于模型描述中。`pnpm db:migrate` 只向前执行；上线后只能追加迁移，修复通过后续迁移完成。`MIGRATION_DATABASE_URL` 可以单独指定迁移连接，未配置时使用 `DATABASE_URL`。服务不在请求或启动期间迁移。
+修改模型后运行 `pnpm db:makemigrations`，审查生成的迁移。Tortoise 1.1 的 `CreateModel` 不会把 `Meta.constraints` 写入数据库，因此新表的 CHECK 约束须使用原生 `AddConstraint` 操作显式添加，参照初始迁移；真实 PostgreSQL 的非法数据验收用于防止约束仅存在于模型描述中。`pnpm db:migrate` 只向前执行；上线后只能追加迁移，修复通过后续迁移完成。交付必须以 `MIGRATION_DATABASE_URL` 指定 owner 连接，服务的 `DATABASE_URL` 使用普通 `registry_app`。本地单账号开发仍可省略迁移变量并复用 `DATABASE_URL`。权限迁移创建 NOLOGIN 角色；生产和预览控制器在迁移后通过 `scripts/registry_database.py` 设置独立密码并启用登录。服务不在请求或启动期间迁移。
 
 完整检查需要空的、一次性的 PostgreSQL 数据库：
 
@@ -24,7 +24,7 @@ pdm run python -m inkcre_extension_registry
 REGISTRY_TEST_DATABASE_URL=postgres://registry:registry-check@localhost:5432/registry_check pnpm check
 ```
 
-CI 创建 PostgreSQL 17 service；本地可以使用一次性数据库或 Neon 测试分支。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、blocked 读取及 GET / HEAD。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
+CI 创建 PostgreSQL 17 service；本地可以使用一次性数据库或 Neon 测试分支。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、blocked 读取、GET / HEAD 和 ETag 重验证。迁移使用 owner，业务验收使用 `registry_app`，并验证创建表、修改业务表、写迁移记录和创建角色均被拒绝。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
 
 `pnpm registry:check` 单独执行上述验收，仍需要同一个测试变量。CI 另外拒绝修改或删除已在 base 中存在的迁移，并构建完整服务镜像。测试数据不会写入共享预览。
 

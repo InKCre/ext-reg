@@ -1,10 +1,10 @@
 # 生产 Registry 与 PostgreSQL 切换
 
-公开 origin 保持 `https://registry.inkcre.dev`。迁移目标是一个 CPython / FastAPI 服务容器、Registry 专属 Neon PostgreSQL 项目和既有私有 R2 桶。代码实现不等于生产切换；旧生产仍由 Worker 与 D1 服务，直至获得明确生产授权并完成以下步骤。当前资源身份、演练结果及切换状态记录在活动 task packet。
+公开 origin 保持 `https://registry.inkcre.dev`。迁移目标是一个运行于 Heroku Eco dyno 的 CPython / FastAPI 服务容器、Registry 专属 Neon PostgreSQL 项目和既有私有 R2 桶。代码实现不等于生产切换；旧生产仍由 Worker 与 D1 服务，直至获得明确生产授权并完成以下步骤。当前资源身份、演练结果及切换状态记录在活动 task packet。
 
 `production.yml` 只接受精确 current-main SHA。`verify` 执行仓库检查和容器构建，不修改远程资源。`deploy` 在受保护 production 环境中，重新核验 main 后对已配置 app 向前迁移、配置数据库和单桶 S3 凭据、发布同一镜像，并验证 Heroku app origin。它不自动导入 D1、不改变域名、不创建示例数据，也不删除旧资源。
 
-production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET` variables，以及 `HEROKU_API_KEY`、`DATABASE_URL`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` secrets。首次配置保持既有 R2 桶，S3 token 仅授予该桶的对象读写。平台控制 token 不进入运行容器。数据库连接属于独立 Registry 项目，不复用 core-py 的数据库或发布生命周期。
+production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET` variables，以及 `HEROKU_API_KEY`、`MIGRATION_DATABASE_URL`、`DATABASE_URL`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` secrets。首次配置保持既有 R2 桶，S3 token 仅授予该桶的对象读写。`MIGRATION_DATABASE_URL` 使用 `registry_owner`，仅交给迁移容器与可信角色配置命令；`DATABASE_URL` 使用同一数据库的普通 `registry_app` 角色和独立密码。迁移创建该角色及业务表授权，控制器设置密码后以 `web=1:eco` 启动应用。owner 连接与平台控制 token 不进入运行服务配置。数据库连接属于独立 Registry 项目，不复用 core-py 的数据库或发布生命周期。
 
 ## 首次切换
 

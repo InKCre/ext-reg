@@ -4,7 +4,7 @@
 
 完成 Registry 的 minimum lovable product：目录、扩展详情和 Publisher 对齐 client-web，复用 design 的公开样式包；由一个 Python 服务交付 Web、API 和静态资源。服务从 Python Workers / D1 迁到常规 CPython / Neon PostgreSQL，保留 R2 与公开协议，减少特殊运行时适配和两套数据库技术的维护成本。
 
-**2026-09-13，Sir 在确认方向、要求先更新 packet 后，明确授权“开始实施”，并允许通过 Neon CLI 创建项目和数据库分支。** CPython / FastAPI / Jinja、Tortoise / asyncpg、boto3 和单一 OCI 服务已实现。真实 Neon 上的发布流程、D1 导入保真和完整 `pnpm check` 已通过；容器 CI 的提交结果由 PR checks 记录，远程预览仍待凭据恢复，生产尚未切换。
+**2026-09-13，Sir 在确认方向、要求先更新 packet 后，明确授权“开始实施”，并允许通过 Neon CLI 创建项目和数据库分支。** CPython / FastAPI / Jinja、Tortoise / asyncpg、boto3 和单一 OCI 服务已实现。真实 Neon 上的发布流程、D1 导入保真和完整 `pnpm check` 已通过；容器 CI 的提交结果由 PR checks 记录，远程预览正在配置，生产尚未切换。
 
 本 packet 是父任务唯一的工作控制入口，保存目标、决策、执行位置和证据边界，不拥有长期架构事实，也不代替 Sir 的验收。[计划](plan.md)拥有推进顺序；[证据](evidence.md)区分当前结果、旧 Worker 基线与待验证事项。父任务关闭前保留整个 packet。
 
@@ -12,11 +12,11 @@
 
 | 对象 | From → To | 不变量 |
 | --- | --- | --- |
-| 运行时 | Python Worker → CPython / FastAPI / Jinja 单一容器；Heroku 是当前部署实现，托管平台选择待确认 | Web、API、分发与静态资源同一应用，无独立前端部署 |
+| 运行时 | Python Worker → CPython / FastAPI / Jinja 单一容器，Heroku Eco dyno | Web、API、分发与静态资源同一应用，无独立前端部署 |
 | 持久化 | D1 / SQLAlchemy Core → Neon PostgreSQL / Tortoise ORM / asyncpg | 业务唯一身份、namespace 边界、发布状态及不可变关联保持兼容 |
 | 关系与迁移 | 复合主键 → Release、Distribution、File 内部主键与普通外键，业务身份用唯一约束保持 | 内部 ID 不进入公开契约；旧 D1 历史不改写，新迁移仅向前执行 |
 | 文件存储 | R2 binding → boto3 S3 SDK | 原有 key、文件身份、流式读取与先 staging 后可见的语义保持 |
-| 预览 | 当前实现为独立 Heroku app / Neon branch / R2 bucket；尚未部署，托管平台可单独调整 | 更新保留数据，不生成示例扩展，不复制生产业务数据 |
+| 预览 | 独立 Heroku Eco app / Neon branch / 私有 R2 bucket | 更新保留数据，不生成示例扩展，不复制生产业务数据 |
 | 产品 | 保留已接受的简洁目录、详情与 Publisher，复用 design | 无 hero、额外教程面板、错误 logo 或环境驱动的产品分支 |
 
 此前“恢复原始 SQL”不再是当前路线。Tortoise 使用独立关联主键，避免库对外键兼主键的加载限制；没有自建驱动、查询语言或事务模拟。R2 与 PostgreSQL 不组成分布式事务。导入在一次数据库事务中转换关系，并比较全部逻辑内容摘要，不能只比较行数。
@@ -31,9 +31,11 @@
 
 ## 执行位置与下一步
 
-当前在计划 03：`4d79874` 的完整 CI、镜像构建与 HTTP 启动检查已通过；一次性 Neon 分支上的本地 Chromium 验收也已通过，覆盖双版本 Web 发布、详情、撤回恢复、搜索与移动端，见[证据](evidence.md)。Sir 询问 Heroku 的必要性后，已澄清它只是当前应用托管选择，并非 Neon / ORM 的必要依赖；“继续预览验收”不自动确认替换托管平台。已请求在沿用当前 Heroku 实现与先评估 Cloudflare Containers 之间明确选择。
+Sir 已重新确认完整部署方案及权限、缓存调整，并明确要求 Heroku 使用 Eco dyno，授权继续预览部署。当前变更范围为：运行服务的 owner 数据库连接改为普通 `registry_app` 角色，owner 仅用于交付迁移；扩展文件的一年 immutable 缓存改为逐次状态校验和 ETag 重验证；部署配置统一为 `web=1:eco`。影响数据库授权、文件 GET / HEAD、部署控制器及相应文档，不改变扩展业务身份、发布协议或视觉实现。验证覆盖应用角色业务写入成功而 DDL 被拒绝、条件读取及 blocked 状态、真实 Eco / R2 部署和更新保留数据。PostgreSQL 角色与 GRANT 属于原生权限 DDL，业务查询继续由 ORM 实现。
 
-2026-09-13 重新检查时，本机 Heroku 登录仍失效，GitHub preview 缺 `HEROKU_API_KEY` 和 `CLOUDFLARE_PREVIEW_API_TOKEN`。Neon 的项目范围 API key、preview variables 和 Cloudflare 账户 ID 已配置，密钥未进入源码或 packet。当前没有新 CPython 远程预览地址；托管平台与所需凭据明确后才能完成远程验收。
+Heroku 登录已恢复，`HEROKU_API_KEY` 与新建的 `CLOUDFLARE_PREVIEW_API_TOKEN` 已配置到 GitHub preview。Cloudflare 控制 token 仅包含本账户的 Workers R2 Storage Write 与 Account API Tokens Write，已验证令牌、PR 桶查询和桶权限组 API。Docker / Colima 已就绪，可以在本机构建 linux/amd64 镜像；没有增加产品部署流程。
+
+`c1ba81e` 的完整 CI、镜像构建与 HTTP 启动检查，以及一次性 Neon 分支上的本地 Chromium 验收已通过。新增授权与缓存变更正在重新验证；真实 Eco 远程预览尚未完成，不能用旧 Worker 或本地结果替代。
 
 Registry 专属 Neon 项目为 `wandering-base-13707928`，PostgreSQL 17、aws-us-east-1、database `registry`。根分支 `br-muddy-term-aw4iive7` 保持空库，未导入生产数据；无 compute 的空基础分支为 `br-polished-mode-awi5dixy`。PR 33 分支为 `br-falling-breeze-awj9y9ao`，一次性验证分支为 `br-dry-meadow-awo759yq`，后两者到期日为 2026-09-20。后续 PR 从空基础分支建库并运行提交中的迁移，避免把生产数据引入预览。
 

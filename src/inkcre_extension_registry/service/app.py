@@ -162,14 +162,22 @@ async def _public_response(request: Request, descriptor: PublicObject | None) ->
     artifacts = _repository(request).artifacts
     headers = {
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "public, no-cache",
         "ETag": f'"{descriptor.etag}"',
         "X-Content-Type-Options": "nosniff",
     }
-    if request.method == "HEAD":
+    condition = request.headers.get("if-none-match", "")
+    # Our validators are quoted SHA-256 values. GET and HEAD use weak comparison,
+    # as in Starlette's file responses; the wildcard also requires existing bytes.
+    unchanged = condition.strip() == "*" or headers["ETag"] in [
+        tag.strip().removeprefix("W/") for tag in condition.split(",")
+    ]
+    if request.method == "HEAD" or unchanged:
         stored = await artifacts.head(descriptor.r2_key)
         if stored is None:
             raise HTTPException(503, "Distribution bytes unavailable")
+        if unchanged:
+            return Response(status_code=304, headers=headers)
         headers["Content-Length"] = str(stored.size)
         return Response(media_type=descriptor.media_type, headers=headers)
     stored = await artifacts.open(descriptor.r2_key)

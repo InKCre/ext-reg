@@ -11,14 +11,17 @@ import argparse
 import hashlib
 import os
 import re
+import secrets
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import boto3
 import httpx
 from botocore.config import Config
+from registry_database import configure_runtime_login
 
 
 def request(client: httpx.Client, method: str, path: str, *, missing=False, **kwargs):
@@ -129,7 +132,7 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
         neon,
         request(neon, "PATCH", f"branches/{branch['id']}", json={"branch": {"expires_at": expiry}}),
     )
-    database_url = request(
+    owner_url = request(
         neon,
         "GET",
         "connection_uri",
@@ -140,9 +143,34 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
             "pooled": "false",
         },
     )["uri"]
-    config.update(DATABASE_URL=database_url, REGISTRY_NEON_BRANCH_ID=branch["id"])
-    request(heroku, "PATCH", f"apps/{name}/config-vars", json=config)
-
+    database_env = {**os.environ, "MIGRATION_DATABASE_URL": owner_url}
+    run(
+        "docker",
+        "run",
+        "--rm",
+        "--env",
+        "MIGRATION_DATABASE_URL",
+        image,
+        "tortoise",
+        "-c",
+        "inkcre_extension_registry.migration_config.TORTOISE_ORM",
+        "upgrade",
+        env=database_env,
+    )
+    previous = urlsplit(config.get("DATABASE_URL", ""))
+    password = (
+        unquote(previous.password)
+        if previous.username == "registry_app"
+        and previous.password
+        and config.get("REGISTRY_NEON_BRANCH_ID") == branch["id"]
+        else secrets.token_urlsafe(32)
+    )
+    runtime_url = configure_runtime_login(owner_url, password)
+    config.update(
+        DATABASE_URL=runtime_url,
+        MIGRATION_DATABASE_URL=None,
+        REGISTRY_NEON_BRANCH_ID=branch["id"],
+    )
     if request(cloudflare, "GET", f"r2/buckets/{name}", missing=True) is None:
         request(cloudflare, "POST", "r2/buckets", json={"name": name})
     if not config.get("AWS_SECRET_ACCESS_KEY"):
@@ -178,20 +206,7 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
         REGISTRY_SOURCE_REVISION=None,
     )
     request(heroku, "PATCH", f"apps/{name}/config-vars", json=config)
-    database_env = {**os.environ, "DATABASE_URL": database_url}
-    run(
-        "docker",
-        "run",
-        "--rm",
-        "--env",
-        "DATABASE_URL",
-        image,
-        "tortoise",
-        "-c",
-        "inkcre_extension_registry.migration_config.TORTOISE_ORM",
-        "upgrade",
-        env=database_env,
-    )
+    database_env = {**os.environ, "DATABASE_URL": runtime_url}
     run(
         "docker",
         "run",
@@ -223,7 +238,7 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
     run("docker", "tag", image, target)
     run("docker", "push", target)
     run("heroku", "container:release", "web", "--app", name)
-    run("heroku", "ps:scale", "web=1:basic", "--app", name)
+    run("heroku", "ps:scale", "web=1:eco", "--app", name)
     smoke(origin, revision)
     print(f"Preview: {origin}\nSource: {revision}\nNeon branch: {branch['id']}")
     if os.environ.get("GITHUB_OUTPUT"):

@@ -2,8 +2,10 @@
 
 import argparse
 import os
+from urllib.parse import unquote, urlsplit
 
 import httpx
+from registry_database import configure_runtime_login
 from registry_preview import request, run, smoke
 
 
@@ -12,6 +14,10 @@ def main() -> None:
     parser.add_argument("--image", required=True)
     args = parser.parse_args()
     app = os.environ["HEROKU_APP_NAME"]
+    owner_url = os.environ["MIGRATION_DATABASE_URL"]
+    runtime = urlsplit(os.environ["DATABASE_URL"])
+    if runtime.username != "registry_app" or not runtime.password:
+        raise ValueError("Production DATABASE_URL must use registry_app")
     origin = "https://registry.inkcre.dev"
     with httpx.Client(
         base_url="https://api.heroku.com/",
@@ -29,13 +35,14 @@ def main() -> None:
             "run",
             "--rm",
             "--env",
-            "DATABASE_URL",
+            "MIGRATION_DATABASE_URL",
             args.image,
             "tortoise",
             "-c",
             "inkcre_extension_registry.migration_config.TORTOISE_ORM",
             "upgrade",
         )
+        configure_runtime_login(owner_url, unquote(runtime.password))
         config = {
             key: os.environ[key]
             for key in (
@@ -46,7 +53,9 @@ def main() -> None:
                 "AWS_SECRET_ACCESS_KEY",
             )
         }
-        config.update(PUBLIC_ORIGIN=origin, REGISTRY_SOURCE_REVISION=None)
+        config.update(
+            PUBLIC_ORIGIN=origin, REGISTRY_SOURCE_REVISION=None, MIGRATION_DATABASE_URL=None
+        )
         request(heroku, "PATCH", f"apps/{app}/config-vars", json=config)
         run(
             "docker",
@@ -61,7 +70,7 @@ def main() -> None:
         run("docker", "tag", args.image, target)
         run("docker", "push", target)
         run("heroku", "container:release", "web", "--app", app)
-        run("heroku", "ps:scale", "web=1:basic", "--app", app)
+        run("heroku", "ps:scale", "web=1:eco", "--app", app)
         # This origin proves the new app before an independently authorized DNS cutover.
         smoke(existing["web_url"].rstrip("/"), os.environ["SOURCE_SHA"])
         print(f"Production app released: {app}; canonical origin: {origin}")

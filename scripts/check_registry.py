@@ -16,9 +16,12 @@ import secrets
 import zipfile
 
 import httpx
+import psycopg
 from check_d1_import import check_import
 from moto.server import ThreadedMotoServer
+from registry_database import configure_runtime_login
 from tortoise import Tortoise
+from tortoise.context import TortoiseContext
 from tortoise.migrations.autodetector import MigrationAutodetector
 from tortoise.migrations.executor import MigrationExecutor
 
@@ -39,9 +42,8 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     authorization = {"Authorization": f"Bearer {token}"}
 
     async def request(method: str, path: str, expected: int = 200, *, private=False, **kwargs):
-        response = await client.request(
-            method, path, headers=authorization if private else {}, **kwargs
-        )
+        headers = {**(authorization if private else {}), **kwargs.pop("headers", {})}
+        response = await client.request(method, path, headers=headers, **kwargs)
         assert response.status_code == expected, (
             f"{method} {path}: expected {expected}, got {response.status_code}: "
             f"{response.text[:800]}"
@@ -165,6 +167,20 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     await request("HEAD", web_path)
     await request("GET", package_path.replace("check-extension", "CHECK_extension"), 404)
     await request("GET", web_path.replace("remoteEntry.js", "mf-manifest.json"))
+    for path in (package_path, package_path + ".metadata", web_path):
+        cached = await request("GET", path)
+        etag = cached.headers["etag"]
+        assert cached.headers["cache-control"] == "public, no-cache"
+        for condition in (etag, f'"other", W/{etag}', "*"):
+            for method in ("GET", "HEAD"):
+                validated = await request(method, path, 304, headers={"If-None-Match": condition})
+                assert validated.content == b"" and validated.headers["etag"] == etag
+        await request("GET", path, headers={"If-None-Match": '"different"'})
+    artifacts.client.delete_object(Bucket=artifacts.bucket, Key=file.metadata_r2_key)
+    await request("GET", package_path + ".metadata", 503, headers={"If-None-Match": "*"})
+    await artifacts.put(
+        file.metadata_r2_key, metadata.encode(), content_type="application/octet-stream"
+    )
 
     reason = "Publisher's withdrawal ?"
     await request("POST", version_path + "/yank", private=True, json={"reason": reason})
@@ -235,13 +251,46 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     await request("GET", version_path, 451)
     await request("GET", package_path, 451)
     await request("GET", web_path, 451)
+    for path in (package_path, package_path + ".metadata", web_path):
+        for method in ("GET", "HEAD"):
+            denied = await request(method, path, 451, headers={"If-None-Match": "*"})
+            assert denied.headers["cache-control"] == "no-store"
     assert "check-extension" not in (await request("GET", "/simple/")).text
     await db.Credential.all().update(disabled=True)
     await request("GET", "/v1/publisher", 401, private=True)
 
 
+def check_runtime_permissions(url: str) -> None:
+    with psycopg.connect(url, autocommit=True) as connection:
+        for statement in (
+            "CREATE TABLE forbidden (id integer)",
+            "ALTER TABLE namespaces ADD COLUMN forbidden integer",
+            "DELETE FROM tortoise_migrations",
+            "CREATE ROLE forbidden NOLOGIN",
+        ):
+            try:
+                with connection.transaction():
+                    connection.execute(statement)
+                    raise AssertionError("Runtime login unexpectedly has migration authority")
+            except psycopg.errors.InsufficientPrivilege:
+                pass
+
+
 async def main() -> None:
-    url = os.environ["REGISTRY_TEST_DATABASE_URL"]
+    owner_url = os.environ["REGISTRY_TEST_DATABASE_URL"]
+    config = database_config(owner_url)
+    async with TortoiseContext() as context:
+        await context.init(config=config)
+        assert Tortoise.apps is not None
+        assert not await MigrationAutodetector(Tortoise.apps, config["apps"]).changes(), (
+            "Models changed without a checked-in migration"
+        )
+        executor = MigrationExecutor(Tortoise.get_connection("default"), config["apps"])
+        await executor.migrate(direction="forward")
+        assert not await executor.plan(), "Migration head was not reached"
+        assert not await db.Namespace.exists(), "Checks require an empty disposable database"
+    url = await asyncio.to_thread(configure_runtime_login, owner_url, secrets.token_urlsafe(32))
+    await asyncio.to_thread(check_runtime_permissions, url)
     logging.getLogger("werkzeug").setLevel(logging.ERROR)
     server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
     server.start()
@@ -257,15 +306,6 @@ async def main() -> None:
     app = create_app()
     try:
         async with app.router.lifespan_context(app):
-            config = database_config(url)
-            assert Tortoise.apps is not None
-            assert not await MigrationAutodetector(Tortoise.apps, config["apps"]).changes(), (
-                "Models changed without a checked-in migration"
-            )
-            executor = MigrationExecutor(Tortoise.get_connection("default"), config["apps"])
-            await executor.migrate(direction="forward")
-            assert not await executor.plan(), "Migration head was not reached"
-            assert not await db.Namespace.exists(), "Checks require an empty disposable database"
             app.state.repository.artifacts.client.create_bucket(
                 Bucket="registry-check", CreateBucketConfiguration={"LocationConstraint": "auto"}
             )
