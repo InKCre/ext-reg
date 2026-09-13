@@ -9,9 +9,7 @@ browser consumers use the producer's native `mf-manifest.json`. Deployment
 installation, per-Peer enablement, and running state remain outside this
 repository.
 
-The service runs as a Python Cloudflare Worker with D1 metadata and private R2
-bytes. It does not publish a generic target manifest or a shared Runtime/API
-package.
+服务使用 CPython、FastAPI / Jinja、Tortoise ORM 和 Neon PostgreSQL，私有文件继续存放于 R2，并通过 boto3 的 S3 接口访问。目录、详情、Publisher、API 与文件分发由同一个容器交付；没有独立前端部署。现有生产 Worker 的切换步骤见 [生产迁移](docs/40-deployment/production-registry.md)。
 
 This repository also releases the independent
 `inkcre-extension-toolkit` developer/CD distribution. Its `cli` extra exposes
@@ -28,7 +26,7 @@ use the native APIs described above.
 ```bash
 pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
-pnpm check
+REGISTRY_TEST_DATABASE_URL=postgres://registry:registry-check@localhost:5432/registry_check pnpm check
 ```
 
 See the [documentation index](docs/index.md) for internal design and deployment

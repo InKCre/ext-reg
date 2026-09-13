@@ -4,7 +4,7 @@
 base package owns pure, Registry-compatible native association projections;
 the `cli` extra owns HTTP and command dependencies and exposes `inkcre-ext`.
 The Registry service may reuse the pure library, but the Toolkit must not
-depend on Registry implementation or Worker runtime state.
+depend on Registry implementation or service runtime state.
 
 The Toolkit prepares Release descriptors, uploads native Module Federation
 snapshots, and builds deterministic static preview facades from one explicit,

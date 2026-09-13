@@ -4,23 +4,25 @@ import base64
 import binascii
 import hashlib
 import mimetypes
+import os
 import re
+from contextlib import asynccontextmanager
 from typing import Annotated, Any
-from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from packaging.version import InvalidVersion
 from packaging.version import Version as Pep440Version
 from starlette.datastructures import UploadFile
-from starlette.formparsers import MultiPartParser
+from tortoise.contrib.fastapi import RegisterTortoise
 
 from .. import __version__
 from ..contracts.models import (
     ExtensionRecord,
     ExtensionSummary,
     PrepareReleaseRequest,
+    PublisherWorkspace,
     PythonEntryPoint,
     RegistrySegment,
     ReleaseRecord,
@@ -49,6 +51,7 @@ from .repository import (
     RegistryRepository,
     RegistryStateError,
 )
+from .settings import Settings, database_config
 from .simple import (
     SIMPLE_HTML,
     SIMPLE_JSON,
@@ -58,10 +61,10 @@ from .simple import (
     root_html,
     root_json,
 )
-from .ui import extension_catalog_html
+from .storage import ArtifactStore
+from .ui import SCRIPT, extension_catalog_html, extension_detail_html, html_response, page
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-MultiPartParser.spool_max_size = MAX_UPLOAD_BYTES + 1
 
 BEARER_PATTERN = re.compile(r"^Bearer ([A-Za-z0-9._~-]{24,512})$")
 UPLOAD_PATH_PATTERN = re.compile(
@@ -70,7 +73,7 @@ UPLOAD_PATH_PATTERN = re.compile(
 
 
 def _repository(request: Request) -> RegistryRepository:
-    return RegistryRepository(request.scope["env"])
+    return request.app.state.repository
 
 
 def _credential_from_authorization(authorization: str | None) -> str | None:
@@ -131,29 +134,7 @@ def _map_repository_error(error: Exception) -> HTTPException:
 
 
 def _public_origin(request: Request) -> str:
-    value = getattr(request.scope["env"], "PUBLIC_ORIGIN", None)
-    if not isinstance(value, str):
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "canonical PUBLIC_ORIGIN binding is required",
-        )
-    parsed = urlparse(value)
-    local_http = parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
-    if (
-        (parsed.scheme != "https" and not local_http)
-        or not parsed.netloc
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.path not in {"", "/"}
-        or parsed.params
-        or parsed.query
-        or parsed.fragment
-    ):
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "PUBLIC_ORIGIN must be an absolute HTTPS origin",
-        )
-    return value.rstrip("/")
+    return request.app.state.settings.public_origin
 
 
 async def _form(request: Request) -> Any:
@@ -175,28 +156,56 @@ def _form_string(form: Any, name: str, *, required: bool = True) -> str | None:
     return value
 
 
-async def _read_public_object(
-    repository: RegistryRepository, descriptor: PublicObject | None
-) -> tuple[bytes, PublicObject]:
+async def _public_response(request: Request, descriptor: PublicObject | None) -> Response:
     if descriptor is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Distribution file does not exist")
-    stored = await repository.artifacts.get(descriptor.r2_key)
+    artifacts = _repository(request).artifacts
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, no-cache",
+        "ETag": f'"{descriptor.etag}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    condition = request.headers.get("if-none-match", "")
+    # Our validators are quoted SHA-256 values. GET and HEAD use weak comparison,
+    # as in Starlette's file responses; the wildcard also requires existing bytes.
+    unchanged = condition.strip() == "*" or headers["ETag"] in [
+        tag.strip().removeprefix("W/") for tag in condition.split(",")
+    ]
+    if request.method == "HEAD" or unchanged:
+        stored = await artifacts.head(descriptor.r2_key)
+        if stored is None:
+            raise HTTPException(503, "Distribution bytes unavailable")
+        if unchanged:
+            return Response(status_code=304, headers=headers)
+        headers["Content-Length"] = str(stored.size)
+        return Response(media_type=descriptor.media_type, headers=headers)
+    stored = await artifacts.open(descriptor.r2_key)
     if stored is None:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Distribution bytes unavailable")
-    body = stored.body
-    if not isinstance(body, bytes):
-        try:
-            body = bytes(body)
-        except (TypeError, ValueError) as error:
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE, "Distribution bytes unavailable"
-            ) from error
-    return body, descriptor
+        raise HTTPException(503, "Distribution bytes unavailable")
+    headers["Content-Length"] = str(stored["ContentLength"])
+    return StreamingResponse(
+        artifacts.stream(stored["Body"]), media_type=descriptor.media_type, headers=headers
+    )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = Settings.from_env()
+    artifacts = ArtifactStore(settings.s3_endpoint_url, settings.s3_bucket)
+    try:
+        async with RegisterTortoise(app, config=database_config(settings.database_url)):
+            app.state.settings = settings
+            app.state.repository = RegistryRepository(artifacts)
+            yield
+    finally:
+        await artifacts.close()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="InKCre Extension Registry",
+        lifespan=lifespan,
         version=__version__,
         description="Extension Releases with native Python and Module Federation distribution.",
     )
@@ -232,7 +241,7 @@ def create_app() -> FastAPI:
                     content={"detail": "multipart upload exceeds 20 MiB"},
                 )
         response = await call_next(request)
-        if response.status_code in {
+        if request.url.path == "/v1/publisher" or response.status_code in {
             status.HTTP_404_NOT_FOUND,
             status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS,
         }:
@@ -241,20 +250,70 @@ def create_app() -> FastAPI:
 
     @app.get("/livez")
     async def livez() -> dict[str, str]:
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "revision": os.environ.get("REGISTRY_SOURCE_REVISION", "development"),
+        }
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    async def extension_catalog(request: Request) -> HTMLResponse:
+    async def extension_catalog(
+        request: Request,
+        q: Annotated[str, Query(max_length=200)] = "",
+        publisher: Annotated[str, Query(max_length=64)] = "",
+    ) -> HTMLResponse:
         extensions = await _repository(request).list_extensions()
-        response = HTMLResponse(extension_catalog_html(extensions))
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
-            "form-action 'none'; frame-ancestors 'none'"
+        return html_response(
+            extension_catalog_html(extensions, query=q.strip(), namespace=publisher)
         )
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response
+
+    @app.get("/assets/registry.js", include_in_schema=False)
+    async def registry_script() -> Response:
+        return Response(
+            SCRIPT,
+            media_type="text/javascript",
+            headers={
+                "Cache-Control": "public, max-age=0, must-revalidate",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    @app.get("/explore/{namespace}/{name}", response_class=HTMLResponse, include_in_schema=False)
+    async def extension_detail(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        request: Request,
+        version: Annotated[str | None, Query(max_length=128)] = None,
+    ) -> HTMLResponse:
+        extension_name = _validate_identity(namespace, name)
+        extension = await _repository(request).get_extension(extension_name)
+        document = extension_detail_html(extension, version) if extension else None
+        if document is None:
+            return html_response(
+                page(
+                    "error.html",
+                    title="This release isn't available.",
+                    code="404",
+                    message="It may be unpublished, withdrawn, or no longer available. "
+                    "Explore the catalog to find a published version.",
+                    active="catalog",
+                ),
+                status_code=404,
+            )
+        return html_response(document)
+
+    @app.get("/publish", response_class=HTMLResponse, include_in_schema=False)
+    async def publisher_page() -> HTMLResponse:
+        return html_response(page("publish.html", title="Publish", active="publish", noindex=True))
+
+    @app.get("/v1/publisher", response_model=PublisherWorkspace)
+    async def publisher_workspace(
+        request: Request,
+        response: Response,
+        namespace: Annotated[str, Depends(_publisher_namespace)],
+        offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+    ) -> PublisherWorkspace:
+        response.headers["Cache-Control"] = "no-store"
+        return await _repository(request).publisher_workspace(namespace, offset)
 
     @app.get("/v1/extensions", response_model=list[ExtensionSummary])
     async def list_extensions(request: Request, response: Response) -> list[ExtensionSummary]:
@@ -547,12 +606,15 @@ def create_app() -> FastAPI:
             )
         return HTMLResponse(project_html(files), media_type=SIMPLE_HTML, headers=headers)
 
+    @app.head("/packages/{project}/{project_version}/{filename}", include_in_schema=False)
     @app.get("/packages/{project}/{project_version}/{filename}")
     async def python_file(
         project: str, project_version: str, filename: str, request: Request
     ) -> Response:
         try:
             normalized_project = normalize_project_name(project)
+            if project != normalized_project:
+                raise HTTPException(404, "Distribution file does not exist")
             metadata = filename.endswith(".metadata")
             archive_filename = filename.removesuffix(".metadata") if metadata else filename
             descriptor = await _repository(request).python_public_file(
@@ -561,21 +623,18 @@ def create_app() -> FastAPI:
                 archive_filename,
                 metadata=metadata,
             )
-            body, public = await _read_public_object(_repository(request), descriptor)
+            return await _public_response(request, descriptor)
+        except ValueError as error:
+            raise HTTPException(404, "Distribution file does not exist") from error
         except Exception as error:
             if isinstance(error, HTTPException):
                 raise
             raise _map_repository_error(error) from error
-        return Response(
-            content=body,
-            media_type=public.media_type,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "ETag": f'"{public.etag}"',
-            },
-        )
 
+    @app.head(
+        "/extensions/{namespace}/{name}/{version}/module-federation/{relative_path:path}",
+        include_in_schema=False,
+    )
     @app.get("/extensions/{namespace}/{name}/{version}/module-federation/{relative_path:path}")
     async def module_federation_file(
         namespace: RegistrySegment,
@@ -595,22 +654,13 @@ def create_app() -> FastAPI:
             descriptor = await _repository(request).module_federation_public_file(
                 extension_name, version, relative_path, media_type
             )
-            body, public = await _read_public_object(_repository(request), descriptor)
+            return await _public_response(request, descriptor)
         except ModuleFederationValidationError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "asset does not exist") from error
         except Exception as error:
             if isinstance(error, HTTPException):
                 raise
             raise _map_repository_error(error) from error
-        return Response(
-            content=body,
-            media_type=public.media_type,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "ETag": f'"{public.etag}"',
-            },
-        )
 
     return app
 

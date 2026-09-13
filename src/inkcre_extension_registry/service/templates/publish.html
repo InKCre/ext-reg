@@ -1,0 +1,154 @@
+{% extends "base.html" %} {% block content %}
+<div class="page-container publisher-page">
+  <header class="section-heading"><h1>Publisher</h1></header>
+  <noscript>
+    <p class="info-note">
+      The publisher workspace needs JavaScript. You can also publish with the
+      <a href="https://github.com/InKCre/ext-reg/tree/main/toolkit">Developer Toolkit</a>
+      .
+    </p>
+  </noscript>
+  <section id="connect-panel" class="connect-layout">
+    <div class="connect-card">
+      <form id="connect-form">
+        <label for="token">Publisher credential</label>
+        <input
+          id="token"
+          type="password"
+          minlength="24"
+          maxlength="512"
+          placeholder="Paste your publisher credential"
+          required
+          autocomplete="off"
+          spellcheck="false"
+        />
+
+        <button class="button button-primary" type="submit" disabled>Connect</button>
+        <p id="connect-status" class="form-status" role="status"></p>
+      </form>
+    </div>
+    <a href="https://github.com/InKCre/ext-reg/issues/new">Request a namespace ↗</a>
+  </section>
+  <section id="workspace" hidden aria-label="Publisher workspace">
+    <div class="workspace-heading">
+      <div>
+        <h2 id="namespace-name"></h2>
+      </div>
+      <button id="disconnect" class="button" type="button">Disconnect</button>
+    </div>
+    <div class="workspace-toolbar">
+      <h2>
+        Your releases
+        <span id="release-count" class="count"></span>
+      </h2>
+      <div>
+        <button id="refresh" class="button" type="button">Refresh</button>
+        <button id="new-release" class="button button-primary" type="button">
+          New Web release
+        </button>
+      </div>
+    </div>
+    <p id="workspace-status" class="form-status" role="status"></p>
+    <div id="release-list" class="release-list"></div>
+    <nav id="release-pagination" class="release-pagination" aria-label="Release pages">
+      <button id="previous-page" type="button" class="button">← Previous</button>
+      <span id="page-position"></span>
+      <button id="next-page" type="button" class="button">Next →</button>
+    </nav>
+    <a href="https://github.com/InKCre/ext-reg/tree/main/toolkit">Python upload · Toolkit ↗</a>
+  </section>
+  <dialog id="release-dialog" aria-labelledby="release-dialog-title">
+    <div class="dialog-heading">
+      <div>
+        <h2 id="release-dialog-title">New Web release</h2>
+      </div>
+      <button class="icon-button close-dialog" type="button" aria-label="Close new release">
+        ×
+      </button>
+    </div>
+    <form id="release-form">
+      <div class="form-grid">
+        <div>
+          <label for="extension-slug">Extension slug</label>
+          <input
+            id="extension-slug"
+            name="slug"
+            required
+            pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?"
+            maxlength="64"
+            placeholder="my-extension"
+          />
+        </div>
+        <div>
+          <label for="nickname">Display name</label>
+          <input
+            id="nickname"
+            name="nickname"
+            required
+            maxlength="128"
+            placeholder="My Extension"
+          />
+        </div>
+        <div>
+          <label for="version">Version</label>
+          <input id="version" name="version" required maxlength="128" placeholder="1.0.0" />
+        </div>
+        <div>
+          <label for="host-range">@inkcre/core version range</label>
+          <input id="host-range" name="host_range" required maxlength="256" placeholder="^0.1.0" />
+        </div>
+        <div class="full-width">
+          <label for="repository">Source repository</label>
+          <input
+            id="repository"
+            name="repository"
+            type="url"
+            required
+            maxlength="512"
+            placeholder="https://github.com/you/my-extension"
+          />
+        </div>
+        <div class="full-width">
+          <label for="revision">Source revision</label>
+          <input
+            id="revision"
+            name="revision"
+            required
+            maxlength="128"
+            placeholder="Commit SHA or source revision"
+          />
+        </div>
+      </div>
+
+      <p id="release-status" class="form-status" role="status"></p>
+      <button class="button button-primary" type="submit">Prepare release</button>
+    </form>
+  </dialog>
+  <dialog id="action-dialog" aria-labelledby="action-title">
+    <div class="dialog-heading">
+      <h2 id="action-title"></h2>
+      <button class="icon-button close-dialog" type="button" aria-label="Close action">×</button>
+    </div>
+    <p id="action-description"></p>
+    <form id="action-form">
+      <div id="reason-field" hidden>
+        <label for="yank-reason">Reason for withdrawing</label>
+        <textarea
+          id="yank-reason"
+          name="reason"
+          maxlength="400"
+          rows="3"
+          placeholder="Withdrawal reason"
+        ></textarea>
+      </div>
+      <div id="upload-field" hidden>
+        <label for="snapshot">Web snapshot (.zip)</label>
+        <input id="snapshot" name="content" type="file" accept=".zip,application/zip" />
+        <p class="field-help">mf-manifest.json at ZIP root · Up to 20 MiB</p>
+      </div>
+      <p id="action-status" class="form-status" role="status"></p>
+      <button id="confirm-action" class="button button-primary" type="submit">Confirm</button>
+    </form>
+  </dialog>
+</div>
+{% endblock %}

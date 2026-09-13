@@ -184,6 +184,121 @@
         "title": "PrepareReleaseRequest",
         "type": "object"
       },
+      "PublisherRelease": {
+        "additionalProperties": false,
+        "properties": {
+          "module_federation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModuleFederationDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "nickname": {
+            "title": "Nickname",
+            "type": "string"
+          },
+          "python": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PythonDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "python_uploaded": {
+            "title": "Python Uploaded",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "published",
+              "yanked",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          },
+          "web_uploaded": {
+            "title": "Web Uploaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "nickname",
+          "version",
+          "state",
+          "python_uploaded",
+          "web_uploaded"
+        ],
+        "title": "PublisherRelease",
+        "type": "object"
+      },
+      "PublisherWorkspace": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Namespace",
+            "type": "string"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/PublisherRelease"
+            },
+            "title": "Releases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "namespace",
+          "releases",
+          "offset",
+          "next_offset"
+        ],
+        "title": "PublisherWorkspace",
+        "type": "object"
+      },
       "PythonAssociationInput": {
         "additionalProperties": false,
         "properties": {
@@ -1249,6 +1364,64 @@
           }
         },
         "summary": "Yank Release"
+      }
+    },
+    "/v1/publisher": {
+      "get": {
+        "operationId": "publisher_workspace_v1_publisher_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublisherWorkspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publisher Workspace"
       }
     }
   }

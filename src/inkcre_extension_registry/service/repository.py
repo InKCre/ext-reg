@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from typing import Any
+from datetime import UTC, datetime
+from typing import Literal, cast
 
 from inkcre_extension_toolkit.simple import PythonFileRecord
+from tortoise.exceptions import IntegrityError
+from tortoise.transactions import in_transaction
 
 from ..contracts.models import (
     ExtensionRecord,
@@ -12,13 +14,18 @@ from ..contracts.models import (
     ModuleFederationAssociationInput,
     ModuleFederationDistribution,
     PrepareReleaseRequest,
+    PublisherRelease,
+    PublisherWorkspace,
     PythonAssociationInput,
     PythonDistribution,
     PythonEntryPoint,
     ReleaseRecord,
+    ReleaseState,
     normalize_project_name,
     python_project_version,
 )
+from . import database as db
+from .storage import ArtifactStore
 
 
 class RegistryConflictError(RuntimeError):
@@ -37,20 +44,9 @@ class RegistryBlockedError(RegistryStateError):
     pass
 
 
-def _column(row: Any, name: str, default: Any = None) -> Any:
-    if row is None:
-        return default
-    if isinstance(row, dict):
-        return row.get(name, default)
-    return getattr(row, name, default)
-
-
-def _results(result: Any) -> list[Any]:
-    return list(_column(result, "results", []))
-
-
 @dataclass(frozen=True)
 class PreparedPythonDistribution:
+    release_id: int
     extension_name: str
     release_version: str
     normalized_project: str
@@ -70,476 +66,321 @@ class PublicObject:
     etag: str
 
 
-def _python_file(row: Any) -> PythonFileRecord:
+def _python_file(
+    row: db.PythonFile, distribution: db.PythonDistribution, yank_reason: str | None = None
+) -> PythonFileRecord:
     return PythonFileRecord(
-        normalized_project=_column(row, "normalized_project"),
-        project_version=_column(row, "project_version"),
-        filename=_column(row, "filename"),
-        sha256=_column(row, "sha256"),
-        size=int(_column(row, "size")),
-        filetype=_column(row, "filetype"),
-        requires_python=_column(row, "requires_python"),
-        core_metadata_sha256=_column(row, "core_metadata_sha256"),
-        r2_key=_column(row, "r2_key"),
-        metadata_r2_key=_column(row, "metadata_r2_key"),
-        uploaded_at=_column(row, "uploaded_at"),
-        yank_reason=_column(row, "yank_reason"),
+        normalized_project=distribution.normalized_project,
+        project_version=distribution.project_version,
+        filename=row.filename,
+        sha256=row.sha256,
+        size=row.size,
+        filetype=row.filetype,
+        requires_python=row.requires_python,
+        core_metadata_sha256=row.core_metadata_sha256,
+        r2_key=row.r2_key,
+        metadata_r2_key=row.metadata_r2_key,
+        uploaded_at=row.uploaded_at.isoformat(),
+        yank_reason=yank_reason,
     )
 
 
-def _prepared_python(row: Any) -> PreparedPythonDistribution:
+def _prepared_python(row: db.PythonDistribution) -> PreparedPythonDistribution:
     return PreparedPythonDistribution(
-        extension_name=_column(row, "extension_name"),
-        release_version=_column(row, "release_version"),
-        normalized_project=_column(row, "normalized_project"),
-        project_version=_column(row, "project_version"),
-        host_sdk=_column(row, "host_sdk"),
-        host_sdk_range=_column(row, "host_sdk_range"),
-        entry_group=_column(row, "entry_group"),
-        entry_name=_column(row, "entry_name"),
-        entry_object=_column(row, "entry_object"),
-        state=_column(row, "state"),
+        release_id=row.release.pk,
+        extension_name=row.release.extension.name,
+        release_version=row.release.version,
+        normalized_project=row.normalized_project,
+        project_version=row.project_version,
+        host_sdk=row.host_sdk,
+        host_sdk_range=row.host_sdk_range,
+        entry_group=row.entry_group,
+        entry_name=row.entry_name,
+        entry_object=row.entry_object,
+        state=row.release.state,
     )
+
+
+def _release_query():
+    return (
+        db.Release.all()
+        .select_related("extension")
+        .prefetch_related("python", "python__files", "module_federation")
+    )
+
+
+def _descriptor(row: db.Release, *, public: bool) -> ReleaseRecord:
+    python_row = row.python
+    mf_row = row.module_federation
+    python = None
+    if python_row is not None and (not public or bool(list(python_row.files))):
+        python = PythonDistribution(
+            project=python_row.normalized_project,
+            simple_url=f"/simple/{python_row.normalized_project}/",
+            host_sdk=cast(Literal["core-py"], python_row.host_sdk),
+            host_sdk_version=python_row.host_sdk_range,
+            entry_point=PythonEntryPoint(
+                group=python_row.entry_group,
+                name=python_row.entry_name,
+                object=python_row.entry_object,
+            ),
+        )
+    module_federation = None
+    if mf_row is not None and (not public or mf_row.manifest_r2_key is not None):
+        module_federation = ModuleFederationDistribution(
+            manifest_url=f"/extensions/{row.extension.name}/{row.version}/module-federation/mf-manifest.json",
+            host_sdk=cast(Literal["@inkcre/core"], mf_row.host_sdk),
+            host_sdk_version=mf_row.host_sdk_range,
+        )
+    return ReleaseRecord(
+        name=row.extension.name,
+        nickname=row.extension.nickname,
+        version=row.version,
+        state=cast(ReleaseState, row.state),
+        python=python,
+        module_federation=module_federation,
+    )
+
+
+def _python_values(association: PythonAssociationInput) -> dict:
+    return {
+        "normalized_project": normalize_project_name(association.project),
+        "host_sdk": association.host_sdk,
+        "host_sdk_range": association.host_sdk_version,
+        "entry_group": association.entry_point.group,
+        "entry_name": association.entry_point.name,
+        "entry_object": association.entry_point.object,
+        "source_repository": association.source_repository,
+        "source_revision": association.source_revision,
+        "build_id": association.build_id,
+    }
+
+
+def _mf_values(association: ModuleFederationAssociationInput) -> dict:
+    return {
+        "host_sdk": association.host_sdk,
+        "host_sdk_range": association.host_sdk_version,
+        "source_repository": association.source_repository,
+        "source_revision": association.source_revision,
+        "build_id": association.build_id,
+    }
 
 
 class RegistryRepository:
-    """D1/R2 authority for immutable native Distribution associations."""
+    """Registry operations own short database transactions; R2 staging precedes them."""
 
-    def __init__(self, env: Any) -> None:
-        self.db = env.DB
-        self.artifacts = env.ARTIFACTS
+    def __init__(self, artifacts: ArtifactStore) -> None:
+        self.artifacts = artifacts
 
     async def authenticate(self, token_hash: str) -> str | None:
         row = (
-            await self.db.prepare(
-                "SELECT c.namespace FROM credentials c JOIN namespaces n "
-                "ON n.name = c.namespace WHERE c.token_hash = ?1 "
-                "AND c.disabled = 0 AND n.status = 'active'"
+            await db.Credential.filter(
+                token_hash=token_hash, disabled=False, namespace__status="active"
             )
-            .bind(token_hash)
+            .select_related("namespace")
             .first()
         )
-        return _column(row, "namespace")
-
-    async def _extension_row(self, extension_name: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT name, namespace, nickname FROM extensions WHERE name = ?1"
-            )
-            .bind(extension_name)
-            .first()
-        )
-
-    async def _release_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT e.nickname, r.extension_name, r.version, r.state, r.yank_reason, "
-                "r.created_at "
-                "FROM releases r JOIN extensions e ON e.name = r.extension_name "
-                "WHERE r.extension_name = ?1 AND r.version = ?2"
-            )
-            .bind(extension_name, version)
-            .first()
-        )
-
-    async def _python_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM python_distributions WHERE extension_name = ?1 "
-                "AND release_version = ?2"
-            )
-            .bind(extension_name, version)
-            .first()
-        )
-
-    async def _module_federation_row(self, extension_name: str, version: str) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM module_federation_distributions WHERE extension_name = ?1 "
-                "AND release_version = ?2"
-            )
-            .bind(extension_name, version)
-            .first()
-        )
-
-    async def _python_project_owner(self, normalized_project: str, version: str) -> str | None:
-        row = (
-            await self.db.prepare(
-                "SELECT extension_name FROM python_distributions "
-                "WHERE normalized_project = ?1 AND project_version = ?2"
-            )
-            .bind(normalized_project, version)
-            .first()
-        )
-        return _column(row, "extension_name")
-
-    @staticmethod
-    def _python_matches(row: Any, association: PythonAssociationInput) -> bool:
-        return bool(
-            row
-            and _column(row, "normalized_project") == normalize_project_name(association.project)
-            and _column(row, "host_sdk") == association.host_sdk
-            and _column(row, "host_sdk_range") == association.host_sdk_version
-            and _column(row, "entry_group") == association.entry_point.group
-            and _column(row, "entry_name") == association.entry_point.name
-            and _column(row, "entry_object") == association.entry_point.object
-            and _column(row, "source_repository") == association.source_repository
-            and _column(row, "source_revision") == association.source_revision
-            and _column(row, "build_id") == association.build_id
-        )
-
-    @staticmethod
-    def _mf_matches(row: Any, association: ModuleFederationAssociationInput) -> bool:
-        return bool(
-            row
-            and _column(row, "host_sdk") == association.host_sdk
-            and _column(row, "host_sdk_range") == association.host_sdk_version
-            and _column(row, "source_repository") == association.source_repository
-            and _column(row, "source_revision") == association.source_revision
-            and _column(row, "build_id") == association.build_id
-        )
+        return row.namespace.name if row else None
 
     async def prepare_release(
-        self,
-        namespace: str,
-        name: str,
-        request: PrepareReleaseRequest,
+        self, namespace: str, name: str, request: PrepareReleaseRequest
     ) -> ReleaseRecord:
         extension_name = f"{namespace}/{name}"
-        extension = await self._extension_row(extension_name)
-        if extension is not None and _column(extension, "nickname") != request.nickname:
-            raise RegistryConflictError("Extension nickname is immutable")
-
-        release = await self._release_row(extension_name, request.version)
-        python_row = await self._python_row(extension_name, request.version)
-        mf_row = await self._module_federation_row(extension_name, request.version)
-        if (
-            request.python is not None
-            and python_row is not None
-            and not self._python_matches(python_row, request.python)
-        ):
-            raise RegistryConflictError("Python association is immutable")
-        if (
-            request.module_federation is not None
-            and mf_row is not None
-            and not self._mf_matches(mf_row, request.module_federation)
-        ):
-            raise RegistryConflictError("Module Federation association is immutable")
-
-        adds_python = request.python is not None and python_row is None
-        adds_mf = request.module_federation is not None and mf_row is None
-        if adds_python and request.python is not None:
-            owner = await self._python_project_owner(
-                normalize_project_name(request.python.project),
-                python_project_version(request.version),
-            )
-            if owner is not None and owner != extension_name:
-                raise RegistryConflictError(
-                    "Python Project/version already belongs to another Extension Release"
-                )
-        if release is not None and (adds_python or adds_mf):
-            state = _column(release, "state")
-            if state not in {"preparing", "published"}:
-                raise RegistryStateError(f"cannot append an association to a {state} release")
-
-        statements = [
-            self.db.prepare(
-                "INSERT INTO extensions(name, namespace, nickname) VALUES (?1, ?2, ?3) "
-                "ON CONFLICT(name) DO NOTHING"
-            ).bind(extension_name, namespace, request.nickname),
-            self.db.prepare(
-                "INSERT INTO releases(extension_name, version) VALUES (?1, ?2) "
-                "ON CONFLICT(extension_name, version) DO NOTHING"
-            ).bind(extension_name, request.version),
-        ]
-        if adds_python and request.python is not None:
-            statements.append(
-                self.db.prepare(
-                    "INSERT INTO python_distributions(extension_name, release_version, "
-                    "normalized_project, project_version, host_sdk, host_sdk_range, "
-                    "entry_group, entry_name, entry_object, source_repository, "
-                    "source_revision, build_id) "
-                    "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"
-                ).bind(
-                    extension_name,
-                    request.version,
-                    normalize_project_name(request.python.project),
-                    python_project_version(request.version),
-                    request.python.host_sdk,
-                    request.python.host_sdk_version,
-                    request.python.entry_point.group,
-                    request.python.entry_point.name,
-                    request.python.entry_point.object,
-                    request.python.source_repository,
-                    request.python.source_revision,
-                    request.python.build_id,
-                )
-            )
-        if adds_mf and request.module_federation is not None:
-            statements.append(
-                self.db.prepare(
-                    "INSERT INTO module_federation_distributions(extension_name, "
-                    "release_version, host_sdk, host_sdk_range, source_repository, "
-                    "source_revision, build_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
-                ).bind(
-                    extension_name,
-                    request.version,
-                    request.module_federation.host_sdk,
-                    request.module_federation.host_sdk_version,
-                    request.module_federation.source_repository,
-                    request.module_federation.source_revision,
-                    request.module_federation.build_id,
-                )
-            )
         try:
-            await self.db.batch(statements)
-        except Exception as error:
-            # Translate races and uniqueness collisions into the public immutable-slot contract.
-            current = await self._release_row(extension_name, request.version)
-            if current is not None:
-                raise RegistryConflictError(
-                    "Release association conflicts with existing data"
-                ) from error
-            if adds_python:
-                raise RegistryConflictError(
-                    "Python Project/version conflicts with an existing association"
-                ) from error
-            raise
-
-        prepared = await self.get_release(extension_name, request.version, public=False)
-        if prepared is None:
-            raise RuntimeError("prepared Release transaction is not readable")
-        return prepared
+            async with in_transaction():
+                # Serialize creation of the publisher's extension identity. Release locks
+                # below are shared with every association/state-changing operation.
+                await db.Namespace.filter(name=namespace).select_for_update().get()
+                extension, _created = await db.Extension.get_or_create(
+                    name=extension_name,
+                    defaults={"namespace_id": namespace, "nickname": request.nickname},
+                )
+                if extension.nickname != request.nickname:
+                    raise RegistryConflictError("Extension nickname is immutable")
+                release, _created = await db.Release.get_or_create(
+                    extension=extension, version=request.version
+                )
+                release = await db.Release.filter(pk=release.pk).select_for_update().get()
+                for model, association, values, label in (
+                    (
+                        db.PythonDistribution,
+                        request.python,
+                        _python_values(request.python) if request.python else {},
+                        "Python",
+                    ),
+                    (
+                        db.ModuleFederationDistribution,
+                        request.module_federation,
+                        _mf_values(request.module_federation) if request.module_federation else {},
+                        "Module Federation",
+                    ),
+                ):
+                    if association is None:
+                        continue
+                    existing = await model.filter(release=release).first()
+                    if existing is not None:
+                        if any(getattr(existing, key) != value for key, value in values.items()):
+                            raise RegistryConflictError(f"{label} association is immutable")
+                    else:
+                        if release.state not in {"preparing", "published"}:
+                            raise RegistryStateError(
+                                f"cannot append an association to a {release.state} release"
+                            )
+                        if model is db.PythonDistribution:
+                            values["project_version"] = python_project_version(request.version)
+                        await model.create(release=release, **values)
+        except IntegrityError as error:
+            raise RegistryConflictError(
+                "Release association conflicts with existing data"
+            ) from error
+        result = await self.get_release(extension_name, request.version, public=False)
+        assert result is not None
+        return result
 
     async def get_release(
         self, extension_name: str, version: str, *, public: bool = True
     ) -> ReleaseRecord | None:
-        row = await self._release_row(extension_name, version)
-        if row is None:
+        row = await _release_query().filter(extension_id=extension_name, version=version).first()
+        if row is None or (public and row.state == "preparing"):
             return None
-        state = _column(row, "state")
-        if public:
-            if state == "preparing":
-                return None
-            if state == "blocked":
-                raise RegistryBlockedError("Release is operator-blocked")
+        if public and row.state == "blocked":
+            raise RegistryBlockedError("Release is operator-blocked")
+        return _descriptor(row, public=public)
 
-        python_row = await self._python_row(extension_name, version)
-        if public and python_row is not None:
-            file_row = (
-                await self.db.prepare(
-                    "SELECT 1 AS ready FROM python_files WHERE normalized_project = ?1 "
-                    "AND project_version = ?2 LIMIT 1"
-                )
-                .bind(
-                    _column(python_row, "normalized_project"),
-                    _column(python_row, "project_version"),
-                )
-                .first()
-            )
-            if file_row is None:
-                python_row = None
-        mf_row = await self._module_federation_row(extension_name, version)
-        if public and mf_row is not None and _column(mf_row, "manifest_r2_key") is None:
-            mf_row = None
-
-        python = None
-        if python_row is not None:
-            project = _column(python_row, "normalized_project")
-            python = PythonDistribution(
-                project=project,
-                simple_url=f"/simple/{project}/",
-                host_sdk=_column(python_row, "host_sdk"),
-                host_sdk_version=_column(python_row, "host_sdk_range"),
-                entry_point=PythonEntryPoint(
-                    group=_column(python_row, "entry_group"),
-                    name=_column(python_row, "entry_name"),
-                    object=_column(python_row, "entry_object"),
+    async def publisher_workspace(self, namespace: str, offset: int) -> PublisherWorkspace:
+        rows = (
+            await _release_query()
+            .filter(extension__namespace_id=namespace)
+            .order_by("-created_at", "extension_id", "-version")
+            .offset(offset)
+            .limit(11)
+        )
+        records = [
+            PublisherRelease(
+                **_descriptor(row, public=False).model_dump(),
+                python_uploaded=row.python is not None and bool(list(row.python.files)),
+                web_uploaded=(
+                    row.module_federation is not None
+                    and row.module_federation.manifest_r2_key is not None
                 ),
             )
-        module_federation = None
-        if mf_row is not None and (not public or _column(mf_row, "manifest_r2_key") is not None):
-            module_federation = ModuleFederationDistribution(
-                manifest_url=(
-                    f"/extensions/{extension_name}/{version}/module-federation/mf-manifest.json"
-                ),
-                host_sdk=_column(mf_row, "host_sdk"),
-                host_sdk_version=_column(mf_row, "host_sdk_range"),
-            )
-        return ReleaseRecord(
-            name=extension_name,
-            nickname=_column(row, "nickname"),
-            version=version,
-            state=state,
-            python=python,
-            module_federation=module_federation,
+            for row in rows[:10]
+        ]
+        return PublisherWorkspace(
+            namespace=namespace,
+            releases=tuple(records),
+            offset=offset,
+            next_offset=offset + 10 if len(rows) > 10 else None,
         )
 
     async def list_extensions(self) -> list[ExtensionSummary]:
-        result = await self.db.prepare(
-            "SELECT e.name, e.nickname FROM extensions e "
-            "WHERE EXISTS (SELECT 1 FROM releases r WHERE r.extension_name = e.name "
-            "AND r.state = 'published') ORDER BY e.name"
-        ).all()
-        return [
-            ExtensionSummary(name=_column(row, "name"), nickname=_column(row, "nickname"))
-            for row in _results(result)
-        ]
+        rows = await db.Extension.filter(releases__state="published").distinct().order_by("name")
+        return [ExtensionSummary(name=row.name, nickname=row.nickname) for row in rows]
 
     async def get_extension(self, extension_name: str) -> ExtensionRecord | None:
-        extension = await self._extension_row(extension_name)
-        if extension is None:
-            return None
-        versions = (
-            await self.db.prepare(
-                "SELECT version FROM releases WHERE extension_name = ?1 AND state = 'published' "
-                "ORDER BY created_at DESC, version DESC"
-            )
-            .bind(extension_name)
-            .all()
+        rows = (
+            await _release_query()
+            .filter(extension_id=extension_name, state="published")
+            .order_by("-created_at", "-version")
         )
-        releases: list[ReleaseRecord] = []
-        for row in _results(versions):
-            release = await self.get_release(extension_name, _column(row, "version"))
-            if release is not None:
-                releases.append(release)
-        if not releases:
+        if not rows:
             return None
         return ExtensionRecord(
             name=extension_name,
-            nickname=_column(extension, "nickname"),
-            releases=tuple(releases),
+            nickname=rows[0].extension.nickname,
+            releases=tuple(_descriptor(row, public=True) for row in rows),
         )
+
+    async def _locked_release(self, extension_name: str, version: str) -> db.Release:
+        row = (
+            await db.Release.filter(extension_id=extension_name, version=version)
+            .select_for_update()
+            .first()
+        )
+        if row is None:
+            raise RegistryNotFoundError("Release does not exist")
+        return row
 
     async def publish(self, extension_name: str, version: str) -> ReleaseRecord:
-        row = await self._release_row(extension_name, version)
+        row = await _release_query().filter(extension_id=extension_name, version=version).first()
         if row is None:
             raise RegistryNotFoundError("Release does not exist")
-        state = _column(row, "state")
-        if state in {"yanked", "blocked"}:
-            raise RegistryStateError(f"cannot publish a {state} Release")
-        if state == "preparing":
-            if not await self._release_objects_available(extension_name, version):
-                raise RegistryStateError(
-                    "Release native Distribution objects are not completely available"
-                )
-            result = (
-                await self.db.prepare(
-                    "UPDATE releases SET state = 'published', yank_reason = NULL, "
-                    "published_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP "
-                    "WHERE extension_name = ?1 AND version = ?2 AND state = 'preparing' "
-                    "AND (EXISTS (SELECT 1 FROM python_distributions pd JOIN python_files pf "
-                    "ON pf.normalized_project = pd.normalized_project "
-                    "AND pf.project_version = pd.project_version "
-                    "WHERE pd.extension_name = ?1 AND pd.release_version = ?2) "
-                    "OR EXISTS (SELECT 1 FROM module_federation_distributions mf "
-                    "WHERE mf.extension_name = ?1 AND mf.release_version = ?2 "
-                    "AND mf.manifest_r2_key IS NOT NULL))"
-                )
-                .bind(extension_name, version)
-                .run()
+        if row.state in {"yanked", "blocked"}:
+            raise RegistryStateError(f"cannot publish a {row.state} Release")
+        # Network checks never hold a database transaction/connection lock.
+        if row.state == "preparing" and not await self._release_objects_available(row):
+            raise RegistryStateError(
+                "Release native Distribution objects are not completely available"
             )
-            if int(_column(_column(result, "meta"), "changes", 0)) != 1:
-                raise RegistryStateError(
-                    "Release requires at least one validated native Distribution"
+        async with in_transaction():
+            locked = await self._locked_release(extension_name, version)
+            if locked.state in {"yanked", "blocked"}:
+                raise RegistryStateError(f"cannot publish a {locked.state} Release")
+            if locked.state == "preparing":
+                locked.state = "published"
+                locked.yank_reason = None
+                locked.published_at = datetime.now(UTC)
+                locked.updated_at = locked.published_at
+                await locked.save(
+                    update_fields=["state", "yank_reason", "published_at", "updated_at"]
                 )
-        published = await self.get_release(extension_name, version)
-        if published is None:
-            raise RuntimeError("published Release is not readable")
-        return published
+        result = await self.get_release(extension_name, version)
+        assert result is not None
+        return result
 
-    async def _release_objects_available(self, extension_name: str, version: str) -> bool:
-        python_result = (
-            await self.db.prepare(
-                "SELECT pf.r2_key, pf.metadata_r2_key, pf.size FROM python_files pf "
-                "JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version "
-                "WHERE pd.extension_name = ?1 AND pd.release_version = ?2"
-            )
-            .bind(extension_name, version)
-            .all()
-        )
-        python_rows = _results(python_result)
-        for row in python_rows:
-            archive = await self.artifacts.head(_column(row, "r2_key"))
-            metadata = await self.artifacts.head(_column(row, "metadata_r2_key"))
-            if archive is None or int(archive.size) != int(_column(row, "size")):
+    async def _release_objects_available(self, row: db.Release) -> bool:
+        files = list(row.python.files) if row.python is not None else []
+        for file in files:
+            archive = await self.artifacts.head(file.r2_key)
+            metadata = await self.artifacts.head(file.metadata_r2_key)
+            if archive is None or archive.size != file.size or metadata is None:
                 return False
-            if metadata is None:
-                return False
-
-        mf_row = await self._module_federation_row(extension_name, version)
-        mf_ready = mf_row is not None and _column(mf_row, "manifest_r2_key") is not None
-        if mf_ready:
-            manifest_key = _column(mf_row, "manifest_r2_key")
-            prefix = manifest_key.removesuffix("mf-manifest.json")
-            paths = json.loads(_column(mf_row, "asset_paths_json"))
-            for relative_path in paths:
-                if await self.artifacts.head(prefix + relative_path) is None:
+        mf = row.module_federation
+        mf_ready = mf is not None and mf.manifest_r2_key is not None
+        if mf is not None and mf.manifest_r2_key is not None:
+            prefix = mf.manifest_r2_key.removesuffix("mf-manifest.json")
+            for path in mf.asset_paths:
+                if await self.artifacts.head(prefix + path) is None:
                     return False
-        return bool(python_rows or mf_ready)
+        return bool(files or mf_ready)
 
     async def yank(self, extension_name: str, version: str, reason: str) -> ReleaseRecord:
-        row = await self._release_row(extension_name, version)
-        if row is None:
-            raise RegistryNotFoundError("Release does not exist")
-        state = _column(row, "state")
-        if state == "yanked":
-            if _column(row, "yank_reason") != reason:
-                raise RegistryConflictError("Yank reason conflicts with the existing yank")
-        elif state == "published":
-            await (
-                self.db.prepare(
-                    "UPDATE releases SET state = 'yanked', yank_reason = ?3, "
-                    "updated_at = CURRENT_TIMESTAMP WHERE extension_name = ?1 "
-                    "AND version = ?2 AND state = 'published'"
-                )
-                .bind(extension_name, version, reason)
-                .run()
-            )
-        else:
-            raise RegistryStateError(f"cannot yank a {state} Release")
-        yanked = await self.get_release(extension_name, version)
-        if yanked is None:
-            raise RuntimeError("yanked Release is not readable")
-        return yanked
+        async with in_transaction():
+            row = await self._locked_release(extension_name, version)
+            if row.state == "yanked":
+                if row.yank_reason != reason:
+                    raise RegistryConflictError("Yank reason conflicts with the existing yank")
+            elif row.state == "published":
+                row.state, row.yank_reason, row.updated_at = "yanked", reason, datetime.now(UTC)
+                await row.save(update_fields=["state", "yank_reason", "updated_at"])
+            else:
+                raise RegistryStateError(f"cannot yank a {row.state} Release")
+        result = await self.get_release(extension_name, version)
+        assert result is not None
+        return result
 
     async def unyank(self, extension_name: str, version: str) -> ReleaseRecord:
-        row = await self._release_row(extension_name, version)
-        if row is None:
-            raise RegistryNotFoundError("Release does not exist")
-        state = _column(row, "state")
-        if state == "yanked":
-            await (
-                self.db.prepare(
-                    "UPDATE releases SET state = 'published', yank_reason = NULL, "
-                    "updated_at = CURRENT_TIMESTAMP WHERE extension_name = ?1 "
-                    "AND version = ?2 AND state = 'yanked'"
-                )
-                .bind(extension_name, version)
-                .run()
-            )
-        elif state != "published":
-            raise RegistryStateError(f"cannot unyank a {state} Release")
-        published = await self.get_release(extension_name, version)
-        if published is None:
-            raise RuntimeError("unyanked Release is not readable")
-        return published
+        async with in_transaction():
+            row = await self._locked_release(extension_name, version)
+            if row.state == "yanked":
+                row.state, row.yank_reason, row.updated_at = "published", None, datetime.now(UTC)
+                await row.save(update_fields=["state", "yank_reason", "updated_at"])
+            elif row.state != "published":
+                raise RegistryStateError(f"cannot unyank a {row.state} Release")
+        result = await self.get_release(extension_name, version)
+        assert result is not None
+        return result
 
     async def prepared_python_distribution(
         self, namespace: str, normalized_project: str, project_version: str
     ) -> PreparedPythonDistribution | None:
         row = (
-            await self.db.prepare(
-                "SELECT pd.*, r.state FROM python_distributions pd "
-                "JOIN releases r ON r.extension_name = pd.extension_name "
-                "AND r.version = pd.release_version "
-                "JOIN extensions e ON e.name = pd.extension_name "
-                "WHERE e.namespace = ?1 AND pd.normalized_project = ?2 "
-                "AND pd.project_version = ?3"
+            await db.PythonDistribution.filter(
+                release__extension__namespace_id=namespace,
+                normalized_project=normalized_project,
+                project_version=project_version,
             )
-            .bind(namespace, normalized_project, project_version)
+            .select_related("release__extension")
             .first()
         )
         return _prepared_python(row) if row is not None else None
@@ -547,30 +388,17 @@ class RegistryRepository:
     async def prepared_python_distributions(
         self, namespace: str, normalized_project: str
     ) -> list[PreparedPythonDistribution]:
-        result = (
-            await self.db.prepare(
-                "SELECT pd.*, r.state FROM python_distributions pd "
-                "JOIN releases r ON r.extension_name = pd.extension_name "
-                "AND r.version = pd.release_version "
-                "JOIN extensions e ON e.name = pd.extension_name "
-                "WHERE e.namespace = ?1 AND pd.normalized_project = ?2"
-            )
-            .bind(namespace, normalized_project)
-            .all()
-        )
-        return [_prepared_python(row) for row in _results(result)]
+        rows = await db.PythonDistribution.filter(
+            release__extension__namespace_id=namespace, normalized_project=normalized_project
+        ).select_related("release__extension")
+        return [_prepared_python(row) for row in rows]
 
-    async def _python_file_row(
-        self, normalized_project: str, project_version: str, filename: str
-    ) -> Any:
-        return (
-            await self.db.prepare(
-                "SELECT * FROM python_files WHERE normalized_project = ?1 "
-                "AND project_version = ?2 AND filename = ?3"
-            )
-            .bind(normalized_project, project_version, filename)
-            .first()
-        )
+    async def _ensure_object(self, key: str, content: bytes, media_type: str) -> None:
+        stored = await self.artifacts.head(key)
+        if stored is not None and stored.size != len(content):
+            raise RegistryConflictError("Distribution staging object size conflict")
+        if stored is None:
+            await self.artifacts.put(key, content, content_type=media_type)
 
     async def put_python_file(
         self,
@@ -588,125 +416,90 @@ class RegistryRepository:
             raise RegistryStateError(
                 f"cannot append a Python file to a {distribution.state} Release"
             )
-        existing = await self._python_file_row(
-            distribution.normalized_project, distribution.project_version, filename
-        )
-        if existing is not None:
-            record = _python_file(existing)
-            if (
-                record.sha256 == sha256
-                and record.size == len(content)
-                and record.core_metadata_sha256 == metadata_sha256
-            ):
-                stored = await self.artifacts.head(record.r2_key)
-                if stored is not None and int(stored.size) != len(content):
-                    raise RegistryConflictError("Python staging object size conflict")
-                if stored is None:
-                    await self.artifacts.put(
-                        record.r2_key,
-                        content,
-                        httpMetadata={"contentType": "application/octet-stream"},
-                    )
-                metadata_stored = await self.artifacts.head(record.metadata_r2_key)
-                if metadata_stored is not None and int(metadata_stored.size) != len(metadata):
-                    raise RegistryConflictError("Core Metadata staging object size conflict")
-                if metadata_stored is None:
-                    await self.artifacts.put(
-                        record.metadata_r2_key,
-                        metadata,
-                        httpMetadata={"contentType": "application/octet-stream"},
-                    )
-                return record
+        existing = await db.PythonFile.filter(
+            distribution__release_id=distribution.release_id, filename=filename
+        ).first()
+        if existing is not None and (
+            existing.sha256 != sha256
+            or existing.size != len(content)
+            or existing.core_metadata_sha256 != metadata_sha256
+        ):
             raise RegistryConflictError("Python filename already has different immutable bytes")
-
-        r2_key = f"staging/python/{sha256}/{filename}"
-        metadata_r2_key = f"staging/python-metadata/{metadata_sha256}.metadata"
-        stored = await self.artifacts.head(r2_key)
-        if stored is not None and int(stored.size) != len(content):
-            raise RegistryConflictError("Python staging object size conflict")
-        if stored is None:
-            await self.artifacts.put(
-                r2_key, content, httpMetadata={"contentType": "application/octet-stream"}
-            )
-        metadata_stored = await self.artifacts.head(metadata_r2_key)
-        if metadata_stored is not None and int(metadata_stored.size) != len(metadata):
-            raise RegistryConflictError("Core Metadata staging object size conflict")
-        if metadata_stored is None:
-            await self.artifacts.put(
-                metadata_r2_key,
-                metadata,
-                httpMetadata={"contentType": "application/octet-stream"},
-            )
-        try:
-            await (
-                self.db.prepare(
-                    "INSERT INTO python_files(normalized_project, project_version, filename, "
-                    "sha256, size, filetype, requires_python, core_metadata_sha256, r2_key, "
-                    "metadata_r2_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"
-                )
-                .bind(
-                    distribution.normalized_project,
-                    distribution.project_version,
-                    filename,
-                    sha256,
-                    len(content),
-                    filetype,
-                    requires_python,
-                    metadata_sha256,
-                    r2_key,
-                    metadata_r2_key,
-                )
-                .run()
-            )
-        except Exception as error:
-            raced = await self._python_file_row(
-                distribution.normalized_project, distribution.project_version, filename
-            )
-            if raced is not None:
-                record = _python_file(raced)
-                if (
-                    record.sha256 == sha256
-                    and record.size == len(content)
-                    and record.core_metadata_sha256 == metadata_sha256
-                ):
-                    return record
-                raise RegistryConflictError(
-                    "Python filename already has different immutable bytes"
-                ) from error
-            raise
-        row = await self._python_file_row(
-            distribution.normalized_project, distribution.project_version, filename
+        r2_key = existing.r2_key if existing else f"staging/python/{sha256}/{filename}"
+        metadata_key = (
+            existing.metadata_r2_key
+            if existing
+            else f"staging/python-metadata/{metadata_sha256}.metadata"
         )
-        if row is None:
-            raise RuntimeError("accepted Python file is not readable")
-        return _python_file(row)
+        await self._ensure_object(r2_key, content, "application/octet-stream")
+        await self._ensure_object(metadata_key, metadata, "application/octet-stream")
+        try:
+            async with in_transaction():
+                release = await self._locked_release(
+                    distribution.extension_name, distribution.release_version
+                )
+                if release.state not in {"preparing", "published"}:
+                    raise RegistryStateError(
+                        f"cannot append a Python file to a {release.state} Release"
+                    )
+                python = await db.PythonDistribution.get(release_id=distribution.release_id)
+                row, _created = await db.PythonFile.get_or_create(
+                    distribution=python,
+                    filename=filename,
+                    defaults={
+                        "sha256": sha256,
+                        "size": len(content),
+                        "filetype": filetype,
+                        "requires_python": requires_python,
+                        "core_metadata_sha256": metadata_sha256,
+                        "r2_key": r2_key,
+                        "metadata_r2_key": metadata_key,
+                    },
+                )
+                if (
+                    row.sha256 != sha256
+                    or row.size != len(content)
+                    or row.core_metadata_sha256 != metadata_sha256
+                ):
+                    raise RegistryConflictError(
+                        "Python filename already has different immutable bytes"
+                    )
+        except IntegrityError as error:
+            raise RegistryConflictError(
+                "Python file conflicts with an existing distribution"
+            ) from error
+        return _python_file(row, python)
 
     async def simple_projects(self) -> list[str]:
-        result = await self.db.prepare(
-            "SELECT DISTINCT pd.normalized_project FROM python_distributions pd "
-            "JOIN releases r ON r.extension_name = pd.extension_name "
-            "AND r.version = pd.release_version JOIN python_files pf "
-            "ON pf.normalized_project = pd.normalized_project "
-            "AND pf.project_version = pd.project_version "
-            "WHERE r.state IN ('published', 'yanked') ORDER BY pd.normalized_project"
-        ).all()
-        return [_column(row, "normalized_project") for row in _results(result)]
+        rows = (
+            await db.PythonDistribution.filter(
+                release__state__in=("published", "yanked"), files__id__isnull=False
+            )
+            .distinct()
+            .order_by("normalized_project")
+            .values("normalized_project")
+        )
+        return [row["normalized_project"] for row in rows]
 
     async def simple_files(self, normalized_project: str) -> list[PythonFileRecord]:
-        result = (
-            await self.db.prepare(
-                "SELECT pf.*, CASE WHEN r.state = 'yanked' THEN r.yank_reason ELSE NULL END "
-                "AS yank_reason FROM python_files pf JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version JOIN releases r "
-                "ON r.extension_name = pd.extension_name AND r.version = pd.release_version "
-                "WHERE pf.normalized_project = ?1 AND r.state IN ('published', 'yanked') "
-                "ORDER BY pf.filename"
+        rows = (
+            await db.PythonFile.filter(
+                distribution__normalized_project=normalized_project,
+                distribution__release__state__in=("published", "yanked"),
             )
-            .bind(normalized_project)
-            .all()
+            .select_related("distribution__release")
+            .order_by("filename")
         )
-        return [_python_file(row) for row in _results(result)]
+        return [
+            _python_file(
+                row,
+                row.distribution,
+                row.distribution.release.yank_reason
+                if row.distribution.release.state == "yanked"
+                else None,
+            )
+            for row in rows
+        ]
 
     async def python_public_file(
         self,
@@ -717,31 +510,23 @@ class RegistryRepository:
         metadata: bool = False,
     ) -> PublicObject | None:
         row = (
-            await self.db.prepare(
-                "SELECT pf.*, r.state FROM python_files pf JOIN python_distributions pd "
-                "ON pd.normalized_project = pf.normalized_project "
-                "AND pd.project_version = pf.project_version JOIN releases r "
-                "ON r.extension_name = pd.extension_name AND r.version = pd.release_version "
-                "WHERE pf.normalized_project = ?1 AND pf.project_version = ?2 "
-                "AND pf.filename = ?3 AND r.state IN ('published', 'yanked', 'blocked')"
+            await db.PythonFile.filter(
+                distribution__normalized_project=normalized_project,
+                distribution__project_version=project_version,
+                filename=filename,
+                distribution__release__state__in=("published", "yanked", "blocked"),
             )
-            .bind(normalized_project, project_version, filename)
+            .select_related("distribution__release")
             .first()
         )
         if row is None:
             return None
-        if _column(row, "state") == "blocked":
+        if row.distribution.release.state == "blocked":
             raise RegistryBlockedError("Python Distribution is operator-blocked")
-        if metadata:
-            return PublicObject(
-                r2_key=_column(row, "metadata_r2_key"),
-                media_type="application/octet-stream",
-                etag=_column(row, "core_metadata_sha256"),
-            )
         return PublicObject(
-            r2_key=_column(row, "r2_key"),
+            r2_key=row.metadata_r2_key if metadata else row.r2_key,
             media_type="application/octet-stream",
-            etag=_column(row, "sha256"),
+            etag=row.core_metadata_sha256 if metadata else row.sha256,
         )
 
     async def put_module_federation_snapshot(
@@ -752,105 +537,78 @@ class RegistryRepository:
         files: dict[str, bytes],
         media_types: dict[str, str],
     ) -> ReleaseRecord:
-        row = await self._module_federation_row(extension_name, version)
+        row = (
+            await db.ModuleFederationDistribution.filter(
+                release__extension_id=extension_name, release__version=version
+            )
+            .select_related("release")
+            .first()
+        )
         if row is None:
             raise RegistryNotFoundError("prepared Module Federation association does not exist")
-        release = await self._release_row(extension_name, version)
-        state = _column(release, "state")
-        existing_hash = _column(row, "internal_snapshot_hash")
-        prefix = f"staging/module-federation/{extension_name}/{version}/{snapshot_hash}/"
-        if existing_hash is not None:
-            if existing_hash == snapshot_hash:
-                for relative_path, content in sorted(files.items()):
-                    key = prefix + relative_path
-                    stored = await self.artifacts.head(key)
-                    if stored is not None and int(stored.size) != len(content):
-                        raise RegistryConflictError(
-                            "Module Federation staging object size conflict"
-                        )
-                    if stored is None:
-                        await self.artifacts.put(
-                            key,
-                            content,
-                            httpMetadata={"contentType": media_types[relative_path]},
-                        )
-                result = await self.get_release(extension_name, version, public=False)
-                if result is None:
-                    raise RuntimeError("Module Federation association is not readable")
-                return result
+        if row.internal_snapshot_hash is not None and row.internal_snapshot_hash != snapshot_hash:
             raise RegistryConflictError(
                 "Module Federation association already has another snapshot"
             )
-        if state not in {"preparing", "published"}:
-            raise RegistryStateError(f"cannot upload a snapshot to a {state} Release")
-
-        for relative_path, content in sorted(files.items()):
-            key = prefix + relative_path
-            stored = await self.artifacts.head(key)
-            if stored is not None:
-                if int(stored.size) != len(content):
-                    raise RegistryConflictError("Module Federation staging object size conflict")
-                continue
-            await self.artifacts.put(
-                key,
-                content,
-                httpMetadata={"contentType": media_types[relative_path]},
-            )
-        manifest_key = prefix + "mf-manifest.json"
-        result = (
-            await self.db.prepare(
-                "UPDATE module_federation_distributions SET manifest_r2_key = ?3, "
-                "asset_paths_json = ?4, internal_snapshot_hash = ?5, "
-                "uploaded_at = CURRENT_TIMESTAMP "
-                "WHERE extension_name = ?1 AND release_version = ?2 "
-                "AND manifest_r2_key IS NULL"
-            )
-            .bind(
-                extension_name,
-                version,
-                manifest_key,
-                json.dumps(sorted(files), separators=(",", ":")),
-                snapshot_hash,
-            )
-            .run()
-        )
-        if int(_column(_column(result, "meta"), "changes", 0)) != 1:
-            raced = await self._module_federation_row(extension_name, version)
-            if _column(raced, "internal_snapshot_hash") != snapshot_hash:
-                raise RegistryConflictError(
-                    "Module Federation association already has another snapshot"
+        if row.internal_snapshot_hash is None and row.release.state not in {
+            "preparing",
+            "published",
+        }:
+            raise RegistryStateError(f"cannot upload a snapshot to a {row.release.state} Release")
+        prefix = f"staging/module-federation/{extension_name}/{version}/{snapshot_hash}/"
+        for path, content in sorted(files.items()):
+            await self._ensure_object(prefix + path, content, media_types[path])
+        async with in_transaction():
+            release = await self._locked_release(extension_name, version)
+            current = await db.ModuleFederationDistribution.get(release=release)
+            if current.internal_snapshot_hash is not None:
+                if current.internal_snapshot_hash != snapshot_hash:
+                    raise RegistryConflictError(
+                        "Module Federation association already has another snapshot"
+                    )
+            else:
+                if release.state not in {"preparing", "published"}:
+                    raise RegistryStateError(
+                        f"cannot upload a snapshot to a {release.state} Release"
+                    )
+                current.manifest_r2_key = prefix + "mf-manifest.json"
+                current.asset_paths = sorted(files)
+                current.internal_snapshot_hash = snapshot_hash
+                current.uploaded_at = datetime.now(UTC)
+                await current.save(
+                    update_fields=[
+                        "manifest_r2_key",
+                        "asset_paths",
+                        "internal_snapshot_hash",
+                        "uploaded_at",
+                    ]
                 )
-        association = await self.get_release(extension_name, version, public=False)
-        if association is None:
-            raise RuntimeError("accepted Module Federation snapshot is not readable")
-        return association
+        result = await self.get_release(extension_name, version, public=False)
+        assert result is not None
+        return result
 
     async def module_federation_public_file(
         self, extension_name: str, version: str, relative_path: str, media_type: str
     ) -> PublicObject | None:
         row = (
-            await self.db.prepare(
-                "SELECT mf.manifest_r2_key, mf.asset_paths_json, "
-                "mf.internal_snapshot_hash, r.state "
-                "FROM module_federation_distributions mf JOIN releases r "
-                "ON r.extension_name = mf.extension_name AND r.version = mf.release_version "
-                "WHERE mf.extension_name = ?1 AND mf.release_version = ?2 "
-                "AND mf.manifest_r2_key IS NOT NULL "
-                "AND r.state IN ('published', 'yanked', 'blocked')"
+            await db.ModuleFederationDistribution.filter(
+                release__extension_id=extension_name,
+                release__version=version,
+                manifest_r2_key__isnull=False,
+                release__state__in=("published", "yanked", "blocked"),
             )
-            .bind(extension_name, version)
+            .select_related("release")
             .first()
         )
         if row is None:
             return None
-        if _column(row, "state") == "blocked":
+        if row.release.state == "blocked":
             raise RegistryBlockedError("Module Federation Distribution is operator-blocked")
-        manifest_key = _column(row, "manifest_r2_key")
-        prefix = manifest_key.removesuffix("mf-manifest.json")
-        if relative_path not in json.loads(_column(row, "asset_paths_json")):
+        if relative_path not in row.asset_paths:
             return None
+        assert row.manifest_r2_key is not None and row.internal_snapshot_hash is not None
         return PublicObject(
-            r2_key=prefix + relative_path,
+            r2_key=row.manifest_r2_key.removesuffix("mf-manifest.json") + relative_path,
             media_type=media_type,
-            etag=_column(row, "internal_snapshot_hash"),
+            etag=row.internal_snapshot_hash,
         )

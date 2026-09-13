@@ -232,6 +232,18 @@ class ExtensionRecord(ContractModel):
     releases: tuple[ReleaseRecord, ...] = ()
 
 
+class PublisherRelease(ReleaseRecord):
+    python_uploaded: bool
+    web_uploaded: bool
+
+
+class PublisherWorkspace(ContractModel):
+    namespace: RegistrySegment
+    releases: tuple[PublisherRelease, ...]
+    offset: int = Field(ge=0)
+    next_offset: int | None = Field(ge=0)
+
+
 class YankRequest(ContractModel):
     reason: str = Field(default="Yanked by publisher", min_length=1, max_length=400)
 

@@ -5,10 +5,11 @@ Distribution hosting, and the independent Extension Developer Toolkit.
 
 ## Repository Map
 
-- `src/inkcre_extension_registry/`: Registry contracts and Worker service.
+- `src/inkcre_extension_registry/`: Registry contracts and CPython service.
 - `toolkit/`: independently released developer and delivery tooling.
 - `contracts/`: generated schemas and OpenAPI; never edit by hand.
-- `migrations/`: checked-in D1 schema history.
+- `src/inkcre_extension_registry/migrations/`: append-only Tortoise schema history.
+- `migrations/`: preserved legacy D1 schema, used only to verify and import snapshots.
 - `docs/`: durable local knowledge; `tasks/`: volatile task packets.
 
 ## Knowledge Owners
@@ -33,7 +34,9 @@ Distribution hosting, and the independent Extension Developer Toolkit.
   Registry service.
 - Never hand-edit `contracts/*`; change its source model or route and run
   `pnpm contracts:generate`.
-- Treat checked-in D1 migrations as append-only after deployment. Production
+- Treat checked-in migrations as append-only after deployment. Use Tortoise ORM
+  for PostgreSQL business and maintenance queries; legacy SQLite reads belong
+  only to the import boundary. Production
   resource mutation requires a separate, explicit authorization.
 
 ## Current Checks
