@@ -54,7 +54,10 @@ def main() -> None:
             )
         }
         config.update(
-            PUBLIC_ORIGIN=origin, REGISTRY_SOURCE_REVISION=None, MIGRATION_DATABASE_URL=None
+            PUBLIC_ORIGIN=origin,
+            FORWARDED_ALLOW_IPS="*",
+            REGISTRY_SOURCE_REVISION=None,
+            MIGRATION_DATABASE_URL=None,
         )
         request(heroku, "PATCH", f"apps/{app}/config-vars", json=config)
         run(
