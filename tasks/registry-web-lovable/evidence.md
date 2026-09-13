@@ -74,3 +74,6 @@ Cloudflare 的 PostgreSQL 接入主要展示 JavaScript 驱动；仅换 Neon 不
 - Registry 项目范围的 Neon key 查询本项目返回 200，查询 core-py 项目返回 404；GitHub 仓库级没有额外 Heroku / R2 secrets 可复用。配套治理提交为 `dafd33c`，已推送并更新 PR #32。容器实际构建 / 启动与 CI 的最终结果以 PR #33 的同提交 checks 为准。
 
 - 原生 `tortoise upgrade` 已成功将初始迁移应用到 PR 33 分支；PostgreSQL 目录确认 15 个 CHECK，namespace / extension / release 均为 0。没有 demo 或审阅者初始化数据；运行时部署待凭据完成。该初始迁移自此冻结，后续只追加。
+
+- `7ea304e` 的 [CI](https://github.com/InKCre/ext-reg/actions/runs/34736306427) 全部通过，包含依赖审查、PostgreSQL 17 行为验收、容器构建与实际 HTTP 启动。后续收尾给健康探测增加镜像内的 revision 校验；新提交的结果以 PR checks 为准。
+- PR 33 与一次性测试分支均通过正式 Neon API 完成独立角色密码轮换，控制器的分支查询、操作等待与连接 URI 读取已在真实 API 验证；这些密码不再继承根分支。Heroku / R2 部署仍未验证。

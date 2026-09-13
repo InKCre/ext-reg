@@ -68,11 +68,11 @@ def find_branch(neon: httpx.Client, name: str):
     return matches[0] if matches else None
 
 
-def smoke(origin: str) -> None:
+def smoke(origin: str, revision: str) -> None:
     for _ in range(30):
         try:
             with httpx.Client(base_url=origin, timeout=20) as client:
-                assert client.get("/livez").json() == {"status": "ok"}
+                assert client.get("/livez").json() == {"status": "ok", "revision": revision}
                 for path in ("/", "/publish", "/v1/extensions", "/simple/"):
                     client.get(path).raise_for_status()
                 assert client.get("/v1/publisher").status_code == 401
@@ -174,7 +174,8 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
         PUBLIC_ORIGIN=origin,
         S3_BUCKET=name,
         S3_ENDPOINT_URL=f"https://{os.environ['CLOUDFLARE_ACCOUNT_ID']}.r2.cloudflarestorage.com",
-        REGISTRY_SOURCE_REVISION=revision,
+        # The image owns revision; a config change must not relabel an old process.
+        REGISTRY_SOURCE_REVISION=None,
     )
     request(heroku, "PATCH", f"apps/{name}/config-vars", json=config)
     database_env = {**os.environ, "DATABASE_URL": database_url}
@@ -223,7 +224,7 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
     run("docker", "push", target)
     run("heroku", "container:release", "web", "--app", name)
     run("heroku", "ps:scale", "web=1:basic", "--app", name)
-    smoke(origin)
+    smoke(origin, revision)
     print(f"Preview: {origin}\nSource: {revision}\nNeon branch: {branch['id']}")
     if os.environ.get("GITHUB_OUTPUT"):
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:

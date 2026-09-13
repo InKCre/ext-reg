@@ -4,6 +4,7 @@ import base64
 import binascii
 import hashlib
 import mimetypes
+import os
 import re
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -241,7 +242,10 @@ def create_app() -> FastAPI:
 
     @app.get("/livez")
     async def livez() -> dict[str, str]:
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "revision": os.environ.get("REGISTRY_SOURCE_REVISION", "development"),
+        }
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def extension_catalog(

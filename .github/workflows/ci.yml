@@ -96,6 +96,6 @@ jobs:
             registry-check
           trap 'docker logs registry-image-check; docker stop registry-image-check' EXIT
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
-            http://localhost:8000/livez | jq -e '.status == "ok"'
+            http://localhost:8000/livez | jq -e '.status == "ok" and .revision == env.GITHUB_SHA'
           curl --fail --silent --show-error http://localhost:8000/v1/extensions | jq -e '. == []'
           curl --fail --silent --show-error http://localhost:8000/publish | grep -F 'Extension Registry'

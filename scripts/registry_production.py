@@ -46,7 +46,7 @@ def main() -> None:
                 "AWS_SECRET_ACCESS_KEY",
             )
         }
-        config.update(PUBLIC_ORIGIN=origin, REGISTRY_SOURCE_REVISION=os.environ["SOURCE_SHA"])
+        config.update(PUBLIC_ORIGIN=origin, REGISTRY_SOURCE_REVISION=None)
         request(heroku, "PATCH", f"apps/{app}/config-vars", json=config)
         run(
             "docker",
@@ -63,7 +63,7 @@ def main() -> None:
         run("heroku", "container:release", "web", "--app", app)
         run("heroku", "ps:scale", "web=1:basic", "--app", app)
         # This origin proves the new app before an independently authorized DNS cutover.
-        smoke(existing["web_url"].rstrip("/"))
+        smoke(existing["web_url"].rstrip("/"), os.environ["SOURCE_SHA"])
         print(f"Production app released: {app}; canonical origin: {origin}")
 
 

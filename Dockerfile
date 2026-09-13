@@ -12,7 +12,8 @@ RUN pdm install --prod --no-editable --frozen-lockfile
 FROM python:3.13-slim
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
-ENV PATH="/app/.venv/bin:${PATH}" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:${PATH}" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    REGISTRY_SOURCE_REVISION="${SOURCE_REVISION}"
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 RUN useradd --uid 10001 --create-home registry
