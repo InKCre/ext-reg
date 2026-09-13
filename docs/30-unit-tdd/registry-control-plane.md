@@ -24,8 +24,7 @@ The Python surface admits bounded wheel uploads through `/legacy/`, validates
 the declared digest, filename, normalized project, version congruence, Core
 Metadata, entry point, and archive safety, then exposes PEP 503/691 and PEP 658
 projections through `/simple/` and `/packages/`. The request is declared-length
-and capped at 20 MiB because Python Workers cannot use Starlette's normal
-thread-backed spill path.
+and capped at 20 MiB. CPython uses Starlette's standard spooled multipart files.
 
 The Module Federation surface admits a bounded ZIP rooted at
 `mf-manifest.json`, validates its relative Remote entry and referenced assets,
@@ -37,31 +36,14 @@ models, routes, generated contracts, and build checks are the exact executable i
 
 ## Persistence and Security
 
-D1 queries and writes use SQLAlchemy Core table mappings and expressions in
-`service/database.py` and `service/repository.py`. SQLAlchemy's SQLite compiler
-generates SQL and ordered bound parameters, including expanded `IN` predicates.
-The Repository passes these directly to the asynchronous D1 binding and retains
-native `batch()` for atomic identity and association creation. It does not use
-an ORM Session or emulate connection transactions: the evaluated
-`sqlalchemy-cloudflare-d1` Worker driver implements commit and rollback as no-ops.
-The binding bridge owns only compilation and execution, not a query language,
-DBAPI driver, identity map, or transaction engine.
+持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有查询与事务。Release、Distribution 和 File 使用独立内部主键，公开身份仍是 Extension Name / Version 或 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
 
-Checked-in migrations remain the schema authority. Core mappings describe the
-existing columns and foreign-key joins; the service never calls `create_all()`
-or changes the schema at startup. Ordinary service and maintenance queries must
-use expressions instead of handwritten SQL. Persisted text and integer columns
-use native scalar values; additional database types require verifying their
-binding and result conversion at the D1 boundary.
+准备关联时，namespace 行锁串行化同一发布者的身份创建，release 行锁保护关联和状态。唯一约束保证 Python Project / Version 不被另一个 release 占用；失败会回滚同一事务中的 Extension、Release 和关联创建。上传、发布、撤回和恢复均重新检查锁定后的 release 状态。关联、文件名和内容身份不可变，相同提交可以重试。模型的联合约束明确使用数据库外键列名；不依赖迁移生成器猜测关系字段的物理列名。
 
-D1 owns identity, lifecycle, association metadata, and hashed namespace
-credentials. R2 owns immutable private bytes. Admission writes staging bytes
-before a conditional D1 exposure transition; unreachable staging objects are
-recoverable garbage, never public authority. Every raw-byte read first proves
-a readable D1 association.
+R2 的网络访问不持有数据库事务锁。boto3 的同步调用在线程中执行；上传先写内容寻址的 staging 对象，再在 PostgreSQL 事务中增加可见关联。发布前检查关联对象存在，文件大小一致。失败可能留下不可达的 staging 对象，它们不是公开状态的来源。每次文件读取先检查 release 可读性，再通过 S3 流式返回；HEAD 只读取对象元数据。
 
-Raw credentials never enter D1 or evidence. Anonymous reads are limited to
-published or yanked state. Registry admission validates structure and
-integrity, not publisher trust: Python code executes in a trusted Core process
-and a Module Federation Remote receives host-page privileges. Platform Hosts
-must perform their own compatibility and runtime negotiation before execution.
+应用启动只初始化连接池，不建表、不运行迁移、不创建凭据或示例数据。交付在启动新版本前运行包内 Tortoise 迁移，并仅允许向前执行。数据迁移工具只在旧 SQLite 快照读取边界使用 SQL，所有 PostgreSQL 读写和运维命令使用 ORM。旧 D1 历史保留用于导入验收，迁移工具不自动访问生产 D1。
+
+Publisher 持有 namespace 范围内的发布能力；原始 token 只用于请求认证和运维命令的标准输入，数据库保存 SHA-256。匿名读取只能看到公开或撤回的 release，blocked 状态拒绝描述和原始文件访问。预览服务只获得所属数据库分支和 R2 桶的凭据；云平台控制凭据只属于可信交付控制器。
+
+Registry 验证文件结构与完整性，不证明发布者可信。Python 扩展在受信任 Core 进程中运行，Module Federation Remote 获得宿主页面权限；Host 继续拥有兼容性判断和运行时协商。

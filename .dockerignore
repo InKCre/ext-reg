@@ -1,0 +1,11 @@
+.git
+.venv
+**/.venv
+**/__pycache__
+**/node_modules
+**/dist
+**/.env*
+.dev.vars
+.wrangler
+tasks
+docs

@@ -12,7 +12,9 @@ dependencies = [
   "packaging>=25,<27",
   "python-multipart>=0.0.22,<0.1",
   "jinja2<4,>=3.1.6",
-  "sqlalchemy<2.1,>=2.0.39",
+  "tortoise-orm[asyncpg]>=1.1.8,<1.2",
+  "uvicorn>=0.52,<0.53",
+  "boto3>=1.43,<2",
 ]
 
 [project.urls]
@@ -23,18 +25,11 @@ dev = [
   "build>=1.4,<2",
   "datamodel-code-generator>=0.35,<0.36",
   "httpx>=0.28,<0.29",
-  # Keep the verified Cloudflare Worker dependency while the public wheel
-  # metadata remains compatible with peer runtimes on newer Pydantic minors.
-  "pydantic==2.10.6",
   "pyright>=1.1.405,<2",
   "ruff>=0.14,<0.15",
   "typer>=0.21,<0.22",
-  # pywrangler invokes uv internally while resolving Pyodide Worker packages.
-  # PDM remains the repository entry point and locks this transitive tool.
-  "uv==0.12.3",
   "wheel>=0.46,<0.48",
-  "workers-py>=1.16,<2",
-  "workers-runtime-sdk>=1.6,<2",
+  "moto[server,s3]>=5.1,<6",
 ]
 
 [build-system]
@@ -56,6 +51,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/inkcre_extension_registry/migrations/*.py" = ["E501", "RUF012"]
 
 [tool.pyright]
 pythonVersion = "3.13"

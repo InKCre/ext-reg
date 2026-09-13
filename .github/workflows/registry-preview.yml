@@ -69,7 +69,7 @@ jobs:
             core.setOutput('pull_number', String(pull.number))
 
   build:
-    name: Build exact-head Python Worker
+    name: Build exact-head CPython image
     needs: identity
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -96,23 +96,17 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
-      - name: Build the existing Python Worker
+      - name: Build the single service image without deployment credentials
+        env:
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
         run: |
-          pdm install --frozen-lockfile
-          pnpm install --frozen-lockfile
-          pnpm build
-          pnpm worker:build
-          mkdir -p artifact/src
-          cp dist/worker/worker.py artifact/src/
-          cp -R dist/worker/inkcre_extension_registry artifact/src/
-          cp -R dist/worker/python_modules artifact/
-          cp -R migrations artifact/
-      - name: Transfer modules and SQL to a separate delivery runner
+          docker build --build-arg SOURCE_REVISION="$SOURCE_SHA" --tag registry-preview .
+          docker save registry-preview --output "$RUNNER_TEMP/registry-image.tar"
+      - name: Transfer the image to a separate delivery runner
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: registry-worker
-          path: artifact/
-          include-hidden-files: true
+          name: registry-image
+          path: ${{ runner.temp }}/registry-image.tar
           retention-days: 1
           if-no-files-found: error
 
@@ -156,11 +150,13 @@ jobs:
         run: |
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile
-      - name: Download this run's Python Worker
+      - name: Install the pinned Heroku CLI
+        run: npm install --global heroku@11.8.1
+      - name: Download this run's service image
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: registry-worker
-          path: ${{ runner.temp }}/registry-worker
+          name: registry-image
+          path: ${{ runner.temp }}/registry-image
       - name: Recheck PR identity after build and concurrency queue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -176,19 +172,22 @@ jobs:
                 pull.head.sha !== process.env.SOURCE_SHA) {
               throw new Error('PR closed or moved; no preview mutation is allowed.')
             }
-      - name: Apply migrations, deploy isolated bindings, and verify reads
+      - name: Apply migrations and deploy the isolated service
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          CLOUDFLARE_PREVIEW_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_PREVIEW_PARENT_BRANCH_ID: ${{ vars.NEON_PREVIEW_PARENT_BRANCH_ID }}
           REGISTRY_PREVIEW_PUBLISHER_TOKEN: ${{ secrets.REGISTRY_PREVIEW_PUBLISHER_TOKEN }}
           PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
           SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
-        run: >-
-          pdm run python scripts/registry_preview.py deploy
-          --pull-number "$PULL_NUMBER"
-          --source-sha "$SOURCE_SHA"
-          --artifact "$RUNNER_TEMP/registry-worker"
+        run: |
+          docker load --input "$RUNNER_TEMP/registry-image/registry-image.tar"
+          pdm run python scripts/registry_preview.py deploy \
+            --pull-number "$PULL_NUMBER" --source-sha "$SOURCE_SHA" --image registry-preview
       - name: Record interactive preview evidence
         env:
           PREVIEW_URL: ${{ steps.deploy.outputs.url }}
@@ -199,6 +198,6 @@ jobs:
             echo
             echo "- 来源：\`$SOURCE_SHA\`"
             echo "- 完整预览：$PREVIEW_URL"
-            echo '- 目录、详情、Publisher 与原生分发运行同一 Python Worker。'
-            echo '- 每 PR 独立 D1/R2；发布测试使用 demo 命名空间和专用预览凭据。'
+            echo '- 目录、详情、Publisher 与原生分发运行同一 CPython 服务。'
+            echo '- 每 PR 独立 Neon 分支与 R2 桶；不生成示例扩展。'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 # Registry Web
 
-Registry Web is a presentation surface of the Python Worker. FastAPI reads the
+Registry Web is a presentation surface of the CPython service. FastAPI reads the
 existing Registry repository and renders autoescaped Jinja templates. Small
 browser enhancements cover theme selection, copying an Extension ID, and the
 publisher workspace. There is no separately deployed frontend or browser
@@ -35,7 +35,7 @@ HTML, or logs. Only the theme preference is persisted in local storage.
 `GET /v1/publisher?offset=0` authenticates through the existing namespace
 credential dependency and returns only that namespace's releases, including
 preparing, withdrawn, and operator-blocked releases. Pages contain at most ten
-records to bound the existing descriptor reads within the D1 query budget.
+records. Related distribution and file data is prefetched in bounded queries.
 `next_offset` indicates another page; concurrent publication can shift this
 non-snapshot listing, and Refresh reloads current state. Private responses,
 including rejected credentials, are not cached. Per-distribution uploaded flags
@@ -66,13 +66,13 @@ is no Registry copy of the token source or a competing design package.
 `pnpm web:build` compiles the pinned package and local Sass into the committed
 `service/static/registry.css`. `pnpm web:check` compares it to a fresh compilation
 and checks browser JavaScript syntax. Committing generated CSS makes Python wheel
-and Worker builds self-contained; it is never edited manually. Wrangler
-Text rules explicitly include CSS and JavaScript in the Python module filesystem.
+and container builds self-contained; it is never edited manually. The wheel
+includes templates, CSS and JavaScript in the ordinary Python package.
 Rendering depends on product data, selected release, and the current route.
 Templates, links, controls, and browser styles contain no preview/production
-switch. Instance origin and storage bindings belong to runtime configuration.
+switch. Instance origin and storage connections belong to runtime configuration.
 
-Remote previews run the same Python Worker with isolated D1/R2 bindings. Their
+Remote previews run the same CPython image with an isolated PostgreSQL branch and R2 bucket. Their
 resource lifecycle and source identity belong to the delivery controller; see
 [Pull-Request Previews](../40-deployment/pull-request-previews.md).
 

@@ -31,10 +31,19 @@ jobs:
     environment:
       name: production
       url: https://registry.inkcre.dev
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: registry
+          POSTGRES_PASSWORD: registry-check
+          POSTGRES_DB: registry_check
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U registry -d registry_check"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      REGISTRY_ORIGIN: https://registry.inkcre.dev
+      REGISTRY_TEST_DATABASE_URL: postgres://registry:registry-check@localhost:5432/registry_check
       SOURCE_SHA: ${{ inputs.source_sha }}
     steps:
       - name: Checkout verified source
@@ -75,45 +84,35 @@ jobs:
       - name: Verify exact delivery source
         run: pnpm check
 
-      - name: Apply native production schema
+      - name: Build the same CPython service artifact used by previews
+        run: docker build --build-arg SOURCE_REVISION="$SOURCE_SHA" --tag registry-production .
+
+      - name: Install the pinned Heroku CLI
         if: inputs.operation == 'deploy'
-        run: pnpm exec wrangler d1 migrations apply DB --remote --config wrangler.jsonc
+        run: npm install --global heroku@11.8.1
 
-      - name: Deploy exact Worker and bindings
+      - name: Migrate and release the authorized production app
         if: inputs.operation == 'deploy'
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ vars.HEROKU_APP_NAME }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          pdm run pywrangler deploy \
-            --config wrangler.jsonc \
-            --message "Native Registry production at $SOURCE_SHA" \
-            --strict
+          current_main=$(git ls-remote origin refs/heads/main | cut -f1)
+          test "$current_main" = "$SOURCE_SHA"
+          pdm run python scripts/registry_production.py --image registry-production
 
-      - name: Smoke anonymous production reads
-        run: |
-          curl --fail --silent --show-error --retry 12 --retry-all-errors \
-            "$REGISTRY_ORIGIN/livez" | jq -e '.status == "ok"'
-          curl --fail --silent --show-error --retry 12 --retry-all-errors \
-            "$REGISTRY_ORIGIN/" | grep -F 'Extension Registry'
-          curl --fail --silent --show-error --retry 12 --retry-all-errors \
-            "$REGISTRY_ORIGIN/v1/extensions" | jq -e 'type == "array"'
-          curl --fail --silent --show-error --retry 12 --retry-all-errors \
-            -H 'Accept: application/vnd.pypi.simple.v1+json' \
-            "$REGISTRY_ORIGIN/simple/" | jq -e '.meta["api-version"] == "1.1"'
-
-      - name: Record production evidence
+      - name: Record delivery boundary
+        env:
+          OPERATION: ${{ inputs.operation }}
         run: |
           {
-            echo '## Extension Registry production authority'
-            echo
-            echo "- Source: \`$SOURCE_SHA\`"
-            echo "- Operation: \`${{ inputs.operation }}\`"
-            echo "- Origin: $REGISTRY_ORIGIN"
-            echo '- D1: inkcre-extension-registry-production-v2'
-            echo '- R2: inkcre-extension-registry-production-v2'
-            echo '- Full repository contract and anonymous smoke: passed'
-            if [ "${{ inputs.operation }}" = 'deploy' ]; then
-              echo '- Checked migration and exact Worker deployment: passed'
-            else
-              echo '- Remote mutation: none (verification only)'
-            fi
-            echo '- Rollback: previously verified compatible native-v2 Worker Version'
+            echo '## Registry CPython 交付'
+            echo "- 来源：$SOURCE_SHA"
+            echo "- 操作：$OPERATION"
+            echo '- 数据导入、旧写入暂停和域名切换按 production-registry.md 单独执行。'
           } >> "$GITHUB_STEP_SUMMARY"

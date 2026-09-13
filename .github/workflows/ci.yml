@@ -30,6 +30,20 @@ jobs:
     name: ext-reg checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: registry
+          POSTGRES_PASSWORD: registry-check
+          POSTGRES_DB: registry_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U registry -d registry_check"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      REGISTRY_TEST_DATABASE_URL: postgres://registry:registry-check@localhost:5432/registry_check
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,3 +74,28 @@ jobs:
 
       - name: Run repository contract
         run: pnpm check
+
+      - name: Enforce append-only deployed migration history
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags origin "$BASE_SHA"
+          git diff --exit-code --diff-filter=DMRT "$BASE_SHA" HEAD -- migrations src/inkcre_extension_registry/migrations
+
+      - name: Build the single CPython service image
+        run: docker build --build-arg SOURCE_REVISION="$GITHUB_SHA" --tag registry-check .
+
+      - name: Verify the installed image serves HTTP and the migrated database
+        run: |
+          docker run --detach --rm --name registry-image-check --network host \
+            --env DATABASE_URL="$REGISTRY_TEST_DATABASE_URL" \
+            --env PUBLIC_ORIGIN=http://localhost:8000 \
+            --env S3_ENDPOINT_URL=http://localhost:9000 --env S3_BUCKET=unused \
+            --env AWS_ACCESS_KEY_ID=testing --env AWS_SECRET_ACCESS_KEY=testing \
+            registry-check
+          trap 'docker logs registry-image-check; docker stop registry-image-check' EXIT
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+            http://localhost:8000/livez | jq -e '.status == "ok"'
+          curl --fail --silent --show-error http://localhost:8000/v1/extensions | jq -e '. == []'
+          curl --fail --silent --show-error http://localhost:8000/publish | grep -F 'Extension Registry'

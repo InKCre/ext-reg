@@ -1,118 +1,175 @@
-"""SQLAlchemy mappings for the existing D1 schema and its binding compiler.
+"""PostgreSQL models. Checked-in Tortoise migrations own schema changes."""
 
-Migrations own DDL. These tables describe the columns and joins used by the
-Registry; they are never used to create or alter a database at runtime.
-"""
+from typing import ClassVar
 
-from __future__ import annotations
-
-from sqlalchemy import Column, ForeignKey, ForeignKeyConstraint, Integer, MetaData, Table, Text
-from sqlalchemy.dialects.sqlite import dialect
-from sqlalchemy.sql import ClauseElement
-from sqlalchemy.sql.compiler import SQLCompiler
-
-metadata = MetaData()
-namespaces = Table(
-    "namespaces",
-    metadata,
-    Column("name", Text, primary_key=True),
-    Column("status", Text),
-    Column("created_at", Text),
-)
-credentials = Table(
-    "credentials",
-    metadata,
-    Column("token_hash", Text, primary_key=True),
-    Column("namespace", Text, ForeignKey("namespaces.name")),
-    Column("label", Text),
-    Column("disabled", Integer),
-    Column("created_at", Text),
-)
-extensions = Table(
-    "extensions",
-    metadata,
-    Column("name", Text, primary_key=True),
-    Column("namespace", Text, ForeignKey("namespaces.name")),
-    Column("nickname", Text),
-    Column("publisher_metadata_json", Text),
-    Column("created_at", Text),
-)
-releases = Table(
-    "releases",
-    metadata,
-    Column("extension_name", Text, ForeignKey("extensions.name"), primary_key=True),
-    Column("version", Text, primary_key=True),
-    Column("state", Text),
-    Column("yank_reason", Text),
-    Column("created_at", Text),
-    Column("published_at", Text),
-    Column("updated_at", Text),
-)
-python_distributions = Table(
-    "python_distributions",
-    metadata,
-    Column("extension_name", Text, primary_key=True),
-    Column("release_version", Text, primary_key=True),
-    Column("normalized_project", Text),
-    Column("project_version", Text),
-    Column("host_sdk", Text),
-    Column("host_sdk_range", Text),
-    Column("entry_group", Text),
-    Column("entry_name", Text),
-    Column("entry_object", Text),
-    Column("source_repository", Text),
-    Column("source_revision", Text),
-    Column("build_id", Text),
-    Column("created_at", Text),
-    ForeignKeyConstraint(
-        ["extension_name", "release_version"], ["releases.extension_name", "releases.version"]
-    ),
-)
-python_files = Table(
-    "python_files",
-    metadata,
-    Column("normalized_project", Text, primary_key=True),
-    Column("project_version", Text, primary_key=True),
-    Column("filename", Text, primary_key=True),
-    Column("sha256", Text),
-    Column("size", Integer),
-    Column("filetype", Text),
-    Column("requires_python", Text),
-    Column("core_metadata_sha256", Text),
-    Column("r2_key", Text),
-    Column("metadata_r2_key", Text),
-    Column("uploaded_at", Text),
-    ForeignKeyConstraint(
-        ["normalized_project", "project_version"],
-        ["python_distributions.normalized_project", "python_distributions.project_version"],
-    ),
-)
-module_federation_distributions = Table(
-    "module_federation_distributions",
-    metadata,
-    Column("extension_name", Text, primary_key=True),
-    Column("release_version", Text, primary_key=True),
-    Column("host_sdk", Text),
-    Column("host_sdk_range", Text),
-    Column("source_repository", Text),
-    Column("source_revision", Text),
-    Column("build_id", Text),
-    Column("manifest_r2_key", Text),
-    Column("asset_paths_json", Text),
-    Column("internal_snapshot_hash", Text),
-    Column("created_at", Text),
-    Column("uploaded_at", Text),
-    ForeignKeyConstraint(
-        ["extension_name", "release_version"], ["releases.extension_name", "releases.version"]
-    ),
-)
-
-_DIALECT = dialect(paramstyle="qmark")
+from tortoise import fields
+from tortoise.migrations.constraints import CheckConstraint
+from tortoise.models import Model
 
 
-def compile_d1(statement: ClauseElement) -> tuple[str, list[object]]:
-    """Compile bound parameters in SQLite order, including expanded IN lists."""
-    compiled = statement.compile(dialect=_DIALECT, compile_kwargs={"render_postcompile": True})
-    assert isinstance(compiled, SQLCompiler)
-    assert compiled.positiontup is not None and compiled.params is not None
-    return str(compiled), [compiled.params[name] for name in compiled.positiontup]
+class Namespace(Model):
+    name = fields.CharField(max_length=64, primary_key=True)
+    status = fields.CharField(max_length=16, default="active")
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta(Model.Meta):
+        table = "namespaces"
+        constraints: ClassVar = [
+            CheckConstraint("status IN ('active', 'blocked')", "namespace_status")
+        ]
+
+
+class Credential(Model):
+    token_hash = fields.CharField(max_length=64, primary_key=True)
+    namespace: fields.ForeignKeyRelation[Namespace] = fields.ForeignKeyField(
+        "models.Namespace", on_delete=fields.RESTRICT
+    )
+    label = fields.TextField()
+    disabled = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta(Model.Meta):
+        table = "credentials"
+        constraints: ClassVar = [
+            CheckConstraint("token_hash ~ '^[0-9a-f]{64}$'", "credential_hash")
+        ]
+
+
+class Extension(Model):
+    name = fields.CharField(max_length=129, primary_key=True)
+    namespace: fields.ForeignKeyRelation[Namespace] = fields.ForeignKeyField(
+        "models.Namespace", on_delete=fields.RESTRICT
+    )
+    nickname = fields.TextField()
+    publisher_metadata = fields.JSONField(default=dict)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    releases: fields.ReverseRelation["Release"]
+
+    class Meta(Model.Meta):
+        table = "extensions"
+        constraints: ClassVar = [
+            CheckConstraint("name ~ '^[^/]+/[^/]+$'", "extension_name"),
+            CheckConstraint(
+                "jsonb_typeof(publisher_metadata) = 'object'", "publisher_metadata_object"
+            ),
+        ]
+
+
+class Release(Model):
+    id = fields.BigIntField(primary_key=True)
+    extension: fields.ForeignKeyRelation[Extension] = fields.ForeignKeyField(
+        "models.Extension",
+        related_name="releases",
+        on_delete=fields.RESTRICT,
+    )
+    version = fields.CharField(max_length=128)
+    state = fields.CharField(max_length=16, default="preparing")
+    yank_reason: str | None = fields.TextField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    published_at = fields.DatetimeField(null=True)
+    updated_at = fields.DatetimeField(auto_now_add=True)
+    python: fields.BackwardOneToOneRelation["PythonDistribution"] | None
+    module_federation: fields.BackwardOneToOneRelation["ModuleFederationDistribution"] | None
+
+    class Meta(Model.Meta):
+        table = "releases"
+        unique_together = (("extension_id", "version"),)
+        indexes = (("extension_id", "state", "created_at"),)
+        constraints: ClassVar = [
+            CheckConstraint(
+                "state IN ('preparing', 'published', 'yanked', 'blocked')", "release_state"
+            )
+        ]
+
+
+class PythonDistribution(Model):
+    id = fields.BigIntField(primary_key=True)
+    release: fields.OneToOneRelation[Release] = fields.OneToOneField(
+        "models.Release", related_name="python", on_delete=fields.RESTRICT
+    )
+    normalized_project = fields.CharField(max_length=256)
+    project_version = fields.CharField(max_length=256)
+    host_sdk = fields.CharField(max_length=32)
+    host_sdk_range = fields.TextField()
+    entry_group = fields.TextField()
+    entry_name = fields.TextField()
+    entry_object = fields.TextField()
+    source_repository = fields.TextField()
+    source_revision = fields.TextField()
+    build_id = fields.TextField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    files: fields.ReverseRelation["PythonFile"]
+
+    class Meta(Model.Meta):
+        table = "python_distributions"
+        unique_together = (("normalized_project", "project_version"),)
+        constraints: ClassVar = [CheckConstraint("host_sdk = 'core-py'", "python_host_sdk")]
+
+
+class PythonFile(Model):
+    id = fields.BigIntField(primary_key=True)
+    distribution: fields.ForeignKeyRelation[PythonDistribution] = fields.ForeignKeyField(
+        "models.PythonDistribution", related_name="files", on_delete=fields.RESTRICT
+    )
+    filename = fields.TextField()
+    sha256 = fields.CharField(max_length=64)
+    size = fields.IntField()
+    filetype = fields.CharField(max_length=32)
+    requires_python = fields.TextField(null=True)
+    core_metadata_sha256 = fields.CharField(max_length=64)
+    r2_key = fields.CharField(max_length=1024, unique=True)
+    metadata_r2_key = fields.CharField(max_length=1024, unique=True)
+    uploaded_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta(Model.Meta):
+        table = "python_files"
+        unique_together = (("distribution_id", "filename"),)
+        constraints: ClassVar = [
+            CheckConstraint(
+                "position('/' in filename) = 0 AND position(chr(92) in filename) = 0",
+                "python_filename",
+            ),
+            CheckConstraint("sha256 ~ '^[0-9a-f]{64}$'", "python_sha256"),
+            CheckConstraint("size BETWEEN 0 AND 20971520", "python_size"),
+            CheckConstraint("filetype = 'bdist_wheel'", "python_filetype"),
+            CheckConstraint("core_metadata_sha256 ~ '^[0-9a-f]{64}$'", "python_metadata_sha256"),
+        ]
+
+
+class ModuleFederationDistribution(Model):
+    id = fields.BigIntField(primary_key=True)
+    release: fields.OneToOneRelation[Release] = fields.OneToOneField(
+        "models.Release",
+        related_name="module_federation",
+        on_delete=fields.RESTRICT,
+    )
+    host_sdk = fields.CharField(max_length=32)
+    host_sdk_range = fields.TextField()
+    source_repository = fields.TextField()
+    source_revision = fields.TextField()
+    build_id = fields.TextField(null=True)
+    manifest_r2_key = fields.TextField(null=True)
+    asset_paths = fields.JSONField(null=True)
+    internal_snapshot_hash = fields.CharField(max_length=64, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    uploaded_at = fields.DatetimeField(null=True)
+
+    class Meta(Model.Meta):
+        table = "module_federation_distributions"
+        constraints: ClassVar = [
+            CheckConstraint("host_sdk = '@inkcre/core'", "mf_host_sdk"),
+            CheckConstraint(
+                "asset_paths IS NULL OR jsonb_typeof(asset_paths) = 'array'", "mf_asset_paths"
+            ),
+            CheckConstraint(
+                "internal_snapshot_hash IS NULL OR internal_snapshot_hash ~ '^[0-9a-f]{64}$'",
+                "mf_snapshot_hash",
+            ),
+            CheckConstraint(
+                "(manifest_r2_key IS NULL AND asset_paths IS NULL "
+                "AND internal_snapshot_hash IS NULL AND uploaded_at IS NULL) OR "
+                "(manifest_r2_key IS NOT NULL AND asset_paths IS NOT NULL "
+                "AND internal_snapshot_hash IS NOT NULL AND uploaded_at IS NOT NULL)",
+                "mf_complete_snapshot",
+            ),
+        ]
