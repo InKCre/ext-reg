@@ -52,6 +52,11 @@ Package release intent uses the ecosystem-native release tool:
 The three package versions are independent. Registry Worker deployment has its
 own release lifecycle and is never versioned by either package tool.
 
+Every protected-main update checks the prepared package versions and publishes
+missing GitHub Releases. Existing releases are left unchanged. Publication does
+not depend on a commit-title prefix: Python packages prepared with Changie and
+the Web Runtime Version PR both use this same publication path.
+
 Registry, Toolkit publication, Runtime publication and Cloudflare production changes are separate
 privileged operations. Extension publishers install the independent
 `inkcre-extension-toolkit[cli]` distribution, prepare typed associations with
