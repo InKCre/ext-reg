@@ -38,7 +38,6 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
         local_id = model.name.partition("/")[2]
         if not local_id or local_id != cls.__extid__:
             raise ExtensionLifecycleError("Extension class identity differs from installed model")
-        cls.__configcls__.model_validate(model.config)
         cls.__model__ = model
 
     @classmethod
@@ -59,7 +58,11 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
 
     @classmethod
     def update_config(cls, value: dict[str, typing.Any] | ConfigT) -> ConfigT:
-        config = cls.__configcls__.model_validate(value)
+        config = (
+            value
+            if isinstance(value, cls.__configcls__)
+            else cls.__configcls__.model_validate(value)
+        )
         try:
             cls.__model__ = cls._model().update_config(config.model_dump(mode="json"))
         except Exception as error:
@@ -76,25 +79,34 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
 
     @classmethod
     def mutate_state(cls, transform: typing.Callable[[StateT], StateT]) -> StateT:
+        result: StateT | None = None
+
         def mutate(raw: dict[str, typing.Any]) -> dict[str, typing.Any]:
+            nonlocal result
             updated = transform(cls.__statecls__.model_validate(raw))
             if not isinstance(updated, cls.__statecls__):
                 raise TypeError("Extension state transform returned the wrong model")
+            result = updated
             return updated.model_dump(mode="json")
 
         try:
-            raw = cls._model().mutate_state(mutate)
+            cls._model().mutate_state(mutate)
         except Exception as error:
             translate_host_model_error(error)
-        return cls.__statecls__.model_validate(raw)
+        # The Host invokes the transform under its transaction and commits its
+        # returned JSON unchanged. Keep the typed result rather than revalidating it.
+        return typing.cast(StateT, result)
 
     @classmethod
     def mutate_config_and_state(
         cls, transform: typing.Callable[[ConfigT, StateT], tuple[ConfigT, StateT]]
     ) -> tuple[ConfigT, StateT]:
+        result: tuple[ConfigT, StateT] | None = None
+
         def mutate(
             config: dict[str, typing.Any], state: dict[str, typing.Any]
         ) -> tuple[dict[str, typing.Any], dict[str, typing.Any]]:
+            nonlocal result
             new_config, new_state = transform(
                 cls.__configcls__.model_validate(config), cls.__statecls__.model_validate(state)
             )
@@ -102,17 +114,18 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
                 new_state, cls.__statecls__
             ):
                 raise TypeError("Extension config/state transform returned the wrong models")
+            result = new_config, new_state
             return new_config.model_dump(mode="json"), new_state.model_dump(mode="json")
 
         try:
-            config, state = cls._model().mutate_config_and_state(mutate)
+            cls._model().mutate_config_and_state(mutate)
         except Exception as error:
             translate_host_model_error(error)
-        return cls.__configcls__.model_validate(config), cls.__statecls__.model_validate(state)
+        return typing.cast(tuple[ConfigT, StateT], result)
 
     @classmethod
     def on_start(cls, app: typing.Any) -> None:
-        """Validate config and publish concrete Core contributions."""
+        """Publish concrete Core contributions; config reads restore types on use."""
         import fastapi
         from app.business.peer import PeerManager
 
@@ -125,7 +138,6 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
             raise ExtensionLifecycleError(f"Extension {cls.__extid__} is already active")
         publication = ExtensionPublication(app)
         try:
-            cls.__configcls__.model_validate(cls._model().config)
             router = fastapi.APIRouter(
                 prefix=f"/{cls.__extid__}", dependencies=cls.api_dependencies()
             )
