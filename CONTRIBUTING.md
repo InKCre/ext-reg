@@ -57,6 +57,10 @@ missing GitHub Releases. Existing releases are left unchanged. Publication does
 not depend on a commit-title prefix: Python packages prepared with Changie and
 the Web Runtime Version PR both use this same publication path.
 
+Package publication runs static and generated-contract checks, then builds its
+own release assets. The Registry database journey remains in repository CI; it
+is not a dependency of Toolkit or Runtime publication.
+
 Registry, Toolkit publication, Runtime publication and Cloudflare production changes are separate
 privileged operations. Extension publishers install the independent
 `inkcre-extension-toolkit[cli]` distribution, prepare typed associations with

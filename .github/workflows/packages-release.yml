@@ -100,8 +100,8 @@ jobs:
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile
 
-      - name: Run repository contract
-        run: pnpm check
+      - name: Check package contracts before building release assets
+        run: pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check
 
       - name: Verify managed package versions
         run: |
