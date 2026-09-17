@@ -6,6 +6,10 @@
 `tasks/async-database-boundaries/plan.md` 拥有；不得在此建立另一条全量迁移计划。
 Sir 已授权修改 ext-reg、提交、推送与创建 PR，明确禁止 Agent 合并。
 
+上游交付 PR：https://github.com/InKCre/ext-reg/pull/38（实现提交 `5fc4ad7`）。
+父任务 draft PR：https://github.com/InKCre/core-py/pull/105。当前等待本 PR 的检查、外部合并和正式 artifact，
+不把本地 wheel 构建成功当作依赖已经交付。
+
 从 origin/main `006759a` 建立独立分支 `feat/runtime-async-persistence`，worktree 为
 `/Volumes/WorkSSD/Development/InKCre/.worktrees/ext-reg-async-persistence`。既有 ext-reg checkout 未改动。
 
