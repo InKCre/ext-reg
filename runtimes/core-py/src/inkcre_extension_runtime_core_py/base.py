@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import typing
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import pydantic
 
 from .errors import ExtensionLifecycleError, translate_host_model_error
+
+if typing.TYPE_CHECKING:
+    from .publication import ExtensionPublication
 
 
 class EmptyConfig(pydantic.BaseModel): ...
@@ -124,8 +129,101 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
         return typing.cast(tuple[ConfigT, StateT], result)
 
     @classmethod
+    async def update_config_async(cls, value: dict[str, typing.Any] | ConfigT) -> ConfigT:
+        """Persist validated configuration through the Host async capability."""
+        config = (
+            value
+            if isinstance(value, cls.__configcls__)
+            else cls.__configcls__.model_validate(value)
+        )
+        try:
+            cls.__model__ = await cls._model().update_config_async(config.model_dump(mode="json"))
+        except Exception as error:
+            translate_host_model_error(error)
+        return config
+
+    @classmethod
+    async def get_state_async(cls) -> StateT:
+        """Read fresh state through the Host async capability."""
+        try:
+            state = await cls._model().read_state_async()
+        except Exception as error:
+            translate_host_model_error(error)
+        return cls.__statecls__.model_validate(state)
+
+    @classmethod
+    async def mutate_state_async(cls, transform: typing.Callable[[StateT], StateT]) -> StateT:
+        """Await one committed state mutation; transform runs synchronously under the Host lock."""
+        result: StateT | None = None
+
+        def mutate(raw: dict[str, typing.Any]) -> dict[str, typing.Any]:
+            nonlocal result
+            updated = transform(cls.__statecls__.model_validate(raw))
+            if not isinstance(updated, cls.__statecls__):
+                raise TypeError("Extension state transform returned the wrong model")
+            result = updated
+            return updated.model_dump(mode="json")
+
+        try:
+            await cls._model().mutate_state_async(mutate)
+        except Exception as error:
+            translate_host_model_error(error)
+        # The Host invokes the transform under its transaction and commits its
+        # returned JSON unchanged. Keep the typed result rather than revalidating it.
+        return typing.cast(StateT, result)
+
+    @classmethod
+    async def mutate_config_and_state_async(
+        cls, transform: typing.Callable[[ConfigT, StateT], tuple[ConfigT, StateT]]
+    ) -> tuple[ConfigT, StateT]:
+        """Await one atomic config/state mutation with a synchronous typed transform."""
+        result: tuple[ConfigT, StateT] | None = None
+
+        def mutate(
+            config: dict[str, typing.Any], state: dict[str, typing.Any]
+        ) -> tuple[dict[str, typing.Any], dict[str, typing.Any]]:
+            nonlocal result
+            new_config, new_state = transform(
+                cls.__configcls__.model_validate(config), cls.__statecls__.model_validate(state)
+            )
+            if not isinstance(new_config, cls.__configcls__) or not isinstance(
+                new_state, cls.__statecls__
+            ):
+                raise TypeError("Extension config/state transform returned the wrong models")
+            result = new_config, new_state
+            return new_config.model_dump(mode="json"), new_state.model_dump(mode="json")
+
+        try:
+            await cls._model().mutate_config_and_state_async(mutate)
+        except Exception as error:
+            translate_host_model_error(error)
+        return typing.cast(tuple[ConfigT, StateT], result)
+
+    @classmethod
     def on_start(cls, app: typing.Any) -> None:
-        """Publish concrete Core contributions; config reads restore types on use."""
+        """Publish contributions using the synchronous Host persistence contract."""
+        with cls._publication_scope(app) as publication:
+            publication.activate_source_types()
+            try:
+                cls.__model__ = cls._model().update_config_schema(dict(cls.__configschema__))
+            except Exception as error:
+                translate_host_model_error(error)
+
+    @classmethod
+    async def on_start_async(cls, app: typing.Any) -> None:
+        """Publish contributions and await catalog/schema persistence before becoming active."""
+        with cls._publication_scope(app) as publication:
+            await publication.activate_source_types_async()
+            try:
+                cls.__model__ = await cls._model().update_config_schema_async(
+                    dict(cls.__configschema__)
+                )
+            except Exception as error:
+                translate_host_model_error(error)
+
+    @classmethod
+    @contextmanager
+    def _publication_scope(cls, app: typing.Any) -> Iterator[ExtensionPublication]:
         import fastapi
         from app.business.peer import PeerManager
 
@@ -134,9 +232,12 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
             PublicHTTPRouteClaim,
         )
 
-        if cls.runtime_active():
-            raise ExtensionLifecycleError(f"Extension {cls.__extid__} is already active")
+        if cls.runtime_active() or cls.__dict__.get("__runtime_starting__", False):
+            raise ExtensionLifecycleError(
+                f"Extension {cls.__extid__} is already active or starting"
+            )
         publication = ExtensionPublication(app)
+        cls.__runtime_starting__ = True
         try:
             router = fastapi.APIRouter(
                 prefix=f"/{cls.__extid__}", dependencies=cls.api_dependencies()
@@ -154,15 +255,15 @@ class ExtensionBase[ConfigT: pydantic.BaseModel, StateT: pydantic.BaseModel]:
             publication.public_http_claim = PublicHTTPRouteClaim.acquire(
                 cls.__extid__, cls.public_http_routes(), publication.routes
             )
-            publication.activate_source_types()
-            try:
-                cls.__model__ = cls._model().update_config_schema(dict(cls.__configschema__))
-            except Exception as error:
-                translate_host_model_error(error)
-        except Exception:
+            yield publication
+        except BaseException:
+            # Cancellation during Host persistence must revoke already-published effects.
             publication.withdraw()
             raise
-        cls.__runtime_publication__ = publication
+        else:
+            cls.__runtime_publication__ = publication
+        finally:
+            del cls.__runtime_starting__
 
     @classmethod
     def api_dependencies(cls) -> list[typing.Any]:
