@@ -172,6 +172,10 @@ class ExtensionPublication:
         """Synchronize the process-monotonic Source catalog."""
         SourceManager.sync_source_types()
 
+    async def activate_source_types_async(self) -> None:
+        """Synchronize the catalog through the async Host capability."""
+        await SourceManager.sync_source_types_async()
+
     def withdraw(self) -> None:
         """Withdraw this instance's exact active effects."""
         if not self.active:
