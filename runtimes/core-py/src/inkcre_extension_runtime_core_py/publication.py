@@ -11,6 +11,7 @@ import fastapi
 from app.business.peer import PeerManager
 from app.business.source.main import SourceManager
 from app.schemas.peer import CapabilityID
+from fastapi.routing import iter_route_contexts
 
 
 @dataclass(frozen=True)
@@ -55,7 +56,7 @@ class PublicHTTPRouteClaim:
             return None
         available = {
             (method, route.path)
-            for route in published_routes
+            for route in iter_route_contexts(published_routes)
             for method in (getattr(route, "methods", None) or ())
             if isinstance(getattr(route, "path", None), str)
         }

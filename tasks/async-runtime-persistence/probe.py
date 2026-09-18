@@ -108,6 +108,7 @@ def host_modules():
 
 async def exercise():
     from inkcre_extension_runtime_core_py import ExtensionBase, ExtensionLifecycleError
+    from inkcre_extension_runtime_core_py.publication import PublicHTTPRoute, PublicHTTPRouteClaim
 
     class Probe(ExtensionBase, ext_id="probe", config_cls=Config, state_cls=State):
         @classmethod
@@ -116,13 +117,41 @@ async def exercise():
 
         @classmethod
         def _register_apis(cls, router):
-            @router.get("/callback")
+            nested = fastapi.APIRouter()
+
+            @nested.get("/callback", include_in_schema=False)
             def callback():
                 return {"ok": True}
+
+            router.include_router(nested)
+
+        @classmethod
+        def public_http_routes(cls):
+            return (PublicHTTPRoute(method="GET", path="/callback"),)
 
         @classmethod
         def peer_inbounds(cls):
             return (types.SimpleNamespace(capability="probe.read"),)
+
+    # A matching dynamic route or another method must not authorize an exact claim.
+    dynamic = fastapi.APIRouter(prefix="/probe")
+
+    @dynamic.get("/{name}")
+    def dynamic_handler(name: str):
+        return name
+
+    container = fastapi.FastAPI()
+    container.include_router(dynamic)
+    for declaration in (
+        PublicHTTPRoute(method="GET", path="/callback"),
+        PublicHTTPRoute(method="POST", path="/callback"),
+    ):
+        try:
+            PublicHTTPRouteClaim.acquire("probe", (declaration,), tuple(container.routes))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("an unpublished exact public route was accepted")
 
     record = HostRecord()
     Probe.bind(record)
@@ -138,6 +167,7 @@ async def exercise():
 
         async def verify_withdrawn():
             assert not Probe.runtime_active()
+            assert not PublicHTTPRouteClaim.permits("GET", "/probe/callback")
             assert (await client.get("/probe/callback")).status_code == 404
             assert (await client.get("/unrelated")).status_code == 200
             assert "probe.read" not in PeerRegistry.entries
@@ -197,6 +227,9 @@ async def exercise():
 
         await Probe.on_start_async(app)
         assert Probe.runtime_active()
+        assert PublicHTTPRouteClaim.permits("GET", "/probe/callback")
+        assert not PublicHTTPRouteClaim.permits("POST", "/probe/callback")
+        assert not PublicHTTPRouteClaim.permits("GET", "/probe/other")
         assert (await client.get("/probe/callback")).json() == {"ok": True}
         Probe.unpublish()
         Probe.release_runtime()
@@ -204,6 +237,9 @@ async def exercise():
         # Existing synchronous Hosts still use the same publication/withdrawal mechanism.
         Probe.on_start(app)
         assert Probe.runtime_active()
+        assert PublicHTTPRouteClaim.permits("GET", "/probe/callback")
+        assert not PublicHTTPRouteClaim.permits("POST", "/probe/callback")
+        assert not PublicHTTPRouteClaim.permits("GET", "/probe/other")
         Probe.unpublish()
         Probe.release_runtime()
         await verify_withdrawn()

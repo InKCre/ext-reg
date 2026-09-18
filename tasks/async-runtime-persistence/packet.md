@@ -50,3 +50,24 @@ slice 完成到可审阅 PR 后，Core 等待外部合并和 0.1.4 artifact；�
 `Public Extension routes were not published: [('GET', '/probe/callback')]`。因此 probe 的成功启动不声明
 public callback；本次覆盖 routes/inbounds 的取消撤销，没有伪造 public-claim 成功证据。该问题不由
 数据库异步化引入，未扩展本次源码范围；采用方的 callback 验收仍受其影响。
+
+
+## 采用验收发现的阻塞与修复（2026-09-18）
+
+#38 已获 Sir 单独批准并 squash 合并为 09b6c84，SDK 0.1.4 正式发布。
+Core #105 采用时进入实际 lifecycle 验收，既有 public callback 缺陷阻挡 Twitter 启用。
+本分支 feat/runtime-public-route-contexts 从该 main 建立，只修复此采用阻塞，
+仍由父任务步骤 05 拥有执行顺序。
+
+PublicHTTPRouteClaim 从检查顶层 route.path 改为调用 FastAPI 的 iter_route_contexts。
+SDK 原有 >=0.139.2 版本下界已支持此公共接口，无需私有结构或降级分支。
+参考 FastAPI 维护者说明：https://github.com/fastapi/fastapi/discussions/15782。
+此处的 actor 是匿名 HTTP caller，能力为公开声明的精确 method/path；未声明路径仍受原
+admission 约束。缺陷是合法 callback 被拒绝的可用性问题，未发现越权攻击路径。
+不放宽路径匹配，不用 dynamic route 的运行匹配替代 exact declaration 校验。
+
+probe 先在旧实现复现失败，再在修复后通过。增加真实 nested router/隐藏 OpenAPI callback，
+精确 GET 放行、POST/其他路径拒绝、动态路由不能充当精确声明，以及取消/失败后的 claim 撤销。
+使用同一 probe 验证旧同步启动与新异步启动，不新增验证框架。
+SDK 0.1.5 由 Changie 准备；需通过 PR 和 main 正式发布后 Core 才能采用。
+此次 PR 没有获得合并授权（既有合并授权仅限 #38）。
