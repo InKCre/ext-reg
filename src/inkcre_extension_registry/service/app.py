@@ -3,10 +3,12 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import logging
 import mimetypes
 import os
 import re
 from contextlib import asynccontextmanager
+from time import perf_counter
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
@@ -65,6 +67,7 @@ from .storage import ArtifactStore
 from .ui import SCRIPT, extension_catalog_html, extension_detail_html, html_response, page
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+logger = logging.getLogger(__name__)
 
 BEARER_PATTERN = re.compile(r"^Bearer ([A-Za-z0-9._~-]{24,512})$")
 UPLOAD_PATH_PATTERN = re.compile(
@@ -543,6 +546,7 @@ def create_app() -> FastAPI:
         _publisher: Annotated[str, Depends(_publisher_namespace)],
     ) -> ReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
+        started = perf_counter()
         form = await _form(request)
         try:
             upload = form.get("content")
@@ -555,8 +559,23 @@ def create_app() -> FastAPI:
                 _public_origin(request)
                 + f"/extensions/{extension_name}/{version}/module-federation/"
             )
+            logger.info(
+                "mf_upload extension=%s version=%s phase=receive bytes=%d duration_ms=%.1f",
+                extension_name,
+                version,
+                len(content),
+                (perf_counter() - started) * 1000,
+            )
             try:
+                started = perf_counter()
                 snapshot = inspect_module_federation_snapshot(content, public_prefix=public_prefix)
+                logger.info(
+                    "mf_upload extension=%s version=%s phase=validation files=%d duration_ms=%.1f",
+                    extension_name,
+                    version,
+                    len(snapshot.files),
+                    (perf_counter() - started) * 1000,
+                )
                 return await _repository(request).put_module_federation_snapshot(
                     extension_name,
                     version,

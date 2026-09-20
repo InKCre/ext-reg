@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Literal, cast
 
+import anyio
 from inkcre_extension_toolkit.simple import PythonFileRecord
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
@@ -26,6 +29,9 @@ from ..contracts.models import (
 )
 from . import database as db
 from .storage import ArtifactStore
+
+logger = logging.getLogger(__name__)
+MF_STORAGE_CONCURRENCY = 4
 
 
 class RegistryConflictError(RuntimeError):
@@ -171,6 +177,9 @@ class RegistryRepository:
 
     def __init__(self, artifacts: ArtifactStore) -> None:
         self.artifacts = artifacts
+        # Shared across MF uploads and publication checks. Downloads and Python
+        # uploads retain their existing concurrency policy.
+        self._mf_capacity = anyio.CapacityLimiter(MF_STORAGE_CONCURRENCY)
 
     async def authenticate(self, token_hash: str) -> str | None:
         row = (
@@ -339,9 +348,38 @@ class RegistryRepository:
         mf_ready = mf is not None and mf.manifest_r2_key is not None
         if mf is not None and mf.manifest_r2_key is not None:
             prefix = mf.manifest_r2_key.removesuffix("mf-manifest.json")
-            for path in mf.asset_paths:
-                if await self.artifacts.head(prefix + path) is None:
-                    return False
+            paths = iter(mf.asset_paths)
+            failure: Exception | None = None
+            started = perf_counter()
+
+            async def check_objects() -> None:
+                nonlocal mf_ready, failure
+                try:
+                    for path in paths:
+                        async with self._mf_capacity:
+                            if await self.artifacts.head(prefix + path) is None:
+                                mf_ready = False
+                                group.cancel_scope.cancel()
+                                return
+                except Exception as error:
+                    if failure is None:
+                        failure = error
+                    group.cancel_scope.cancel()
+
+            async with anyio.create_task_group() as group:
+                for _ in range(min(MF_STORAGE_CONCURRENCY, len(mf.asset_paths))):
+                    group.start_soon(check_objects)
+            if failure is not None:
+                raise failure
+            logger.info(
+                "mf_publish extension=%s version=%s phase=objects files=%d duration_ms=%.1f",
+                row.extension.name,
+                row.version,
+                len(mf.asset_paths),
+                (perf_counter() - started) * 1000,
+            )
+            if not mf_ready:
+                return False
         return bool(files or mf_ready)
 
     async def yank(self, extension_name: str, version: str, reason: str) -> ReleaseRecord:
@@ -537,6 +575,7 @@ class RegistryRepository:
         files: dict[str, bytes],
         media_types: dict[str, str],
     ) -> ReleaseRecord:
+        started = perf_counter()
         row = (
             await db.ModuleFederationDistribution.filter(
                 release__extension_id=extension_name, release__version=version
@@ -555,9 +594,43 @@ class RegistryRepository:
             "published",
         }:
             raise RegistryStateError(f"cannot upload a snapshot to a {row.release.state} Release")
+        logger.info(
+            "mf_upload extension=%s version=%s phase=lookup duration_ms=%.1f",
+            extension_name,
+            version,
+            (perf_counter() - started) * 1000,
+        )
         prefix = f"staging/module-federation/{extension_name}/{version}/{snapshot_hash}/"
-        for path, content in sorted(files.items()):
-            await self._ensure_object(prefix + path, content, media_types[path])
+        paths = iter(sorted(files))
+        failure: Exception | None = None
+        started = perf_counter()
+
+        async def stage_objects() -> None:
+            nonlocal failure
+            try:
+                for path in paths:
+                    async with self._mf_capacity:
+                        await self._ensure_object(prefix + path, files[path], media_types[path])
+            except Exception as error:
+                if failure is None:
+                    failure = error
+                group.cancel_scope.cancel()
+
+        async with anyio.create_task_group() as group:
+            for _ in range(min(MF_STORAGE_CONCURRENCY, len(files))):
+                group.start_soon(stage_objects)
+        if failure is not None:
+            # Re-raise the original error after sibling I/O has stopped so that
+            # immutable conflicts keep their HTTP 409 mapping.
+            raise failure
+        logger.info(
+            "mf_upload extension=%s version=%s phase=staging files=%d duration_ms=%.1f",
+            extension_name,
+            version,
+            len(files),
+            (perf_counter() - started) * 1000,
+        )
+        started = perf_counter()
         async with in_transaction():
             release = await self._locked_release(extension_name, version)
             current = await db.ModuleFederationDistribution.get(release=release)
@@ -585,6 +658,12 @@ class RegistryRepository:
                 )
         result = await self.get_release(extension_name, version, public=False)
         assert result is not None
+        logger.info(
+            "mf_upload extension=%s version=%s phase=commit duration_ms=%.1f",
+            extension_name,
+            version,
+            (perf_counter() - started) * 1000,
+        )
         return result
 
     async def module_federation_public_file(

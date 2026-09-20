@@ -36,6 +36,12 @@ Heroku SNI endpoint `gallimimus-68400` 绑定了仅覆盖 `registry.inkcre.dev` 
 
 PostgreSQL 事务不覆盖 R2。中断上传可能留下不可达 staging 对象；公开可见性仍由数据库关联和 release 状态决定。后续修复追加迁移，不回写已部署历史，也不使用 `--fake` 掩盖 schema 与迁移记录不一致。
 
+MF snapshot 上传和发布前的对象检查在进程内共享四个并发额度，每个请求最多运行四个对象 worker。它们复用现有 boto3 客户端；十条连接的保留池容量本身不限制并发。上传仍逐对象先 HEAD、缺失时 PUT，全部完成后才在 release 行锁事务内提交 association；发布仍等待全部关联对象可用。失败或取消会等待已启动的对象调用结束，部分 staging 对象可以由相同 snapshot 重试复用，不会提前成为公开关联。
+
+服务输出 `mf_upload` 的 `receive`、`validation`、`lookup`、`staging` 和 `commit` 阶段完成日志，以及 `mf_publish phase=objects` 的检查日志。`duration_ms` 是该阶段墙钟耗时，`commit` 包含事务后的 descriptor 查询；日志以 extension/version 关联请求，不记录凭据或文件内容。排查 H12 时将这些日志与 Heroku request 日志对应，区分接收和 ZIP 校验、R2 往返、数据库提交；未完成阶段不会输出完成耗时。相同 release 的并行重试应结合请求时间判断，不能把相同身份的相邻日志当作同一个请求。
+
+[Heroku H12](https://devcenter.heroku.com/articles/request-timeout) 表示路由器在 30 秒内没有收到响应，应用仍可能完成当前请求。上传得到 503 或连接超时不能证明提交失败。恢复时保留原 ZIP、prepare descriptor、source revision 和 build identity；重新查询发行状态，对相同候选幂等重试并在公开后核验全部字节。MF-only Release 在 `preparing` 时公共读取仍是 404，须通过已认证的 Publisher 状态检查或继续同一发行的 publish；对象尚未就绪的 409 可以有限等待，鉴权、内容冲突、yanked 或 blocked 不应作为临时错误重试。有限并发减少逐文件往返累积，不保证上游故障或大 snapshot 一定在路由超时内完成。
+
 ## 本次迁移的恢复坐标
 
 旧 Worker 为 `inkcre-extension-registry`，保留版本 `ef4f71a1-a596-4b91-a33c-e78835e5b015`；旧 D1 为 `af52114f-55b5-476f-b986-8ff8d8601d77`。它们不再承接公开流量，不作为新 PostgreSQL 写入后的实时副本。删除旧生产资源仍需单独约定保留窗口和授权。

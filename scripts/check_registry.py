@@ -13,8 +13,11 @@ import json
 import logging
 import os
 import secrets
+import threading
 import zipfile
+from unittest.mock import patch
 
+import anyio
 import httpx
 import psycopg
 from check_d1_import import check_import
@@ -27,6 +30,7 @@ from tortoise.migrations.executor import MigrationExecutor
 
 from inkcre_extension_registry.service import database as db
 from inkcre_extension_registry.service.app import create_app
+from inkcre_extension_registry.service.module_federation import inspect_module_federation_snapshot
 from inkcre_extension_registry.service.settings import database_config
 
 
@@ -246,6 +250,101 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     replies = await asyncio.gather(competing("first"), competing("second"))
     assert sorted(reply.status_code for reply in replies) == [200, 409]
     assert await db.Release.filter(version="3.0.0").count() == 1
+
+    # Two uploads share the S3 budget. A staging conflict must remain HTTP 409,
+    # wait for sibling I/O, and never make a partially uploaded snapshot visible.
+    staged_files = {
+        "mf-manifest.json": json.dumps(
+            {"metaData": {"publicPath": "./", "remoteEntry": {"name": "remoteEntry.js"}}}
+        ),
+        "remoteEntry.js": "export const check = true;",
+        **{f"chunk-{index}.js": f"export const value = {index};" for index in range(8)},
+    }
+    staged_zip = archive(staged_files)
+    staged_path = release_path + "/4.0.0"
+    await request(
+        "POST",
+        release_path,
+        private=True,
+        json={**association, "version": "4.0.0", "python": None},
+    )
+    inspected = inspect_module_federation_snapshot(
+        staged_zip,
+        public_prefix="http://localhost/extensions/check/extension/4.0.0/module-federation/",
+    )
+    prefix = f"staging/module-federation/check/extension/4.0.0/{inspected.snapshot_hash}/"
+    conflict_key = prefix + "chunk-0.js"
+    await artifacts.put(conflict_key, b"truncated", content_type="text/javascript")
+    original_head = artifacts.client.head_object
+    active = peak = 0
+    lock = threading.Lock()
+    entered, proceed = threading.Event(), threading.Event()
+
+    def gated_head(**kwargs):
+        nonlocal active, peak
+        with lock:
+            active += 1
+            peak = max(peak, active)
+            if active == 4:
+                entered.set()
+        try:
+            assert proceed.wait(10), "MF object workers did not get released"
+            return original_head(**kwargs)
+        finally:
+            with lock:
+                active -= 1
+
+    async def conflicting_upload():
+        await request(
+            "POST",
+            staged_path + "/module-federation",
+            409,
+            private=True,
+            files={"content": ("staging.zip", staged_zip)},
+        )
+
+    with patch.object(artifacts.client, "head_object", gated_head):
+        async with anyio.create_task_group() as group:
+            group.start_soon(conflicting_upload)
+            group.start_soon(conflicting_upload)
+            try:
+                assert await anyio.to_thread.run_sync(entered.wait, 10), (
+                    "MF uploads serialized independent object requests"
+                )
+            finally:
+                proceed.set()
+    assert peak == 4 and active == 0
+    staged = await db.ModuleFederationDistribution.get(release__version="4.0.0")
+    assert staged.internal_snapshot_hash is None and staged.manifest_r2_key is None
+    await request("POST", staged_path + "/publish", 409, private=True)
+    await artifacts.put(conflict_key, inspected.files["chunk-0.js"], content_type="text/javascript")
+    for _ in range(2):
+        await request(
+            "POST",
+            staged_path + "/module-federation",
+            private=True,
+            files={"content": ("staging.zip", staged_zip)},
+        )
+    artifacts.client.delete_object(Bucket=artifacts.bucket, Key=prefix + "chunk-7.js")
+    await request("POST", staged_path + "/publish", 409, private=True)
+    await request(
+        "POST",
+        staged_path + "/module-federation",
+        private=True,
+        files={"content": ("staging.zip", staged_zip)},
+    )
+    await request("POST", staged_path + "/publish", private=True)
+    for path, content in inspected.files.items():
+        public = await request("GET", "/extensions/check/extension/4.0.0/module-federation/" + path)
+        assert public.content == content
+    changed_zip = archive({**staged_files, "chunk-0.js": "export const changed = true;"})
+    await request(
+        "POST",
+        staged_path + "/module-federation",
+        409,
+        private=True,
+        files={"content": ("staging.zip", changed_zip)},
+    )
 
     await db.Release.filter(version="1.0.0").update(state="blocked")
     await request("GET", version_path, 451)
