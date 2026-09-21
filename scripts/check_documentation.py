@@ -12,7 +12,11 @@ import zipfile
 from unittest.mock import patch
 
 import httpx
-from inkcre_extension_toolkit.client import RegistryClient
+from inkcre_extension_toolkit.client import (
+    DocumentationOutcomeUnknown,
+    RegistryClient,
+    RegistryHTTPError,
+)
 from inkcre_extension_toolkit.documentation import inspect_documentation
 from inkcre_extension_toolkit.generated.documentation import DocumentationUpload
 from tortoise.exceptions import IntegrityError
@@ -67,6 +71,7 @@ async def check_documentation(
     authorization = {"Authorization": f"Bearer {token}"}
     base = "/v1/extensions/check/documentation/releases/1.0.0"
     docs = base + "/documentation"
+    entry_url = "/documentation/check/documentation/1.0.0/global/"
     private = docs.replace("/v1/", "/v1/publisher/", 1)
 
     async def request(method, path, expected=200, **kwargs):
@@ -111,14 +116,15 @@ async def check_documentation(
             "source_revision": "revision",
             "entry": "index.html",
             "build_id": "check",
+            "expected_etag": None,
         }
 
     async def upload(payload, content=zipped, expected=200, headers=None, scope="global"):
         return await request(
-            "PUT",
+            "POST",
             docs + "/" + scope,
             expected,
-            headers={**authorization, **({"If-None-Match": "*"} if headers is None else headers)},
+            headers={**authorization, **(headers or {})},
             data={"metadata": json.dumps(payload)},
             files={"content": ("docs.zip", content)},
         )
@@ -126,16 +132,19 @@ async def check_documentation(
     first = metadata()
     await upload(first, expected=401, headers={"Authorization": ""})
     await upload(first, expected=403, headers={"Authorization": f"Bearer {other_token}"})
-    await upload(first, expected=428, headers={})
-    await upload(first, expected=400, headers={"If-Match": "*", "If-None-Match": "*"})
+    await upload(
+        {key: value for key, value in first.items() if key != "expected_etag"}, expected=400
+    )
     await upload(first, expected=409, scope="python")
-    first_record = (await upload(first)).json()
-    await upload(first, expected=412)
+    first_response = await upload(first)
+    assert "etag" not in first_response.headers
+    first_record = first_response.json()
+    assert (await upload(first)).json() == first_record
     assert (await request("GET", private, headers=authorization)).json()["sets"][0][
         "snapshot_id"
     ] == first["snapshot_id"]
     await request("GET", docs, 404)
-    await request("GET", first_record["entry_url"], 404)
+    await request("GET", entry_url, 404)
     await request("GET", first_record["snapshot_url"], 404)
     await request("POST", base + "/publish", 409, headers=authorization)
     await request(
@@ -166,7 +175,7 @@ async def check_documentation(
     public = (await request("GET", docs)).json()
     assert public["sets"][0]["snapshot_id"] == first["snapshot_id"]
     root = first_record["snapshot_url"]
-    entry = await request("GET", first_record["entry_url"], 307)
+    entry = await request("GET", entry_url, 307)
     assert entry.headers["location"] == root
     for path, content in files.items():
         response = await request("GET", root + path)
@@ -185,7 +194,7 @@ async def check_documentation(
     await request("GET", root + "missing", 404)
     await request("GET", root + "v1/publisher", 404, headers=authorization)
     await request(
-        "PUT",
+        "POST",
         root + "v1/extensions/check/documentation/releases/1.0.0/documentation/global",
         405,
         headers=authorization,
@@ -194,49 +203,67 @@ async def check_documentation(
 
     # A failed staging operation cannot move the pointer. Neither can a stale editor.
     changed_zip = archive({**files, "index.html": "Corrected page"})
-    second = metadata(changed_zip)
+    second = {**metadata(changed_zip), "expected_etag": first_record["snapshot_etag"]}
 
     async def fail_put(*args, **kwargs):
         raise OSError("simulated storage failure")
 
     with patch.object(artifacts, "put", fail_put):
         try:
-            await upload(second, changed_zip, headers={"If-Match": first_record["etag"]})
+            await upload(second, changed_zip)
         except OSError:
             pass
         else:
             raise AssertionError("failed storage upload unexpectedly succeeded")
     assert (await request("GET", docs)).json() == public
-    second_record = (
-        await upload(second, changed_zip, headers={"If-Match": first_record["etag"]})
-    ).json()
+    second_record = (await upload(second, changed_zip)).json()
     assert second_record["snapshot_url"] != root
     assert (await request("GET", root)).text == files["index.html"]
     assert (await request("GET", second_record["snapshot_url"])).text == "Corrected page"
-    await upload(metadata(), expected=412, headers={"If-Match": first_record["etag"]})
+    await upload({**metadata(), "expected_etag": first_record["snapshot_etag"]}, expected=409)
+    before_replay = (await request("GET", docs)).json()
+    assert (await upload(first)).json() == first_record
+    assert (await request("GET", docs)).json() == before_replay
+    for change in (
+        {"source_revision": "changed"},
+        {"entry": "clean.html"},
+        {"expected_etag": second_record["snapshot_etag"]},
+    ):
+        await upload({**first, **change}, expected=409)
+    await upload(first, expected=409, scope="module-federation")
     await upload(
-        {**metadata(), "snapshot_id": first["snapshot_id"]},
+        {
+            **metadata(),
+            "snapshot_id": first["snapshot_id"],
+            "expected_etag": second_record["snapshot_etag"],
+        },
         expected=409,
-        headers={"If-Match": second_record["etag"]},
     )
 
     # Two editors observing the same pointer cannot both win.
     async def contender():
-        return await client.put(
+        return await client.post(
             docs + "/global",
-            headers={**authorization, "If-Match": second_record["etag"]},
-            data={"metadata": json.dumps(metadata())},
+            headers=authorization,
+            data={
+                "metadata": json.dumps(
+                    {**metadata(), "expected_etag": second_record["snapshot_etag"]}
+                )
+            },
             files={"content": ("docs.zip", zipped)},
         )
 
     outcomes = await asyncio.gather(contender(), contender())
-    assert sorted(item.status_code for item in outcomes) == [200, 412]
+    assert sorted(item.status_code for item in outcomes) == [200, 409]
     current = next(item.json() for item in outcomes if item.status_code == 200)
     assert (await request("GET", base)).json() == native_before
     await request("POST", base + "/yank", headers=authorization)
-    warning = await request("GET", current["entry_url"])
+    warning = await request("GET", entry_url)
     assert "withdrawn" in warning.text and current["snapshot_url"] in warning.text
-    await upload(metadata(), headers={"If-Match": current["etag"]})
+    repeated = {**metadata(), "expected_etag": current["snapshot_etag"]}
+    duplicates = await asyncio.gather(upload(repeated), upload(repeated))
+    assert duplicates[0].json() == duplicates[1].json()
+    assert await db.DocumentationSnapshot.filter(id=repeated["snapshot_id"]).count() == 1
     await request("GET", root)
 
     row = await db.Release.get(extension_id="check/documentation", version="1.0.0")
@@ -272,7 +299,7 @@ async def check_documentation(
     for path in (
         docs,
         private,
-        first_record["entry_url"],
+        entry_url,
         root,
         root + "assets/main.css",
         second_record["snapshot_url"],
@@ -283,6 +310,7 @@ async def check_documentation(
             )
             assert response.headers["cache-control"] == "no-store"
     await upload(metadata(), expected=451)
+    await upload(first, expected=451)
 
     # Inspect raw ZIP names, not normalized extraction output; no files touch disk.
     for bad in (
@@ -313,24 +341,17 @@ async def check_documentation(
     else:
         raise AssertionError("documentation symlink admitted")
 
-    # The Toolkit recovers a lost response by identity without taking a newer ETag.
-    payload = DocumentationUpload.model_validate(first)
-    successful = {**first_record, **first}
+    # A finite retry resends the candidate, never queries or adopts current.
+    payload = DocumentationUpload.model_validate(
+        {key: value for key, value in first.items() if key != "expected_etag"}
+    )
     requests: list[httpx.Request] = []
 
     def recover(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        if request.method == "PUT":
+        if len(requests) == 1:
             raise httpx.ReadTimeout("lost response", request=request)
-        return httpx.Response(
-            200,
-            json={
-                "name": "check/documentation",
-                "version": "1.0.0",
-                "state": "published",
-                "sets": [successful],
-            },
-        )
+        return httpx.Response(200, json=first_record)
 
     with RegistryClient(
         "http://localhost", token=token, transport=httpx.MockTransport(recover)
@@ -339,5 +360,24 @@ async def check_documentation(
             "check", "documentation", "1.0.0", "global", payload, zipped
         )
         assert recovered.snapshot_id == first["snapshot_id"]
-    assert [item.method for item in requests] == ["PUT", "GET"]
-    assert requests[0].headers["if-none-match"] == "*"
+    assert [item.method for item in requests] == ["POST", "POST"]
+
+    for unavailable in (503, 409, 200):
+        attempts = 0
+
+        def fail(request: httpx.Request, status=unavailable) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(status, json={"detail": "unavailable"})
+
+        with RegistryClient("http://localhost", transport=httpx.MockTransport(fail)) as toolkit:
+            try:
+                toolkit.upload_documentation(
+                    "check", "documentation", "1.0.0", "global", payload, zipped
+                )
+            except DocumentationOutcomeUnknown:
+                assert unavailable in {503, 200} and attempts == 2
+            except RegistryHTTPError:
+                assert unavailable == 409 and attempts == 1
+            else:
+                raise AssertionError("a missing receipt must not be reported as success")

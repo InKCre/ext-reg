@@ -22,6 +22,32 @@ class Scope(Enum):
     module_federation = "module-federation"
 
 
+class DocumentationReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    build_id: constr(max_length=256) | None = Field(None, title="Build Id")
+    committed_at: str = Field(..., title="Committed At")
+    content_sha256: constr(pattern=r"^[0-9a-f]{64}$") = Field(..., title="Content Sha256")
+    entry: constr(min_length=1, max_length=768) | None = Field("index.html", title="Entry")
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    scope: Scope = Field(..., title="Scope")
+    snapshot_etag: str = Field(..., title="Snapshot Etag")
+    snapshot_id: constr(pattern=r"^[0-9a-f]{32}$") = Field(..., title="Snapshot Id")
+    snapshot_url: str = Field(..., title="Snapshot Url")
+    source_repository: constr(min_length=1, max_length=2048) = Field(..., title="Source Repository")
+    source_revision: constr(min_length=1, max_length=256) = Field(..., title="Source Revision")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
 class DocumentationRecord(BaseModel):
     model_config = ConfigDict(
         extra="forbid",

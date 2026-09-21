@@ -146,6 +146,19 @@ class DocumentationRecord(DocumentationUpload):
     updated_at: str
 
 
+class DocumentationPublication(DocumentationUpload):
+    expected_etag: str | None = Field(pattern=r'^"[0-9a-f]{64}"$')
+
+
+class DocumentationReceipt(DocumentationUpload):
+    name: CanonicalExtensionName
+    version: StrictSemVer
+    scope: DocumentationScope
+    snapshot_etag: str
+    snapshot_url: str
+    committed_at: str
+
+
 class ReleaseDocumentation(ContractModel):
     name: CanonicalExtensionName
     version: StrictSemVer
@@ -159,6 +172,8 @@ class DocumentationHosting(ContractModel):
 
 class DocumentationContracts(ContractModel):
     upload: DocumentationUpload
+    publication: DocumentationPublication
+    receipt: DocumentationReceipt
     release: ReleaseDocumentation
     hosting: DocumentationHosting
 

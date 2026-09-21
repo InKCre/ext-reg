@@ -15,6 +15,101 @@
         "title": "DocumentationHosting",
         "type": "object"
       },
+      "DocumentationReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "build_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Id"
+          },
+          "committed_at": {
+            "title": "Committed At",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "entry": {
+            "default": "index.html",
+            "maxLength": 768,
+            "minLength": 1,
+            "title": "Entry",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "python",
+              "module-federation"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "snapshot_etag": {
+            "title": "Snapshot Etag",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_url": {
+            "title": "Snapshot Url",
+            "type": "string"
+          },
+          "source_repository": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Repository",
+            "type": "string"
+          },
+          "source_revision": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "content_sha256",
+          "source_repository",
+          "source_revision",
+          "name",
+          "version",
+          "scope",
+          "snapshot_etag",
+          "snapshot_url",
+          "committed_at"
+        ],
+        "title": "DocumentationReceipt",
+        "type": "object"
+      },
       "DocumentationRecord": {
         "additionalProperties": false,
         "properties": {
@@ -1302,8 +1397,8 @@
       }
     },
     "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}": {
-      "put": {
-        "operationId": "upload_documentation_v1_extensions__namespace___name__releases__version__documentation__scope__put",
+      "post": {
+        "operationId": "upload_documentation_v1_extensions__namespace___name__releases__version__documentation__scope__post",
         "parameters": [
           {
             "in": "path",
@@ -1353,42 +1448,6 @@
               ],
               "title": "Scope",
               "type": "string"
-            }
-          },
-          {
-            "description": "Replace the observed strong ETag; do not combine with If-None-Match.",
-            "in": "header",
-            "name": "if-match",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Replace the observed strong ETag; do not combine with If-None-Match.",
-              "title": "If-Match"
-            }
-          },
-          {
-            "description": "Use * to create an absent set; do not combine with If-Match.",
-            "in": "header",
-            "name": "if-none-match",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Use * to create an absent set; do not combine with If-Match.",
-              "title": "If-None-Match"
             }
           },
           {
@@ -1446,6 +1505,18 @@
                           "title": "Entry",
                           "type": "string"
                         },
+                        "expected_etag": {
+                          "anyOf": [
+                            {
+                              "pattern": "^\"[0-9a-f]{64}\"$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Expected Etag"
+                        },
                         "snapshot_id": {
                           "pattern": "^[0-9a-f]{32}$",
                           "title": "Snapshot Id",
@@ -1468,12 +1539,13 @@
                         "snapshot_id",
                         "content_sha256",
                         "source_repository",
-                        "source_revision"
+                        "source_revision",
+                        "expected_etag"
                       ],
-                      "title": "DocumentationUpload",
+                      "title": "DocumentationPublication",
                       "type": "object"
                     },
-                    "description": "JSON-encoded DocumentationUpload; send as a text form field, not a file.",
+                    "description": "JSON-encoded DocumentationPublication; send as a text form field, not a file.",
                     "type": "string"
                   }
                 },
@@ -1492,18 +1564,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentationRecord"
+                  "$ref": "#/components/schemas/DocumentationReceipt"
                 }
               }
             },
-            "description": "Snapshot committed atomically; ETag identifies the current set.",
-            "headers": {
-              "ETag": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
+            "description": "Historical commit confirmed; current may differ."
           },
           "400": {
             "content": {
@@ -1553,7 +1618,7 @@
                 }
               }
             },
-            "description": "Missing Distribution association, digest conflict, or snapshot address occupied."
+            "description": "Publication identity conflict, stale expected_etag, or missing association."
           },
           "411": {
             "content": {
@@ -1564,16 +1629,6 @@
               }
             },
             "description": "A non-chunked Content-Length is required."
-          },
-          "412": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Set already exists or replacement ETag is stale; the current pointer is unchanged."
           },
           "413": {
             "content": {
@@ -1604,16 +1659,6 @@
               }
             },
             "description": "Validation Error"
-          },
-          "428": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Conditional write required: If-None-Match: * or the observed strong If-Match ETag."
           },
           "451": {
             "content": {

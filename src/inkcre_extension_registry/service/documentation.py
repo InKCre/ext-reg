@@ -13,9 +13,10 @@ from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
 from ..contracts.models import (
+    DocumentationPublication,
+    DocumentationReceipt,
     DocumentationRecord,
     DocumentationScope,
-    DocumentationUpload,
     ReleaseDocumentation,
     ReleaseState,
 )
@@ -82,6 +83,25 @@ def snapshot_link(settings: Settings, snapshot_id: str, path: str) -> str:
     return settings.documentation_origin(snapshot_id) + "/" + quote(path, safe="/")
 
 
+def receipt(
+    snapshot: db.DocumentationSnapshot, release: db.Release, settings: Settings
+) -> DocumentationReceipt:
+    return DocumentationReceipt(
+        name=release.extension_id,
+        version=release.version,
+        scope=cast(DocumentationScope, snapshot.scope),
+        snapshot_id=snapshot.id,
+        content_sha256=snapshot.content_sha256,
+        entry=snapshot.entry,
+        source_repository=snapshot.source_repository,
+        source_revision=snapshot.source_revision,
+        build_id=snapshot.build_id,
+        snapshot_etag=f'"{snapshot.etag}"',
+        snapshot_url=settings.documentation_origin(snapshot.id) + "/",
+        committed_at=snapshot.created_at.isoformat(),
+    )
+
+
 class DocumentationRepository:
     """Own documentation queries, atomic pointer replacement, and bounded object staging."""
 
@@ -122,11 +142,10 @@ class DocumentationRepository:
         extension: str,
         version: str,
         scope: DocumentationScope,
-        payload: DocumentationUpload,
+        payload: DocumentationPublication,
         bundle: DocumentationBundle,
-        condition: str,
         settings: Settings,
-    ) -> DocumentationRecord:
+    ) -> DocumentationReceipt:
         if bundle.digest != payload.content_sha256:
             raise RegistryConflictError("documentation content digest does not match metadata")
         metadata = payload.model_dump(mode="json")
@@ -138,7 +157,9 @@ class DocumentationRepository:
             ).encode()
         ).hexdigest()
 
-        async def check(release: db.Release) -> db.DocumentationSet | None:
+        async def check(
+            release: db.Release,
+        ) -> db.DocumentationSet | db.DocumentationSnapshot | None:
             readable(release, public=False)
             association = {
                 "python": db.PythonDistribution,
@@ -148,28 +169,35 @@ class DocumentationRepository:
                 raise RegistryStateError(
                     "documentation scope requires its Distribution association"
                 )
+            previous = await db.DocumentationSnapshot.filter(id=payload.snapshot_id).first()
+            if previous is not None:
+                # The ETag fingerprints target, metadata and original precondition.
+                # Confirming this commit never reactivates its historical snapshot.
+                if previous.etag != etag:
+                    raise RegistryConflictError(
+                        "snapshot identity belongs to a different publication"
+                    )
+                return previous
             current = (
                 await db.DocumentationSet.filter(release=release, scope=scope)
                 .select_related("snapshot")
                 .first()
             )
-            if (condition == "*" and current is not None) or (
-                condition != "*" and (current is None or condition != f'"{current.snapshot.etag}"')
+            if (payload.expected_etag is None and current is not None) or (
+                payload.expected_etag is not None
+                and (current is None or payload.expected_etag != f'"{current.snapshot.etag}"')
             ):
                 raise DocumentationPreconditionError(
                     "documentation changed; read it before replacing"
                 )
-            previous = await db.DocumentationSnapshot.filter(id=payload.snapshot_id).first()
-            if previous is not None:
-                # Reusing an old address, even for identical bytes, would also reuse
-                # its browser storage and service worker. Corrections need a new ID.
-                raise RegistryConflictError("documentation snapshot address is already bound")
             return current
 
         release = await db.Release.filter(extension_id=extension, version=version).first()
         if release is None:
             raise RegistryNotFoundError("Release does not exist")
-        await check(release)
+        existing = await check(release)
+        if isinstance(existing, db.DocumentationSnapshot):
+            return receipt(existing, release, settings)
         paths = iter(bundle.files)
         failure: Exception | None = None
 
@@ -203,11 +231,17 @@ class DocumentationRepository:
             async with in_transaction():
                 release = await db.Release.filter(id=release.id).select_for_update().get()
                 current = await check(release)
+                if isinstance(current, db.DocumentationSnapshot):
+                    return receipt(current, release, settings)
                 snapshot = await db.DocumentationSnapshot.create(
                     id=payload.snapshot_id,
                     release=release,
                     scope=scope,
-                    **{key: value for key, value in metadata.items() if key != "snapshot_id"},
+                    **{
+                        key: value
+                        for key, value in metadata.items()
+                        if key not in {"snapshot_id", "expected_etag"}
+                    },
                     files=bundle.manifest,
                     etag=etag,
                 )
@@ -222,4 +256,4 @@ class DocumentationRepository:
             raise RegistryConflictError(
                 "documentation snapshot address is already bound"
             ) from error
-        return record(current, release, settings)
+        return receipt(snapshot, release, settings)

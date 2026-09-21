@@ -10,6 +10,34 @@ export const zDocumentationHosting = z.object({
 })
 
 /**
+ * DocumentationReceipt
+ */
+export const zDocumentationReceipt = z.object({
+  build_id: z.string().max(256).nullish(),
+  committed_at: z.string(),
+  content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  entry: z.string().min(1).max(768).optional().default('index.html'),
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  scope: z.enum(['global', 'python', 'module-federation']),
+  snapshot_etag: z.string(),
+  snapshot_id: z.string().regex(/^[0-9a-f]{32}$/),
+  snapshot_url: z.string(),
+  source_repository: z.string().min(1).max(2048),
+  source_revision: z.string().min(1).max(256),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
  * DocumentationRecord
  */
 export const zDocumentationRecord = z.object({
@@ -397,20 +425,18 @@ export const zGetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentat
 export const zGetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
   zReleaseDocumentation
 
-export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutBody =
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostBody =
   z.object({
     content: z.string(),
     metadata: z.string(),
   })
 
-export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutHeaders =
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostHeaders =
   z.object({
-    'if-match': z.string().nullish(),
-    'if-none-match': z.string().nullish(),
     authorization: z.string().nullish(),
   })
 
-export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutPath =
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostPath =
   z.object({
     namespace: z
       .string()
@@ -433,10 +459,10 @@ export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumen
   })
 
 /**
- * Snapshot committed atomically; ETag identifies the current set.
+ * Historical commit confirmed; current may differ.
  */
-export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponse =
-  zDocumentationRecord
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponse =
+  zDocumentationReceipt
 
 export const zUploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostHeaders =
   z.object({

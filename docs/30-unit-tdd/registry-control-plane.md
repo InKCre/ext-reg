@@ -39,17 +39,28 @@ models, routes, generated contracts, and build checks are the exact executable i
 Documentation is a separate projection of one exact Release, not another Distribution and not an
 optional field added to `ReleaseRecord`. A set is addressed by Release and `global`, `python`, or
 `module-federation` scope. Channel scopes require their corresponding Distribution association;
-the global scope does not. Each replacement uploads a complete ZIP, uses `If-None-Match: *` for the
-first set or the observed strong ETag for a correction, and receives a fresh opaque snapshot origin.
+the global scope does not. Each publication submits a complete ZIP through POST, with a required
+`expected_etag` business field: null creates an absent set, while the observed strong ETag permits
+a correction. Every new publication uses a fresh opaque snapshot identity and origin.
 
 Registry validates normalized paths, admitted static media types, expansion limits, the HTML entry,
 and the declared content digest. It stages every object before a short transaction locks the Release,
 rechecks the precondition, records the immutable snapshot, and moves the current-set pointer. Failed
 staging and stale editors cannot replace the previous pointer. The Toolkit saves the archive,
-metadata, snapshot identity, and precondition as one candidate; recovery rereads identity and never
-adopts a newer ETag on the caller's behalf.
+metadata, snapshot identity, and precondition as one candidate. The snapshot ETag fingerprints the
+canonical target, metadata, and original precondition; the atomically committed snapshot is also
+the publication receipt. An exact replay returns that historical receipt before checking current,
+without staging again, changing the pointer, or changing its timestamp. Reusing an ID with a different
+fingerprint conflicts. The receipt exposes `committed_at` and `snapshot_etag`, not a current-set HTTP
+ETag. Authentication and blocked checks apply before acknowledging a replay.
 
-作者的构建、上传限制、MIME 映射及恢复方式以[静态文档发布协议](documentation-admission.md)为准。JSON Schema 包含 upload、release、hosting 三种契约；OpenAPI 的 multipart `metadata` 是 JSON 编码的文本字段，其 `contentSchema` 给出内部结构，HTTP 错误与条件写入语义也在 OpenAPI 中声明。
+Toolkit makes at most two foreground attempts for transport failures, selected temporary 5xx, or an
+invalid receipt. Exhaustion reports an unknown outcome and retains the saved candidate. Definitive
+client errors are not retried. There is no background recovery, eventual-delivery guarantee, or
+automatic adoption of a newer ETag. Staging failure can leave unreachable objects; commit receipts
+confirm a past database transaction, not the continuing availability of every stored byte.
+
+作者的构建、上传限制、MIME 映射及恢复方式以[静态文档发布协议](documentation-admission.md)为准。JSON Schema 包含 upload、publication、receipt、release 和 hosting 契约；OpenAPI 的 multipart `metadata` 是 JSON 编码的 publication 文本字段，其 `contentSchema` 给出内部结构，HTTP 错误与写入前提也在 OpenAPI 中声明。
 
 Management and content use separate origins. The stable management entry redirects to the selected
 snapshot; files, root-relative assets, browser storage, and Service Workers remain confined to that

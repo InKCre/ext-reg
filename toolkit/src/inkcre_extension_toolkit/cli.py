@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from .client import RegistryClient
+from .client import DocumentationOutcomeUnknown, RegistryClient
 from .contracts import PrepareReleaseRequest
 from .documentation import DocumentationCandidate, inspect_documentation, pack_documentation
 from .preview import build_preview_registry
@@ -102,15 +102,19 @@ def docs_publish(
     namespace, name = saved.name.split("/", 1)
     archive = (candidate / "documentation.zip").read_bytes()
     with _client(registry_url, token) as client:
-        result = client.upload_documentation(
-            namespace,
-            name,
-            saved.version,
-            saved.scope,
-            saved.metadata,
-            archive,
-            expected_etag=saved.expected_etag,
-        )
+        try:
+            result = client.upload_documentation(
+                namespace,
+                name,
+                saved.version,
+                saved.scope,
+                saved.metadata,
+                archive,
+                expected_etag=saved.expected_etag,
+            )
+        except DocumentationOutcomeUnknown as error:
+            typer.echo(str(error), err=True)
+            raise typer.Exit(1) from error
     typer.echo(result.model_dump_json())
 
 

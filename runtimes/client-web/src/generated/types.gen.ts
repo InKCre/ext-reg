@@ -15,6 +15,60 @@ export type DocumentationHosting = {
 }
 
 /**
+ * DocumentationReceipt
+ */
+export type DocumentationReceipt = {
+  /**
+   * Build Id
+   */
+  build_id?: string | null
+  /**
+   * Committed At
+   */
+  committed_at: string
+  /**
+   * Content Sha256
+   */
+  content_sha256: string
+  /**
+   * Entry
+   */
+  entry?: string
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Scope
+   */
+  scope: 'global' | 'python' | 'module-federation'
+  /**
+   * Snapshot Etag
+   */
+  snapshot_etag: string
+  /**
+   * Snapshot Id
+   */
+  snapshot_id: string
+  /**
+   * Snapshot Url
+   */
+  snapshot_url: string
+  /**
+   * Source Repository
+   */
+  source_repository: string
+  /**
+   * Source Revision
+   */
+  source_revision: string
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
  * DocumentationRecord
  */
 export type DocumentationRecord = {
@@ -776,55 +830,44 @@ export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentatio
 export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
   GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses[keyof GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses]
 
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutData = {
-  body: {
-    content: Blob | File
-    /**
-     * JSON-encoded DocumentationUpload; send as a text form field, not a file.
-     */
-    metadata: string
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData =
+  {
+    body: {
+      content: Blob | File
+      /**
+       * JSON-encoded DocumentationPublication; send as a text form field, not a file.
+       */
+      metadata: string
+    }
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+      /**
+       * Scope
+       */
+      scope: 'global' | 'python' | 'module-federation'
+    }
+    query?: never
+    url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}'
   }
-  headers?: {
-    /**
-     * If-Match
-     *
-     * Replace the observed strong ETag; do not combine with If-None-Match.
-     */
-    'if-match'?: string | null
-    /**
-     * If-None-Match
-     *
-     * Use * to create an absent set; do not combine with If-Match.
-     */
-    'if-none-match'?: string | null
-    /**
-     * Authorization
-     */
-    authorization?: string | null
-  }
-  path: {
-    /**
-     * Namespace
-     */
-    namespace: string
-    /**
-     * Name
-     */
-    name: string
-    /**
-     * Version
-     */
-    version: string
-    /**
-     * Scope
-     */
-    scope: 'global' | 'python' | 'module-federation'
-  }
-  query?: never
-  url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}'
-}
 
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors =
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors =
   {
     /**
      * Malformed conditional headers, multipart fields, metadata, or static ZIP.
@@ -843,17 +886,13 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
      */
     404: RegistryError
     /**
-     * Missing Distribution association, digest conflict, or snapshot address occupied.
+     * Publication identity conflict, stale expected_etag, or missing association.
      */
     409: RegistryError
     /**
      * A non-chunked Content-Length is required.
      */
     411: RegistryError
-    /**
-     * Set already exists or replacement ETag is stale; the current pointer is unchanged.
-     */
-    412: RegistryError
     /**
      * The complete multipart request exceeds 20 MiB.
      */
@@ -867,10 +906,6 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
      */
     422: HttpValidationError
     /**
-     * Conditional write required: If-None-Match: * or the observed strong If-Match ETag.
-     */
-    428: RegistryError
-    /**
      * The Release is operator-blocked, including for its publisher.
      */
     451: RegistryError
@@ -880,19 +915,19 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
     503: RegistryError
   }
 
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutError =
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors]
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostError =
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors]
 
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses =
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses =
   {
     /**
-     * Snapshot committed atomically; ETag identifies the current set.
+     * Historical commit confirmed; current may differ.
      */
-    200: DocumentationRecord
+    200: DocumentationReceipt
   }
 
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponse =
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses]
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponse =
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses]
 
 export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData =
   {

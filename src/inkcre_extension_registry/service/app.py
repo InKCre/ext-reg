@@ -26,9 +26,9 @@ from tortoise.contrib.fastapi import RegisterTortoise
 from .. import __version__
 from ..contracts.models import (
     DocumentationHosting,
-    DocumentationRecord,
+    DocumentationPublication,
+    DocumentationReceipt,
     DocumentationScope,
-    DocumentationUpload,
     ExtensionRecord,
     ExtensionSummary,
     PrepareReleaseRequest,
@@ -99,12 +99,10 @@ DOCUMENTATION_ERRORS = {
         401: "Publisher credential is missing or invalid.",
         403: "Publisher does not own this namespace.",
         404: "Release or publicly readable documentation does not exist.",
-        409: "Missing Distribution association, digest conflict, or snapshot address occupied.",
+        409: "Publication identity conflict, stale expected_etag, or missing association.",
         411: "A non-chunked Content-Length is required.",
-        412: "Set already exists or replacement ETag is stale; the current pointer is unchanged.",
         413: "The complete multipart request exceeds 20 MiB.",
         415: "The request must use multipart/form-data.",
-        428: "Conditional write required: If-None-Match: * or the observed strong If-Match ETag.",
         451: "The Release is operator-blocked, including for its publisher.",
         503: "Documentation content hosting is not configured.",
     }.items()
@@ -435,14 +433,13 @@ def create_app() -> FastAPI:
     ) -> ReleaseDocumentation:
         return await read_documentation(namespace, name, version, request, response, public=False)
 
-    @app.put(
+    @app.post(
         "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}",
-        response_model=DocumentationRecord,
+        response_model=DocumentationReceipt,
         responses={
             **DOCUMENTATION_ERRORS,
             200: {
-                "description": "Snapshot committed atomically; ETag identifies the current set.",
-                "headers": {"ETag": {"schema": {"type": "string"}}},
+                "description": "Historical commit confirmed; current may differ.",
             },
         },
         openapi_extra={
@@ -457,9 +454,9 @@ def create_app() -> FastAPI:
                                 "metadata": {
                                     "type": "string",
                                     "contentMediaType": "application/json",
-                                    "contentSchema": DocumentationUpload.model_json_schema(),
+                                    "contentSchema": DocumentationPublication.model_json_schema(),
                                     "description": (
-                                        "JSON-encoded DocumentationUpload; "
+                                        "JSON-encoded DocumentationPublication; "
                                         "send as a text form field, not a file."
                                     ),
                                 },
@@ -479,36 +476,16 @@ def create_app() -> FastAPI:
         request: Request,
         response: Response,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-        if_match: Annotated[
-            str | None,
-            Header(
-                description="Replace the observed strong ETag; do not combine with If-None-Match."
-            ),
-        ] = None,
-        if_none_match: Annotated[
-            str | None,
-            Header(description="Use * to create an absent set; do not combine with If-Match."),
-        ] = None,
-    ) -> DocumentationRecord:
+    ) -> DocumentationReceipt:
         extension = _validate_identity(namespace, name, version)
         settings = documentation_settings(request)
-        if if_match is None and if_none_match is None:
-            raise HTTPException(428, "If-None-Match: * or the current If-Match ETag is required")
-        if (
-            (if_match is not None and if_none_match is not None)
-            or (if_none_match is not None and if_none_match != "*")
-            or (if_match is not None and not re.fullmatch(r'"[0-9a-f]{64}"', if_match))
-        ):
-            raise HTTPException(
-                400, "provide exactly one strong replacement ETag or If-None-Match: *"
-            )
         form = await _form(request)
         try:
             upload = form.get("content")
             if not isinstance(upload, UploadFile):
                 raise HTTPException(400, "content ZIP file is required")
             try:
-                payload = DocumentationUpload.model_validate_json(
+                payload = DocumentationPublication.model_validate_json(
                     _form_string(form, "metadata") or ""
                 )
                 bundle = await anyio.to_thread.run_sync(
@@ -523,16 +500,14 @@ def create_app() -> FastAPI:
                     scope,
                     payload,
                     bundle,
-                    if_match or "*",
                     settings,
                 )
             except documentation.DocumentationPreconditionError as error:
-                raise HTTPException(412, str(error)) from error
+                raise HTTPException(409, str(error)) from error
             except (RegistryConflictError, RegistryStateError, RegistryNotFoundError) as error:
                 raise _map_repository_error(error) from error
         finally:
             await form.close()
-        response.headers["ETag"] = result.etag
         response.headers["Cache-Control"] = "no-store"
         return result
 

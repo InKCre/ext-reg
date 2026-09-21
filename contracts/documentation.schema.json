@@ -14,6 +14,170 @@
       "title": "DocumentationHosting",
       "type": "object"
     },
+    "DocumentationPublication": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "entry": {
+          "default": "index.html",
+          "maxLength": 768,
+          "minLength": 1,
+          "title": "Entry",
+          "type": "string"
+        },
+        "expected_etag": {
+          "anyOf": [
+            {
+              "pattern": "^\"[0-9a-f]{64}\"$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Etag"
+        },
+        "snapshot_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "source_repository": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "content_sha256",
+        "source_repository",
+        "source_revision",
+        "expected_etag"
+      ],
+      "title": "DocumentationPublication",
+      "type": "object"
+    },
+    "DocumentationReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "committed_at": {
+          "title": "Committed At",
+          "type": "string"
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "entry": {
+          "default": "index.html",
+          "maxLength": 768,
+          "minLength": 1,
+          "title": "Entry",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "global",
+            "python",
+            "module-federation"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "snapshot_etag": {
+          "title": "Snapshot Etag",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "snapshot_url": {
+          "title": "Snapshot Url",
+          "type": "string"
+        },
+        "source_repository": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Source Revision",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "content_sha256",
+        "source_repository",
+        "source_revision",
+        "name",
+        "version",
+        "scope",
+        "snapshot_etag",
+        "snapshot_url",
+        "committed_at"
+      ],
+      "title": "DocumentationReceipt",
+      "type": "object"
+    },
     "DocumentationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -204,6 +368,12 @@
     "hosting": {
       "$ref": "#/$defs/DocumentationHosting"
     },
+    "publication": {
+      "$ref": "#/$defs/DocumentationPublication"
+    },
+    "receipt": {
+      "$ref": "#/$defs/DocumentationReceipt"
+    },
     "release": {
       "$ref": "#/$defs/ReleaseDocumentation"
     },
@@ -213,6 +383,8 @@
   },
   "required": [
     "upload",
+    "publication",
+    "receipt",
     "release",
     "hosting"
   ],

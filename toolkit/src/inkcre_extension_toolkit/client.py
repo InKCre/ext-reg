@@ -3,11 +3,13 @@ from __future__ import annotations
 from urllib.parse import quote
 
 import httpx
+from pydantic import ValidationError
 
 from .contracts import PrepareReleaseRequest, ReleaseRecord
 from .generated.documentation import (
     DocumentationHosting,
-    DocumentationRecord,
+    DocumentationPublication,
+    DocumentationReceipt,
     DocumentationUpload,
     ReleaseDocumentation,
 )
@@ -22,6 +24,10 @@ class RegistryHTTPError(RuntimeError):
         super().__init__(f"Registry HTTP {response.status_code}: {detail}")
         self.status_code = response.status_code
         self.response = response
+
+
+class DocumentationOutcomeUnknown(RuntimeError):
+    """A bounded publication attempt ended without an authoritative commit receipt."""
 
 
 class RegistryClient:
@@ -135,44 +141,37 @@ class RegistryClient:
         archive: bytes,
         *,
         expected_etag: str | None = None,
-    ) -> DocumentationRecord:
-        """Recover only an exact matching result without refreshing the precondition."""
+    ) -> DocumentationReceipt:
+        """Try the saved publication at most twice; never infer success from current."""
         from .documentation import inspect_documentation
 
         inspected = inspect_documentation(archive, metadata.entry)
         if inspected.digest != metadata.content_sha256:
             raise ValueError("saved documentation archive no longer matches its metadata")
-        try:
-            response = self._require_success(
-                self._client.put(
-                    self._release_path(namespace, name, version) + f"/documentation/{scope}",
-                    headers={"If-Match": expected_etag}
-                    if expected_etag
-                    else {"If-None-Match": "*"},
-                    data={"metadata": metadata.model_dump_json()},
-                    files={"content": ("documentation.zip", archive, "application/zip")},
-                )
-            )
-            return DocumentationRecord.model_validate(response.json())
-        except (httpx.TransportError, RegistryHTTPError) as error:
-            if isinstance(error, RegistryHTTPError) and error.status_code not in {
-                409,
-                412,
-                500,
-                502,
-                503,
-                504,
-            }:
-                raise
+        publication = DocumentationPublication.model_validate(
+            {**metadata.model_dump(mode="json"), "expected_etag": expected_etag}
+        )
+        last_error: Exception | None = None
+        for _attempt in range(2):
             try:
-                current = self.get_documentation(namespace, name, version, private=True)
-            except (httpx.TransportError, RegistryHTTPError):
-                raise error from None
-            for item in current.sets:
-                if item.scope == scope and all(
-                    item.model_dump(mode="json")[key] == value
-                    for key, value in metadata.model_dump(mode="json").items()
-                ):
-                    return item
-            # A successful concurrent replacement is not ours to overwrite.
-            raise
+                response = self._require_success(
+                    self._client.post(
+                        self._release_path(namespace, name, version) + f"/documentation/{scope}",
+                        data={"metadata": publication.model_dump_json()},
+                        files={"content": ("documentation.zip", archive, "application/zip")},
+                    )
+                )
+                return DocumentationReceipt.model_validate_json(response.content)
+            except (httpx.TransportError, RegistryHTTPError, ValidationError) as error:
+                if isinstance(error, RegistryHTTPError) and error.status_code not in {
+                    500,
+                    502,
+                    503,
+                    504,
+                }:
+                    raise
+                last_error = error
+        raise DocumentationOutcomeUnknown(
+            f"Publication {metadata.snapshot_id} outcome is unknown after two attempts; "
+            "keep and retry the same saved candidate. Do not refresh its ETag or snapshot ID."
+        ) from last_error

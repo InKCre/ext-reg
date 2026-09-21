@@ -55,9 +55,9 @@ import type {
   UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostData,
   UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors,
   UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutData,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses,
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData,
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
   UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData,
   UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors,
   UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses,
@@ -286,21 +286,21 @@ export const getDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentati
 /**
  * Upload Documentation
  */
-export const uploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePut = <
+export const uploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePost = <
   ThrowOnError extends boolean = false,
 >(
   options: Options<
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutData,
+    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData,
     ThrowOnError
   >,
 ): RequestResult<
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors,
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
   ThrowOnError
 > =>
-  (options.client ?? client).put<
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses,
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors,
+  (options.client ?? client).post<
+    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
+    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
     ThrowOnError
   >({
     ...formDataBodySerializer,
