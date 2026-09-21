@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+  <h1>Documentation for a withdrawn release</h1>
+  <p>{{ name }} {{ version }} has been withdrawn. Its documentation remains available for existing installations, but this is not a recommended release.</p>
+  <a href="{{ target }}" rel="noopener noreferrer">Continue to this exact documentation snapshot</a>
+</section>
+{% endblock %}

@@ -21,6 +21,7 @@ import anyio
 import httpx
 import psycopg
 from check_d1_import import check_import
+from check_documentation import check_documentation
 from moto.server import ThreadedMotoServer
 from registry_database import configure_runtime_login
 from tortoise import Tortoise
@@ -355,6 +356,7 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
             denied = await request(method, path, 451, headers={"If-None-Match": "*"})
             assert denied.headers["cache-control"] == "no-store"
     assert "check-extension" not in (await request("GET", "/simple/")).text
+    await check_documentation(client, token, other_token, artifacts)
     await db.Credential.all().update(disabled=True)
     await request("GET", "/v1/publisher", 401, private=True)
 
@@ -397,6 +399,7 @@ async def main() -> None:
     os.environ.update(
         DATABASE_URL=url,
         PUBLIC_ORIGIN="http://localhost",
+        DOCUMENTATION_ORIGIN_TEMPLATE="http://{snapshot}.docs.localhost",
         S3_ENDPOINT_URL=f"http://{host}:{port}",
         S3_BUCKET="registry-check",
         AWS_ACCESS_KEY_ID="testing",
@@ -430,6 +433,8 @@ async def main() -> None:
                         db.ModuleFederationDistribution,
                         db.PythonDistribution,
                         db.PythonFile,
+                        db.DocumentationSnapshot,
+                        db.DocumentationSet,
                     )
                 ):
                     await model.all().delete()
@@ -437,6 +442,8 @@ async def main() -> None:
                 print("Registry PostgreSQL migrations, transactions, HTTP and S3 checks passed.")
             finally:
                 for model in (
+                    db.DocumentationSet,
+                    db.DocumentationSnapshot,
                     db.PythonFile,
                     db.PythonDistribution,
                     db.ModuleFederationDistribution,

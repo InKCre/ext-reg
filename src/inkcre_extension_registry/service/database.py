@@ -57,6 +57,7 @@ class Extension(Model):
 
 class Release(Model):
     id = fields.BigIntField(primary_key=True)
+    extension_id: str
     extension: fields.ForeignKeyRelation[Extension] = fields.ForeignKeyField(
         "models.Extension",
         related_name="releases",
@@ -172,4 +173,53 @@ class ModuleFederationDistribution(Model):
                 "AND internal_snapshot_hash IS NOT NULL AND uploaded_at IS NOT NULL)",
                 "mf_complete_snapshot",
             ),
+        ]
+
+
+class DocumentationSnapshot(Model):
+    id = fields.CharField(max_length=32, primary_key=True)
+    release: fields.ForeignKeyRelation[Release] = fields.ForeignKeyField(
+        "models.Release", on_delete=fields.RESTRICT
+    )
+    scope = fields.CharField(max_length=32)
+    content_sha256 = fields.CharField(max_length=64)
+    entry = fields.TextField()
+    source_repository = fields.TextField()
+    source_revision = fields.TextField()
+    build_id = fields.TextField(null=True)
+    files = fields.JSONField()
+    etag = fields.CharField(max_length=64)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta(Model.Meta):
+        table = "documentation_snapshots"
+        constraints: ClassVar = [
+            CheckConstraint("id ~ '^[0-9a-f]{32}$'", "docs_snapshot_id"),
+            CheckConstraint(
+                "scope IN ('global', 'python', 'module-federation')", "docs_snapshot_scope"
+            ),
+            CheckConstraint(
+                "content_sha256 ~ '^[0-9a-f]{64}$' AND etag ~ '^[0-9a-f]{64}$'",
+                "docs_snapshot_hash",
+            ),
+            CheckConstraint("jsonb_typeof(files) = 'object'", "docs_snapshot_files"),
+        ]
+
+
+class DocumentationSet(Model):
+    id = fields.BigIntField(primary_key=True)
+    release: fields.ForeignKeyRelation[Release] = fields.ForeignKeyField(
+        "models.Release", on_delete=fields.RESTRICT
+    )
+    scope = fields.CharField(max_length=32)
+    snapshot: fields.ForeignKeyRelation[DocumentationSnapshot] = fields.ForeignKeyField(
+        "models.DocumentationSnapshot", on_delete=fields.RESTRICT
+    )
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta(Model.Meta):
+        table = "documentation_sets"
+        unique_together = (("release_id", "scope"),)
+        constraints: ClassVar = [
+            CheckConstraint("scope IN ('global', 'python', 'module-federation')", "docs_set_scope"),
         ]

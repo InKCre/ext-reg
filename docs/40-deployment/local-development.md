@@ -7,7 +7,7 @@ pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 ```
 
-配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
+配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，并且不能与管理 origin 共站。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
 
 ```bash
 pnpm db:migrate
@@ -24,7 +24,7 @@ pdm run python -m inkcre_extension_registry
 REGISTRY_TEST_DATABASE_URL=postgres://registry:registry-check@localhost:5432/registry_check pnpm check
 ```
 
-CI 创建 PostgreSQL 17 service；本地使用独立、一次性的 PostgreSQL 实例或 Neon 测试分支。授权迁移会创建实例级角色，因此仅在共享实例内增加一个空数据库不足以隔离这些检查。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、blocked 读取、GET / HEAD 和 ETag 重验证。迁移使用 owner，业务验收使用 `registry_app`，并验证创建表、修改业务表、写迁移记录和创建角色均被拒绝。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
+CI 创建 PostgreSQL 17 service；本地使用独立、一次性的 PostgreSQL 实例或 Neon 测试分支。授权迁移会创建实例级角色，因此仅在共享实例内增加一个空数据库不足以隔离这些检查。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、文档条件替换与快照域隔离、blocked 读取、GET / HEAD 和 ETag 重验证。迁移使用 owner，业务验收使用 `registry_app`，并验证创建表、修改业务表、写迁移记录和创建角色均被拒绝。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
 
 `pnpm registry:check` 单独执行上述验收，仍需要同一个测试变量。CI 另外拒绝修改或删除已在 base 中存在的迁移，并构建完整服务镜像。测试数据不会写入共享预览。
 

@@ -9,6 +9,36 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
 
+class DocumentationHosting(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    origin_template: str = Field(..., title="Origin Template")
+
+
+class Scope(Enum):
+    global_ = "global"
+    python = "python"
+    module_federation = "module-federation"
+
+
+class DocumentationRecord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    build_id: constr(max_length=256) | None = Field(None, title="Build Id")
+    content_sha256: constr(pattern=r"^[0-9a-f]{64}$") = Field(..., title="Content Sha256")
+    entry: constr(min_length=1, max_length=768) | None = Field("index.html", title="Entry")
+    entry_url: str = Field(..., title="Entry Url")
+    etag: str = Field(..., title="Etag")
+    scope: Scope = Field(..., title="Scope")
+    snapshot_id: constr(pattern=r"^[0-9a-f]{32}$") = Field(..., title="Snapshot Id")
+    snapshot_url: str = Field(..., title="Snapshot Url")
+    source_repository: constr(min_length=1, max_length=2048) = Field(..., title="Source Repository")
+    source_revision: constr(min_length=1, max_length=256) = Field(..., title="Source Revision")
+    updated_at: str = Field(..., title="Updated At")
+
+
 class ExtensionSummary(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -67,6 +97,24 @@ class PythonEntryPoint(BaseModel):
         min_length=1,
         max_length=256,
     ) = Field(..., title="Object")
+
+
+class ReleaseDocumentation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    sets: list[DocumentationRecord] = Field(..., title="Sets")
+    state: State = Field(..., title="State")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
 
 
 class ValidationError(BaseModel):

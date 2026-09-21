@@ -5,6 +5,66 @@ export type ClientOptions = {
 }
 
 /**
+ * DocumentationHosting
+ */
+export type DocumentationHosting = {
+  /**
+   * Origin Template
+   */
+  origin_template: string
+}
+
+/**
+ * DocumentationRecord
+ */
+export type DocumentationRecord = {
+  /**
+   * Build Id
+   */
+  build_id?: string | null
+  /**
+   * Content Sha256
+   */
+  content_sha256: string
+  /**
+   * Entry
+   */
+  entry?: string
+  /**
+   * Entry Url
+   */
+  entry_url: string
+  /**
+   * Etag
+   */
+  etag: string
+  /**
+   * Scope
+   */
+  scope: 'global' | 'python' | 'module-federation'
+  /**
+   * Snapshot Id
+   */
+  snapshot_id: string
+  /**
+   * Snapshot Url
+   */
+  snapshot_url: string
+  /**
+   * Source Repository
+   */
+  source_repository: string
+  /**
+   * Source Revision
+   */
+  source_revision: string
+  /**
+   * Updated At
+   */
+  updated_at: string
+}
+
+/**
  * ExtensionRecord
  */
 export type ExtensionRecord = {
@@ -230,6 +290,28 @@ export type PythonEntryPoint = {
    * Object
    */
   object: string
+}
+
+/**
+ * ReleaseDocumentation
+ */
+export type ReleaseDocumentation = {
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Sets
+   */
+  sets: Array<DocumentationRecord>
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Version
+   */
+  version: string
 }
 
 /**
@@ -468,6 +550,23 @@ export type SimpleProjectSimpleProjectGetResponses = {
   200: unknown
 }
 
+export type DocumentationHostingV1DocumentationHostingGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/v1/documentation-hosting'
+}
+
+export type DocumentationHostingV1DocumentationHostingGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: DocumentationHosting
+}
+
+export type DocumentationHostingV1DocumentationHostingGetResponse =
+  DocumentationHostingV1DocumentationHostingGetResponses[keyof DocumentationHostingV1DocumentationHostingGetResponses]
+
 export type ListExtensionsV1ExtensionsGetData = {
   body?: never
   path?: never
@@ -604,6 +703,112 @@ export type GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponses = {
 
 export type GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponse =
   GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponses[keyof GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponses]
+
+export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetData = {
+  body?: never
+  path: {
+    /**
+     * Namespace
+     */
+    namespace: string
+    /**
+     * Name
+     */
+    name: string
+    /**
+     * Version
+     */
+    version: string
+  }
+  query?: never
+  url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation'
+}
+
+export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetError =
+  GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetErrors[keyof GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetErrors]
+
+export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: ReleaseDocumentation
+}
+
+export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
+  GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses[keyof GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses]
+
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutData = {
+  body: {
+    content: Blob | File
+    /**
+     * DocumentationUpload JSON
+     */
+    metadata: string
+  }
+  headers?: {
+    /**
+     * If-Match
+     */
+    'if-match'?: string | null
+    /**
+     * If-None-Match
+     */
+    'if-none-match'?: string | null
+    /**
+     * Authorization
+     */
+    authorization?: string | null
+  }
+  path: {
+    /**
+     * Namespace
+     */
+    namespace: string
+    /**
+     * Name
+     */
+    name: string
+    /**
+     * Version
+     */
+    version: string
+    /**
+     * Scope
+     */
+    scope: 'global' | 'python' | 'module-federation'
+  }
+  query?: never
+  url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}'
+}
+
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutError =
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors]
+
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: DocumentationRecord
+  }
+
+export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponse =
+  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses]
 
 export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData =
   {
@@ -832,3 +1037,52 @@ export type PublisherWorkspaceV1PublisherGetResponses = {
 
 export type PublisherWorkspaceV1PublisherGetResponse =
   PublisherWorkspaceV1PublisherGetResponses[keyof PublisherWorkspaceV1PublisherGetResponses]
+
+export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetData =
+  {
+    body?: never
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v1/publisher/extensions/{namespace}/{name}/releases/{version}/documentation'
+  }
+
+export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetError =
+  PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetErrors[keyof PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetErrors]
+
+export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: ReleaseDocumentation
+  }
+
+export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
+  PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses[keyof PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses]

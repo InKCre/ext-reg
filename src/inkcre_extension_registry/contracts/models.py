@@ -122,6 +122,43 @@ class ContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+DocumentationScope = Literal["global", "python", "module-federation"]
+
+
+class DocumentationUpload(ContractModel):
+    snapshot_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    entry: str = Field(default="index.html", min_length=1, max_length=768)
+    source_repository: str = Field(min_length=1, max_length=2048)
+    source_revision: str = Field(min_length=1, max_length=256)
+    build_id: str | None = Field(default=None, max_length=256)
+
+
+class DocumentationRecord(DocumentationUpload):
+    scope: DocumentationScope
+    etag: str
+    entry_url: str
+    snapshot_url: str
+    updated_at: str
+
+
+class ReleaseDocumentation(ContractModel):
+    name: CanonicalExtensionName
+    version: StrictSemVer
+    state: ReleaseState
+    sets: list[DocumentationRecord]
+
+
+class DocumentationHosting(ContractModel):
+    origin_template: str
+
+
+class DocumentationContracts(ContractModel):
+    upload: DocumentationUpload
+    release: ReleaseDocumentation
+    hosting: DocumentationHosting
+
+
 class PythonEntryPoint(ContractModel):
     group: str = Field(min_length=1, max_length=128, pattern=ENTRY_GROUP_PATTERN_TEXT)
     name: str = Field(min_length=1, max_length=128, pattern=ENTRY_NAME_PATTERN_TEXT)

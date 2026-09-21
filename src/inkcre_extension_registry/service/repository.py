@@ -180,6 +180,7 @@ class RegistryRepository:
         # Shared across MF uploads and publication checks. Downloads and Python
         # uploads retain their existing concurrency policy.
         self._mf_capacity = anyio.CapacityLimiter(MF_STORAGE_CONCURRENCY)
+        self.documentation_capacity = anyio.CapacityLimiter(4)
 
     async def authenticate(self, token_hash: str) -> str | None:
         row = (

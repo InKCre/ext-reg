@@ -1,7 +1,12 @@
 {
-  "contract_revision": 2,
+  "contract_revision": 3,
   "distribution_kinds": [
     "module_federation",
+    "python"
+  ],
+  "documentation_scopes": [
+    "global",
+    "module-federation",
     "python"
   ],
   "extension_version": "strict-semver-without-build-metadata",

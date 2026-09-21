@@ -34,6 +34,29 @@ and materializes only the manifest's public path from canonical
 The generated [OpenAPI contract](../../contracts/openapi.json), JSON Schemas,
 models, routes, generated contracts, and build checks are the exact executable interface authorities.
 
+## Extension Documentation
+
+Documentation is a separate projection of one exact Release, not another Distribution and not an
+optional field added to `ReleaseRecord`. A set is addressed by Release and `global`, `python`, or
+`module-federation` scope. Channel scopes require their corresponding Distribution association;
+the global scope does not. Each replacement uploads a complete ZIP, uses `If-None-Match: *` for the
+first set or the observed strong ETag for a correction, and receives a fresh opaque snapshot origin.
+
+Registry validates normalized paths, admitted static media types, expansion limits, the HTML entry,
+and the declared content digest. It stages every object before a short transaction locks the Release,
+rechecks the precondition, records the immutable snapshot, and moves the current-set pointer. Failed
+staging and stale editors cannot replace the previous pointer. The Toolkit saves the archive,
+metadata, snapshot identity, and precondition as one candidate; recovery rereads identity and never
+adopts a newer ETag on the caller's behalf.
+
+Management and content use separate origins. The stable management entry redirects to the selected
+snapshot; files, root-relative assets, browser storage, and Service Workers remain confined to that
+snapshot's origin. The content-origin middleware serves only GET and HEAD, never management routes,
+credentials, author headers, redirects, or server execution. Exact and directory-index routes are
+supported, with `.html` clean URLs; there is no SPA fallback. Published and yanked Release snapshots
+remain readable, with a withdrawal warning on stable yanked entries. `preparing` is publisher-only,
+and `blocked` denies discovery, stable entries, and every historical snapshot before revalidation.
+
 ## Persistence and Security
 
 持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有查询与事务。Release、Distribution 和 File 使用独立内部主键，公开身份仍是 Extension Name / Version 或 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
@@ -42,7 +65,7 @@ models, routes, generated contracts, and build checks are the exact executable i
 
 R2 的网络访问不持有数据库事务锁。boto3 的同步调用在线程中执行；上传先写内容寻址的 staging 对象，再在 PostgreSQL 事务中增加可见关联。发布前检查关联对象存在，文件大小一致。失败可能留下不可达的 staging 对象，它们不是公开状态的来源。每次文件读取先检查 release 可读性，再通过 S3 流式返回；HEAD 只读取对象元数据。响应使用 `Cache-Control: public, no-cache` 和内容 SHA-256 ETag；条件 GET / HEAD 在 release 可读、对象存在之后才能返回 304。缓存必须逐次重验证，blocked 的 451 响应使用 `no-store`。已经被客户端下载的内容无法通过服务端状态变化收回。
 
-应用启动只初始化连接池，不建表、不运行迁移、不创建凭据或示例数据。交付在启动新版本前运行包内 Tortoise 迁移，并仅允许向前执行。数据迁移工具只在旧 SQLite 快照读取边界使用 SQL，PostgreSQL 业务读写与发布凭据维护使用 ORM。角色与 GRANT 是 PostgreSQL 原生授权 DDL，由追加迁移维护；登录密码由可信交付端设置。运行角色 `registry_app` 仅获得七张业务表的 SELECT / INSERT / UPDATE / DELETE、对应序列的 USAGE 和 schema 的 USAGE，不能修改 schema、角色或迁移记录。后续新增表须在同一迁移显式授予所需权限，不自动授权全部未来表。旧 D1 历史保留用于导入验收，迁移工具不自动访问生产 D1。
+应用启动只初始化连接池，不建表、不运行迁移、不创建凭据或示例数据。交付在启动新版本前运行包内 Tortoise 迁移，并仅允许向前执行。数据迁移工具只在旧 SQLite 快照读取边界使用 SQL，PostgreSQL 业务读写与发布凭据维护使用 ORM。角色与 GRANT 是 PostgreSQL 原生授权 DDL，由追加迁移维护；登录密码由可信交付端设置。运行角色 `registry_app` 仅获得明确列出的业务表的 SELECT / INSERT / UPDATE / DELETE、对应序列的 USAGE 和 schema 的 USAGE，不能修改 schema、角色或迁移记录。后续新增表须在同一迁移显式授予所需权限，不自动授权全部未来表。旧 D1 历史保留用于导入验收，迁移工具不自动访问生产 D1。
 
 Publisher 持有 namespace 范围内的发布能力；原始 token 只用于请求认证和运维命令的标准输入，数据库保存 SHA-256。匿名读取只能看到公开或撤回的 release，blocked 状态拒绝描述和原始文件访问。预览服务只获得所属数据库分支和 R2 桶的凭据；云平台控制凭据只属于可信交付控制器。
 

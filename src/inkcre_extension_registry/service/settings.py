@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import ssl
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, unquote, urlparse
@@ -58,6 +59,23 @@ class Settings:
     public_origin: str
     s3_endpoint_url: str
     s3_bucket: str
+    documentation_origin_template: str | None = None
+
+    def documentation_origin(self, snapshot_id: str) -> str:
+        if self.documentation_origin_template is None:
+            raise ValueError("documentation content origin is not configured")
+        if not re.fullmatch(r"[0-9a-f]{32}", snapshot_id):
+            raise ValueError("invalid documentation snapshot identity")
+        return self.documentation_origin_template.replace("{snapshot}", snapshot_id)
+
+    def documentation_snapshot(self, authority: str) -> str | None:
+        if self.documentation_origin_template is None:
+            return None
+        template = urlparse(self.documentation_origin_template).netloc
+        match = re.fullmatch(
+            re.escape(template).replace(r"\{snapshot\}", "([0-9a-f]{32})"), authority.lower()
+        )
+        return match.group(1) if match else None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -79,9 +97,36 @@ class Settings:
             or parsed.params
         ):
             raise ValueError("PUBLIC_ORIGIN must be an absolute HTTPS origin")
+        documentation_origin = os.environ.get("DOCUMENTATION_ORIGIN_TEMPLATE")
+        if documentation_origin is not None:
+            content = urlparse(documentation_origin)
+            local_content = content.scheme == "http" and (content.hostname or "").endswith(
+                ".localhost"
+            )
+            if (
+                documentation_origin.count("{snapshot}") != 1
+                or not (content.hostname or "").startswith("{snapshot}.")
+                or (content.scheme != "https" and not local_content)
+                or content.username is not None
+                or content.password is not None
+                or content.path
+                or content.query
+                or content.fragment
+                or content.params
+                or "{" in documentation_origin.replace("{snapshot}", "")
+                or "}" in documentation_origin.replace("{snapshot}", "")
+                or (parsed.hostname or "").endswith(
+                    (content.hostname or "").removeprefix("{snapshot}")
+                )
+            ):
+                raise ValueError(
+                    "DOCUMENTATION_ORIGIN_TEMPLATE must be a separate wildcard HTTPS origin "
+                    "with a leading {snapshot} label"
+                )
         return cls(
             database_url=os.environ["DATABASE_URL"],
             public_origin=origin,
             s3_endpoint_url=os.environ["S3_ENDPOINT_URL"],
             s3_bucket=os.environ["S3_BUCKET"],
+            documentation_origin_template=documentation_origin,
         )
