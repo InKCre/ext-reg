@@ -9,6 +9,7 @@ generated contracts and build checks remain executable authority.
 - [Registry Web](registry-web.md): discovery, publisher workspace, and design consumption.
 - [Extension Developer Toolkit](developer-toolkit.md)
 - [Core Python Extension Host Runtime](core-python-runtime.md)
+- [Client Web Extension Runtime](client-web-runtime.md)：浏览器生命周期、精确 Peer 管理与发行文档消费。
 
 Shared product behavior and cross-unit Host contracts remain in the InKCre
 documentation Hub rather than being copied here.

@@ -16,10 +16,12 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "prepare:sdk": "node prepare-sdk.mjs",
+    "build": "pnpm prepare:sdk && tsdown",
+    "check:boundaries": "pnpm build && node check-boundaries.mjs",
     "check:bindings": "pnpm generate:bindings && git diff --exit-code -- src/generated",
     "generate:bindings": "openapi-ts -f openapi-ts.config.ts && prettier --write src/generated",
-    "type-check": "tsc --noEmit",
+    "type-check": "pnpm prepare:sdk && tsc --noEmit",
     "pack": "pnpm pack"
   },
   "dependencies": {
@@ -27,13 +29,17 @@
     "zod": "4.1.12"
   },
   "peerDependencies": {
-    "@inkcre/core": ">=0.1.2 <0.2.0",
+    "@inkcre/core": ">=0.3.0 <0.4.0",
     "@module-federation/runtime": ">=0.21.4 <0.23.0"
   },
   "devDependencies": {
+    "@inkcre/core": "github:InKCre/client-web#f29a407ae02980b221e9419bb38421aa95805771&path:/packages/core",
     "@module-federation/runtime": "0.21.6",
     "@types/semver": "7.7.1",
+    "@vueuse/core": "14.1.0",
+    "pinia": "3.0.3",
     "tsdown": "0.15.11",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vue": "3.5.18"
   }
 }

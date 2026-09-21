@@ -92,7 +92,8 @@ export class RegistryReleaseReader {
   }
 }
 
-function registryOrigin(value: string): URL {
+/** Validate an origin already selected by the Host's Registry origin resolver. */
+export function registryOrigin(value: string): URL {
   const origin = new URL(value)
   if (
     !['http:', 'https:'].includes(origin.protocol) ||
@@ -107,7 +108,7 @@ function registryOrigin(value: string): URL {
   return origin
 }
 
-function assertCoordinate(name: string, version: string): void {
+export function assertCoordinate(name: string, version: string): void {
   if (!EXTENSION_NAME.test(name)) throw new RegistryReleaseError('Invalid Extension name.')
   if (validSemVer(version) !== version || version.includes('+')) {
     throw new RegistryReleaseError(

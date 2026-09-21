@@ -9,7 +9,7 @@
   "scripts": {
     "build": "SOURCE_DATE_EPOCH=315532800 pdm build --no-sdist --dest \"$INIT_CWD/dist\" && SOURCE_DATE_EPOCH=315532800 pdm build --project toolkit --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && SOURCE_DATE_EPOCH=315532800 pdm build --project runtimes/core-py --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pnpm --filter @inkcre/extension-runtime-client-web build",
     "changeset": "changeset",
-    "check": "pnpm web:check && pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm packages:check && pnpm registry:check",
+    "check": "pnpm web:check && pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm --filter @inkcre/extension-runtime-client-web exec node check-boundaries.mjs && pnpm packages:check && pnpm registry:check",
     "packages:check": "pdm run python scripts/check_packages.py",
     "contracts:check": "pdm run python scripts/generate_contracts.py --check && pdm run python runtimes/core-py/scripts/generate_contracts.py --check && pnpm --filter @inkcre/extension-runtime-client-web check:bindings",
     "contracts:generate": "pdm run python scripts/generate_contracts.py && pdm run python runtimes/core-py/scripts/generate_contracts.py && pnpm --filter @inkcre/extension-runtime-client-web generate:bindings",
