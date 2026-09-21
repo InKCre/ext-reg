@@ -5,6 +5,12 @@ from urllib.parse import quote
 import httpx
 
 from .contracts import PrepareReleaseRequest, ReleaseRecord
+from .generated.documentation import (
+    DocumentationHosting,
+    DocumentationRecord,
+    DocumentationUpload,
+    ReleaseDocumentation,
+)
 
 
 class RegistryHTTPError(RuntimeError):
@@ -105,3 +111,68 @@ class RegistryClient:
 
     def simple_project_url(self, project: str) -> str:
         return f"{self.base_url}/simple/{quote(project, safe='-')}/"
+
+    def documentation_hosting(self) -> DocumentationHosting:
+        response = self._require_success(self._client.get("/v1/documentation-hosting"))
+        return DocumentationHosting.model_validate(response.json())
+
+    def get_documentation(
+        self, namespace: str, name: str, version: str, *, private: bool = False
+    ) -> ReleaseDocumentation:
+        path = self._release_path(namespace, name, version) + "/documentation"
+        if private:
+            path = path.replace("/v1/extensions/", "/v1/publisher/extensions/", 1)
+        response = self._require_success(self._client.get(path))
+        return ReleaseDocumentation.model_validate(response.json())
+
+    def upload_documentation(
+        self,
+        namespace: str,
+        name: str,
+        version: str,
+        scope: str,
+        metadata: DocumentationUpload,
+        archive: bytes,
+        *,
+        expected_etag: str | None = None,
+    ) -> DocumentationRecord:
+        """Recover only an exact matching result without refreshing the precondition."""
+        from .documentation import inspect_documentation
+
+        inspected = inspect_documentation(archive, metadata.entry)
+        if inspected.digest != metadata.content_sha256:
+            raise ValueError("saved documentation archive no longer matches its metadata")
+        try:
+            response = self._require_success(
+                self._client.put(
+                    self._release_path(namespace, name, version) + f"/documentation/{scope}",
+                    headers={"If-Match": expected_etag}
+                    if expected_etag
+                    else {"If-None-Match": "*"},
+                    data={"metadata": metadata.model_dump_json()},
+                    files={"content": ("documentation.zip", archive, "application/zip")},
+                )
+            )
+            return DocumentationRecord.model_validate(response.json())
+        except (httpx.TransportError, RegistryHTTPError) as error:
+            if isinstance(error, RegistryHTTPError) and error.status_code not in {
+                409,
+                412,
+                500,
+                502,
+                503,
+                504,
+            }:
+                raise
+            try:
+                current = self.get_documentation(namespace, name, version, private=True)
+            except (httpx.TransportError, RegistryHTTPError):
+                raise error from None
+            for item in current.sets:
+                if item.scope == scope and all(
+                    item.model_dump(mode="json")[key] == value
+                    for key, value in metadata.model_dump(mode="json").items()
+                ):
+                    return item
+            # A successful concurrent replacement is not ours to overwrite.
+            raise
