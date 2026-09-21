@@ -75,8 +75,7 @@ def main() -> None:
         run("docker", "push", target)
         run("heroku", "container:release", "web", "--app", app)
         run("heroku", "ps:scale", "web=1:eco", "--app", app)
-        # This origin proves the new app before an independently authorized DNS cutover.
-        smoke(existing["web_url"].rstrip("/"), os.environ["SOURCE_SHA"])
+        smoke(origin, os.environ["SOURCE_SHA"])
         print(f"Production app released: {app}; canonical origin: {origin}")
 
 
