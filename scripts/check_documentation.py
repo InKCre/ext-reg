@@ -27,12 +27,12 @@ from inkcre_extension_registry.service.settings import Settings
 
 
 def check_content_sites() -> None:
-    """Configuration must enforce the promised cookie-site isolation before serving HTML."""
+    """Configuration must keep each snapshot on its own valid content origin."""
     for management, content, accepted in (
-        ("https://registry.example.com", "https://{snapshot}.docs.example.com", False),
-        ("https://registry.example.co.uk", "https://{snapshot}.docs.example.co.uk", False),
+        ("https://registry.example.com", "https://{snapshot}.docs.example.com", True),
+        ("https://registry.example.co.uk", "https://{snapshot}.docs.example.co.uk", True),
         ("https://registry.example.com", "https://{snapshot}.exampleusercontent.net", True),
-        ("https://registry.team.github.io", "https://{snapshot}.docs.team.github.io", False),
+        ("https://registry.team.github.io", "https://{snapshot}.docs.team.github.io", True),
         ("https://registry.team.github.io", "https://{snapshot}.other.github.io", True),
         ("http://localhost", "http://{snapshot}.docs.localhost", True),
         ("https://registry.example.com", "http://{snapshot}.docs.localhost", False),

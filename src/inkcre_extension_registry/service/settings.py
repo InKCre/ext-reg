@@ -8,8 +8,6 @@ import ssl
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, unquote, urlparse
 
-from publicsuffixlist import PublicSuffixList
-
 
 def database_config(url: str) -> dict:
     parsed = urlparse(url)
@@ -109,6 +107,7 @@ class Settings:
                 documentation_origin.count("{snapshot}") != 1
                 or not (content.hostname or "").startswith("{snapshot}.")
                 or (content.scheme != "https" and not local_content)
+                or (local_content and not local_http)
                 or content.username is not None
                 or content.password is not None
                 or content.path
@@ -122,20 +121,6 @@ class Settings:
                     "DOCUMENTATION_ORIGIN_TEMPLATE must be a separate wildcard HTTPS origin "
                     "with a leading {snapshot} label"
                 )
-            # Author HTML/JS must not share the management site's cookie domain.
-            # Use the packaged ICANN + private PSL, never a startup network fetch.
-            if not (local_http and local_content):
-                psl = PublicSuffixList(accept_unknown=False, only_icann=False)
-                management_host = (parsed.hostname or "").encode("idna").decode("ascii")
-                content_host = (content.hostname or "").removeprefix("{snapshot}.")
-                content_host = content_host.encode("idna").decode("ascii")
-                management_site = psl.privatesuffix(management_host)
-                content_site = psl.privatesuffix(content_host)
-                if not management_site or not content_site or management_site == content_site:
-                    raise ValueError(
-                        "documentation and management must use different registrable domains "
-                        "recognized by the packaged Public Suffix List"
-                    )
         return cls(
             database_url=os.environ["DATABASE_URL"],
             public_origin=origin,

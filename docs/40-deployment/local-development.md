@@ -7,9 +7,9 @@ pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 ```
 
-配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，并且不能与管理 origin 共站。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
+配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，使每份不可变快照拥有独立 origin。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
 
-生产内容域必须使用不同的可注册域，例如 `registry.example.com` 与 `{snapshot}.exampleusercontent.net`；`{snapshot}.docs.example.com` 会被拒绝。配置校验使用 `publicsuffixlist` 包内的 Public Suffix List（含 private section），不在启动时访问网络；PSL 随锁定依赖升级更新，未知后缀和没有固定可注册域的模板被拒绝。域名应采用 ASCII/Punycode 配置。仅管理端是 HTTP loopback、内容端是 HTTP `.localhost` 的配对配置获得本地例外。内容域必须专用于不可信静态内容，不得部署 SSO、转发认证 Cookie，或与其他持有认证 Cookie 的服务共用父域；PSL 校验只验证所配置的管理域与内容域，无法盘点其他服务的 Cookie 配置。
+生产内容域可以与管理站使用同一可注册域。这样部署时，作者提供的 HTML/JS 可能接收或干扰父域 Cookie；不得在共享父域设置敏感 Cookie。需要浏览器级站点隔离时，应改用独立可注册域，例如 `registry.example.com` 与 `{snapshot}.exampleusercontent.net`。域名应采用 ASCII/Punycode 配置。
 
 ```bash
 pnpm db:migrate
