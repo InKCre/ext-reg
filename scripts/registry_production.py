@@ -49,6 +49,7 @@ def main() -> None:
                 "DATABASE_URL",
                 "S3_ENDPOINT_URL",
                 "S3_BUCKET",
+                "DOCUMENTATION_ORIGIN_TEMPLATE",
                 "AWS_ACCESS_KEY_ID",
                 "AWS_SECRET_ACCESS_KEY",
             )

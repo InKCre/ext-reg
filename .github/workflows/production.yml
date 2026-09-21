@@ -100,6 +100,7 @@ jobs:
           MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
           S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
           S3_BUCKET: ${{ vars.S3_BUCKET }}
+          DOCUMENTATION_ORIGIN_TEMPLATE: ${{ vars.DOCUMENTATION_ORIGIN_TEMPLATE }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
