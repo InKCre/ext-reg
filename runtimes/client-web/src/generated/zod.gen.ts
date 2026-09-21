@@ -162,6 +162,13 @@ export const zPublisherWorkspace = z.object({
 })
 
 /**
+ * RegistryError
+ */
+export const zRegistryError = z.object({
+  detail: z.string(),
+})
+
+/**
  * ReleaseDocumentation
  */
 export const zReleaseDocumentation = z.object({
@@ -426,7 +433,7 @@ export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumen
   })
 
 /**
- * Successful Response
+ * Snapshot committed atomically; ETag identifies the current set.
  */
 export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponse =
   zDocumentationRecord

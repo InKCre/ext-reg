@@ -8,7 +8,8 @@ license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
   "fastapi>=0.139.2,<0.142",
-  "inkcre-extension-toolkit>=0.2,<0.3",
+  "inkcre-extension-toolkit>=0.3,<0.4",
+  "publicsuffixlist>=1,<2",
   "packaging>=25,<27",
   "python-multipart>=0.0.22,<0.1",
   "jinja2<4,>=3.1.6",

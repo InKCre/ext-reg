@@ -8,6 +8,8 @@ import ssl
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, unquote, urlparse
 
+from publicsuffixlist import PublicSuffixList
+
 
 def database_config(url: str) -> dict:
     parsed = urlparse(url)
@@ -71,7 +73,7 @@ class Settings:
     def documentation_snapshot(self, authority: str) -> str | None:
         if self.documentation_origin_template is None:
             return None
-        template = urlparse(self.documentation_origin_template).netloc
+        template = urlparse(self.documentation_origin_template).netloc.lower()
         match = re.fullmatch(
             re.escape(template).replace(r"\{snapshot\}", "([0-9a-f]{32})"), authority.lower()
         )
@@ -115,14 +117,25 @@ class Settings:
                 or content.params
                 or "{" in documentation_origin.replace("{snapshot}", "")
                 or "}" in documentation_origin.replace("{snapshot}", "")
-                or (parsed.hostname or "").endswith(
-                    (content.hostname or "").removeprefix("{snapshot}")
-                )
             ):
                 raise ValueError(
                     "DOCUMENTATION_ORIGIN_TEMPLATE must be a separate wildcard HTTPS origin "
                     "with a leading {snapshot} label"
                 )
+            # Author HTML/JS must not share the management site's cookie domain.
+            # Use the packaged ICANN + private PSL, never a startup network fetch.
+            if not (local_http and local_content):
+                psl = PublicSuffixList(accept_unknown=False, only_icann=False)
+                management_host = (parsed.hostname or "").encode("idna").decode("ascii")
+                content_host = (content.hostname or "").removeprefix("{snapshot}.")
+                content_host = content_host.encode("idna").decode("ascii")
+                management_site = psl.privatesuffix(management_host)
+                content_site = psl.privatesuffix(content_host)
+                if not management_site or not content_site or management_site == content_site:
+                    raise ValueError(
+                        "documentation and management must use different registrable domains "
+                        "recognized by the packaged Public Suffix List"
+                    )
         return cls(
             database_url=os.environ["DATABASE_URL"],
             public_origin=origin,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
 import secrets
 import stat
 import zipfile
@@ -18,6 +19,37 @@ from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
 from inkcre_extension_registry.service import database as db
+from inkcre_extension_registry.service.settings import Settings
+
+
+def check_content_sites() -> None:
+    """Configuration must enforce the promised cookie-site isolation before serving HTML."""
+    for management, content, accepted in (
+        ("https://registry.example.com", "https://{snapshot}.docs.example.com", False),
+        ("https://registry.example.co.uk", "https://{snapshot}.docs.example.co.uk", False),
+        ("https://registry.example.com", "https://{snapshot}.exampleusercontent.net", True),
+        ("https://registry.team.github.io", "https://{snapshot}.docs.team.github.io", False),
+        ("https://registry.team.github.io", "https://{snapshot}.other.github.io", True),
+        ("http://localhost", "http://{snapshot}.docs.localhost", True),
+        ("https://registry.example.com", "http://{snapshot}.docs.localhost", False),
+    ):
+        with patch.dict(
+            os.environ, PUBLIC_ORIGIN=management, DOCUMENTATION_ORIGIN_TEMPLATE=content
+        ):
+            try:
+                Settings.from_env()
+            except ValueError:
+                assert not accepted, (management, content)
+            else:
+                assert accepted, (management, content)
+    with patch.dict(
+        os.environ,
+        PUBLIC_ORIGIN="https://registry.example.com",
+        DOCUMENTATION_ORIGIN_TEMPLATE="https://{snapshot}.EXAMPLEUSERCONTENT.NET",
+    ):
+        settings = Settings.from_env()
+        identity = "a" * 32
+        assert settings.documentation_snapshot(f"{identity}.exampleusercontent.net") == identity
 
 
 def archive(files: dict[str, str]) -> bytes:
@@ -31,6 +63,7 @@ def archive(files: dict[str, str]) -> bytes:
 async def check_documentation(
     client: httpx.AsyncClient, token: str, other_token: str, artifacts
 ) -> None:
+    check_content_sites()
     authorization = {"Authorization": f"Bearer {token}"}
     base = "/v1/extensions/check/documentation/releases/1.0.0"
     docs = base + "/documentation"
@@ -214,6 +247,27 @@ async def check_documentation(
         pass
     else:
         raise AssertionError("database admitted an invalid documentation scope")
+    # Bypass publish to prove the database protects pointer ownership itself.
+    other_release = await db.Release.create(extension_id=row.extension_id, version="2.0.0")
+    for values in ({"scope": "python"}, {"release_id": other_release.id}):
+        try:
+            async with in_transaction():
+                await db.DocumentationSet.filter(release=row).update(**values)
+        except IntegrityError:
+            pass
+        else:
+            raise AssertionError(f"database admitted a cross-owner documentation pointer: {values}")
+    # The reverse direction must also be protected while the pointer exists.
+    current_set = await db.DocumentationSet.get(release=row, scope="global").select_related(
+        "snapshot"
+    )
+    try:
+        async with in_transaction():
+            await db.DocumentationSnapshot.filter(id=current_set.snapshot.id).update(scope="python")
+    except IntegrityError:
+        pass
+    else:
+        raise AssertionError("database allowed a referenced snapshot to change ownership")
     await db.Release.filter(id=row.id).update(state="blocked")
     for path in (
         docs,

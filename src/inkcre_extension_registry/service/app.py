@@ -34,6 +34,7 @@ from ..contracts.models import (
     PrepareReleaseRequest,
     PublisherWorkspace,
     PythonEntryPoint,
+    RegistryError,
     RegistrySegment,
     ReleaseDocumentation,
     ReleaseRecord,
@@ -91,9 +92,31 @@ UPLOAD_PATH_PATTERN = re.compile(
     r"^/legacy/$|^/v1/extensions/[^/]+/[^/]+/releases/[^/]+/(module-federation|documentation/[^/]+)$"
 )
 
+DOCUMENTATION_ERRORS = {
+    code: {"model": RegistryError, "description": description}
+    for code, description in {
+        400: "Malformed conditional headers, multipart fields, metadata, or static ZIP.",
+        401: "Publisher credential is missing or invalid.",
+        403: "Publisher does not own this namespace.",
+        404: "Release or publicly readable documentation does not exist.",
+        409: "Missing Distribution association, digest conflict, or snapshot address occupied.",
+        411: "A non-chunked Content-Length is required.",
+        412: "Set already exists or replacement ETag is stale; the current pointer is unchanged.",
+        413: "The complete multipart request exceeds 20 MiB.",
+        415: "The request must use multipart/form-data.",
+        428: "Conditional write required: If-None-Match: * or the observed strong If-Match ETag.",
+        451: "The Release is operator-blocked, including for its publisher.",
+        503: "Documentation content hosting is not configured.",
+    }.items()
+}
+
 
 def _repository(request: Request) -> RegistryRepository:
     return request.app.state.repository
+
+
+def _documentation(request: Request) -> documentation.DocumentationRepository:
+    return request.app.state.documentation
 
 
 def _credential_from_authorization(authorization: str | None) -> str | None:
@@ -230,6 +253,7 @@ async def lifespan(app: FastAPI):
         async with RegisterTortoise(app, config=database_config(settings.database_url)):
             app.state.settings = settings
             app.state.repository = RegistryRepository(artifacts)
+            app.state.documentation = documentation.DocumentationRepository(artifacts)
             yield
     finally:
         await artifacts.close()
@@ -302,7 +326,7 @@ def create_app() -> FastAPI:
                 raise HTTPException(
                     405, "content origins are read-only", headers={"Allow": "GET, HEAD"}
                 )
-            snapshot = await documentation.public_snapshot(snapshot_id)
+            snapshot = await _documentation(request).public_snapshot(snapshot_id)
             path = request.url.path.removeprefix("/")
             if path:
                 document_path(path.removesuffix("/"))
@@ -352,7 +376,11 @@ def create_app() -> FastAPI:
             raise HTTPException(503, "documentation content hosting is not configured")
         return settings
 
-    @app.get("/v1/documentation-hosting", response_model=DocumentationHosting)
+    @app.get(
+        "/v1/documentation-hosting",
+        response_model=DocumentationHosting,
+        responses={503: DOCUMENTATION_ERRORS[503]},
+    )
     async def documentation_hosting(request: Request, response: Response) -> DocumentationHosting:
         settings = documentation_settings(request)
         response.headers["Cache-Control"] = "no-store"
@@ -372,13 +400,16 @@ def create_app() -> FastAPI:
         settings = documentation_settings(request)
         response.headers["Cache-Control"] = "no-store"
         try:
-            return await documentation.discover(extension, version, settings, public=public)
+            return await _documentation(request).discover(
+                extension, version, settings, public=public
+            )
         except (RegistryBlockedError, RegistryNotFoundError) as error:
             raise _map_repository_error(error) from error
 
     @app.get(
         "/v1/extensions/{namespace}/{name}/releases/{version}/documentation",
         response_model=ReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (404, 451, 503)},
     )
     async def get_documentation(
         namespace: RegistrySegment,
@@ -392,6 +423,7 @@ def create_app() -> FastAPI:
     @app.get(
         "/v1/publisher/extensions/{namespace}/{name}/releases/{version}/documentation",
         response_model=ReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (401, 403, 404, 451, 503)},
     )
     async def publisher_documentation(
         namespace: RegistrySegment,
@@ -406,6 +438,13 @@ def create_app() -> FastAPI:
     @app.put(
         "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}",
         response_model=DocumentationRecord,
+        responses={
+            **DOCUMENTATION_ERRORS,
+            200: {
+                "description": "Snapshot committed atomically; ETag identifies the current set.",
+                "headers": {"ETag": {"schema": {"type": "string"}}},
+            },
+        },
         openapi_extra={
             "requestBody": {
                 "required": True,
@@ -418,7 +457,11 @@ def create_app() -> FastAPI:
                                 "metadata": {
                                     "type": "string",
                                     "contentMediaType": "application/json",
-                                    "description": "DocumentationUpload JSON",
+                                    "contentSchema": DocumentationUpload.model_json_schema(),
+                                    "description": (
+                                        "JSON-encoded DocumentationUpload; "
+                                        "send as a text form field, not a file."
+                                    ),
                                 },
                                 "content": {"type": "string", "format": "binary"},
                             },
@@ -436,8 +479,16 @@ def create_app() -> FastAPI:
         request: Request,
         response: Response,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-        if_match: Annotated[str | None, Header()] = None,
-        if_none_match: Annotated[str | None, Header()] = None,
+        if_match: Annotated[
+            str | None,
+            Header(
+                description="Replace the observed strong ETag; do not combine with If-None-Match."
+            ),
+        ] = None,
+        if_none_match: Annotated[
+            str | None,
+            Header(description="Use * to create an absent set; do not combine with If-Match."),
+        ] = None,
     ) -> DocumentationRecord:
         extension = _validate_identity(namespace, name, version)
         settings = documentation_settings(request)
@@ -466,8 +517,7 @@ def create_app() -> FastAPI:
             except (ValueError, ValidationError) as error:
                 raise HTTPException(400, str(error)) from error
             try:
-                result = await documentation.publish(
-                    _repository(request),
+                result = await _documentation(request).publish(
                     extension,
                     version,
                     scope,
@@ -502,13 +552,13 @@ def create_app() -> FastAPI:
         settings = documentation_settings(request)
         extension = _validate_identity(namespace, name, version)
         try:
-            found = await documentation.discover(extension, version, settings)
+            found = await _documentation(request).discover(extension, version, settings)
             selected = next((item for item in found.sets if item.scope == scope), None)
             if selected is None:
                 raise RegistryNotFoundError("documentation scope does not exist")
             if path:
                 document_path(path.removesuffix("/"))
-            snapshot = await documentation.public_snapshot(selected.snapshot_id)
+            snapshot = await _documentation(request).public_snapshot(selected.snapshot_id)
             documentation.static_path(snapshot, path)
         except ValueError as error:
             raise HTTPException(404, "invalid documentation path") from error
@@ -574,7 +624,7 @@ def create_app() -> FastAPI:
         hosted = None
         if selected is not None and request.app.state.settings.documentation_origin_template:
             with suppress(RegistryBlockedError, RegistryNotFoundError):
-                hosted = await documentation.discover(
+                hosted = await _documentation(request).discover(
                     extension_name, selected.version, request.app.state.settings
                 )
         document = extension_detail_html(extension, version, hosted) if extension else None

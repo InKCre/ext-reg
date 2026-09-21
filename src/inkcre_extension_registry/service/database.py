@@ -3,7 +3,7 @@
 from typing import ClassVar
 
 from tortoise import fields
-from tortoise.migrations.constraints import CheckConstraint
+from tortoise.migrations.constraints import CheckConstraint, UniqueConstraint
 from tortoise.models import Model
 
 
@@ -194,6 +194,7 @@ class DocumentationSnapshot(Model):
     class Meta(Model.Meta):
         table = "documentation_snapshots"
         constraints: ClassVar = [
+            UniqueConstraint(("id", "release_id", "scope"), "docs_snapshot_owner"),
             CheckConstraint("id ~ '^[0-9a-f]{32}$'", "docs_snapshot_id"),
             CheckConstraint(
                 "scope IN ('global', 'python', 'module-federation')", "docs_snapshot_scope"

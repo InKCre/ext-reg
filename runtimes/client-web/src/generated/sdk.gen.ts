@@ -11,6 +11,7 @@ import {
 import { client } from './client.gen'
 import type {
   DocumentationHostingV1DocumentationHostingGetData,
+  DocumentationHostingV1DocumentationHostingGetErrors,
   DocumentationHostingV1DocumentationHostingGetResponses,
   GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetData,
   GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetErrors,
@@ -180,10 +181,14 @@ export const simpleProjectSimpleProjectGet = <ThrowOnError extends boolean = fal
  */
 export const documentationHostingV1DocumentationHostingGet = <ThrowOnError extends boolean = false>(
   options?: Options<DocumentationHostingV1DocumentationHostingGetData, ThrowOnError>,
-): RequestResult<DocumentationHostingV1DocumentationHostingGetResponses, unknown, ThrowOnError> =>
+): RequestResult<
+  DocumentationHostingV1DocumentationHostingGetResponses,
+  DocumentationHostingV1DocumentationHostingGetErrors,
+  ThrowOnError
+> =>
   (options?.client ?? client).get<
     DocumentationHostingV1DocumentationHostingGetResponses,
-    unknown,
+    DocumentationHostingV1DocumentationHostingGetErrors,
     ThrowOnError
   >({ url: '/v1/documentation-hosting', ...options })
 

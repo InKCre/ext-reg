@@ -125,6 +125,10 @@ class ContractModel(BaseModel):
 DocumentationScope = Literal["global", "python", "module-federation"]
 
 
+class RegistryError(ContractModel):
+    detail: str
+
+
 class DocumentationUpload(ContractModel):
     snapshot_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

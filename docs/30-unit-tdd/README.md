@@ -5,6 +5,7 @@ independently released units. Public schemas, routes, package metadata, and
 generated contracts and build checks remain executable authority.
 
 - [Registry control plane](registry-control-plane.md)
+- [静态文档发布协议](documentation-admission.md)：作者构建限制、MIME、候选发布与恢复。
 - [Registry Web](registry-web.md): discovery, publisher workspace, and design consumption.
 - [Extension Developer Toolkit](developer-toolkit.md)
 - [Core Python Extension Host Runtime](core-python-runtime.md)

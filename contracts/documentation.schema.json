@@ -1,5 +1,19 @@
 {
   "$defs": {
+    "DocumentationHosting": {
+      "additionalProperties": false,
+      "properties": {
+        "origin_template": {
+          "title": "Origin Template",
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin_template"
+      ],
+      "title": "DocumentationHosting",
+      "type": "object"
+    },
     "DocumentationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -84,48 +98,124 @@
       ],
       "title": "DocumentationRecord",
       "type": "object"
+    },
+    "DocumentationUpload": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "entry": {
+          "default": "index.html",
+          "maxLength": 768,
+          "minLength": 1,
+          "title": "Entry",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "source_repository": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "content_sha256",
+        "source_repository",
+        "source_revision"
+      ],
+      "title": "DocumentationUpload",
+      "type": "object"
+    },
+    "ReleaseDocumentation": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "sets": {
+          "items": {
+            "$ref": "#/$defs/DocumentationRecord"
+          },
+          "title": "Sets",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "published",
+            "yanked",
+            "blocked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "state",
+        "sets"
+      ],
+      "title": "ReleaseDocumentation",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "properties": {
-    "name": {
-      "maxLength": 129,
-      "minLength": 3,
-      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-      "title": "Name",
-      "type": "string"
+    "hosting": {
+      "$ref": "#/$defs/DocumentationHosting"
     },
-    "sets": {
-      "items": {
-        "$ref": "#/$defs/DocumentationRecord"
-      },
-      "title": "Sets",
-      "type": "array"
+    "release": {
+      "$ref": "#/$defs/ReleaseDocumentation"
     },
-    "state": {
-      "enum": [
-        "preparing",
-        "published",
-        "yanked",
-        "blocked"
-      ],
-      "title": "State",
-      "type": "string"
-    },
-    "version": {
-      "maxLength": 128,
-      "minLength": 5,
-      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-      "title": "Version",
-      "type": "string"
+    "upload": {
+      "$ref": "#/$defs/DocumentationUpload"
     }
   },
   "required": [
-    "name",
-    "version",
-    "state",
-    "sets"
+    "upload",
+    "release",
+    "hosting"
   ],
-  "title": "ReleaseDocumentation",
+  "title": "DocumentationContracts",
   "type": "object"
 }

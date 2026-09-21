@@ -16,7 +16,6 @@ from inkcre_extension_registry.contracts.models import (
     InstalledExtension,
     PrepareReleaseRequest,
     PythonConsumerContracts,
-    ReleaseDocumentation,
     ReleaseRecord,
 )
 from inkcre_extension_registry.service.app import create_app
@@ -32,7 +31,7 @@ def _encoded(value: Any) -> bytes:
 
 def generated_contracts() -> dict[Path, bytes]:
     models = {
-        "documentation.schema.json": ReleaseDocumentation.model_json_schema(mode="serialization"),
+        "documentation.schema.json": DocumentationContracts.model_json_schema(mode="serialization"),
         "extension.schema.json": ExtensionRecord.model_json_schema(mode="serialization"),
         "prepare-release.schema.json": PrepareReleaseRequest.model_json_schema(
             mode="serialization"

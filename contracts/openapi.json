@@ -526,6 +526,20 @@
         "title": "PythonEntryPoint",
         "type": "object"
       },
+      "RegistryError": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "RegistryError",
+        "type": "object"
+      },
       "ReleaseDocumentation": {
         "additionalProperties": false,
         "properties": {
@@ -954,6 +968,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
           }
         },
         "summary": "Documentation Hosting"
@@ -1233,6 +1257,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1242,6 +1276,26 @@
               }
             },
             "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
           }
         },
         "summary": "Get Documentation"
@@ -1302,6 +1356,7 @@
             }
           },
           {
+            "description": "Replace the observed strong ETag; do not combine with If-None-Match.",
             "in": "header",
             "name": "if-match",
             "required": false,
@@ -1314,10 +1369,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Replace the observed strong ETag; do not combine with If-None-Match.",
               "title": "If-Match"
             }
           },
           {
+            "description": "Use * to create an absent set; do not combine with If-Match.",
             "in": "header",
             "name": "if-none-match",
             "required": false,
@@ -1330,6 +1387,7 @@
                   "type": "null"
                 }
               ],
+              "description": "Use * to create an absent set; do not combine with If-Match.",
               "title": "If-None-Match"
             }
           },
@@ -1361,7 +1419,61 @@
                   },
                   "metadata": {
                     "contentMediaType": "application/json",
-                    "description": "DocumentationUpload JSON",
+                    "contentSchema": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "build_id": {
+                          "anyOf": [
+                            {
+                              "maxLength": 256,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Build Id"
+                        },
+                        "content_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Content Sha256",
+                          "type": "string"
+                        },
+                        "entry": {
+                          "default": "index.html",
+                          "maxLength": 768,
+                          "minLength": 1,
+                          "title": "Entry",
+                          "type": "string"
+                        },
+                        "snapshot_id": {
+                          "pattern": "^[0-9a-f]{32}$",
+                          "title": "Snapshot Id",
+                          "type": "string"
+                        },
+                        "source_repository": {
+                          "maxLength": 2048,
+                          "minLength": 1,
+                          "title": "Source Repository",
+                          "type": "string"
+                        },
+                        "source_revision": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "title": "Source Revision",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "snapshot_id",
+                        "content_sha256",
+                        "source_repository",
+                        "source_revision"
+                      ],
+                      "title": "DocumentationUpload",
+                      "type": "object"
+                    },
+                    "description": "JSON-encoded DocumentationUpload; send as a text form field, not a file.",
                     "type": "string"
                   }
                 },
@@ -1384,7 +1496,104 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Snapshot committed atomically; ETag identifies the current set.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Malformed conditional headers, multipart fields, metadata, or static ZIP."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Missing Distribution association, digest conflict, or snapshot address occupied."
+          },
+          "411": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "A non-chunked Content-Length is required."
+          },
+          "412": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Set already exists or replacement ETag is stale; the current pointer is unchanged."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The complete multipart request exceeds 20 MiB."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The request must use multipart/form-data."
           },
           "422": {
             "content": {
@@ -1395,6 +1604,36 @@
               }
             },
             "description": "Validation Error"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Conditional write required: If-None-Match: * or the observed strong If-Match ETag."
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
           }
         },
         "summary": "Upload Documentation"
@@ -1871,6 +2110,36 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -1880,6 +2149,26 @@
               }
             },
             "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
           }
         },
         "summary": "Publisher Documentation"

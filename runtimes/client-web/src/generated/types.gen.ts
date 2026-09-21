@@ -293,6 +293,16 @@ export type PythonEntryPoint = {
 }
 
 /**
+ * RegistryError
+ */
+export type RegistryError = {
+  /**
+   * Detail
+   */
+  detail: string
+}
+
+/**
  * ReleaseDocumentation
  */
 export type ReleaseDocumentation = {
@@ -557,6 +567,16 @@ export type DocumentationHostingV1DocumentationHostingGetData = {
   url: '/v1/documentation-hosting'
 }
 
+export type DocumentationHostingV1DocumentationHostingGetErrors = {
+  /**
+   * Documentation content hosting is not configured.
+   */
+  503: RegistryError
+}
+
+export type DocumentationHostingV1DocumentationHostingGetError =
+  DocumentationHostingV1DocumentationHostingGetErrors[keyof DocumentationHostingV1DocumentationHostingGetErrors]
+
 export type DocumentationHostingV1DocumentationHostingGetResponses = {
   /**
    * Successful Response
@@ -726,9 +746,21 @@ export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentatio
 
 export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetErrors = {
   /**
+   * Release or publicly readable documentation does not exist.
+   */
+  404: RegistryError
+  /**
    * Validation Error
    */
   422: HttpValidationError
+  /**
+   * The Release is operator-blocked, including for its publisher.
+   */
+  451: RegistryError
+  /**
+   * Documentation content hosting is not configured.
+   */
+  503: RegistryError
 }
 
 export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetError =
@@ -748,17 +780,21 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
   body: {
     content: Blob | File
     /**
-     * DocumentationUpload JSON
+     * JSON-encoded DocumentationUpload; send as a text form field, not a file.
      */
     metadata: string
   }
   headers?: {
     /**
      * If-Match
+     *
+     * Replace the observed strong ETag; do not combine with If-None-Match.
      */
     'if-match'?: string | null
     /**
      * If-None-Match
+     *
+     * Use * to create an absent set; do not combine with If-Match.
      */
     'if-none-match'?: string | null
     /**
@@ -791,9 +827,57 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
 export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutErrors =
   {
     /**
+     * Malformed conditional headers, multipart fields, metadata, or static ZIP.
+     */
+    400: RegistryError
+    /**
+     * Publisher credential is missing or invalid.
+     */
+    401: RegistryError
+    /**
+     * Publisher does not own this namespace.
+     */
+    403: RegistryError
+    /**
+     * Release or publicly readable documentation does not exist.
+     */
+    404: RegistryError
+    /**
+     * Missing Distribution association, digest conflict, or snapshot address occupied.
+     */
+    409: RegistryError
+    /**
+     * A non-chunked Content-Length is required.
+     */
+    411: RegistryError
+    /**
+     * Set already exists or replacement ETag is stale; the current pointer is unchanged.
+     */
+    412: RegistryError
+    /**
+     * The complete multipart request exceeds 20 MiB.
+     */
+    413: RegistryError
+    /**
+     * The request must use multipart/form-data.
+     */
+    415: RegistryError
+    /**
      * Validation Error
      */
     422: HttpValidationError
+    /**
+     * Conditional write required: If-None-Match: * or the observed strong If-Match ETag.
+     */
+    428: RegistryError
+    /**
+     * The Release is operator-blocked, including for its publisher.
+     */
+    451: RegistryError
+    /**
+     * Documentation content hosting is not configured.
+     */
+    503: RegistryError
   }
 
 export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutError =
@@ -802,7 +886,7 @@ export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumenta
 export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePutResponses =
   {
     /**
-     * Successful Response
+     * Snapshot committed atomically; ETag identifies the current set.
      */
     200: DocumentationRecord
   }
@@ -1068,9 +1152,29 @@ export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVers
 export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetErrors =
   {
     /**
+     * Publisher credential is missing or invalid.
+     */
+    401: RegistryError
+    /**
+     * Publisher does not own this namespace.
+     */
+    403: RegistryError
+    /**
+     * Release or publicly readable documentation does not exist.
+     */
+    404: RegistryError
+    /**
      * Validation Error
      */
     422: HttpValidationError
+    /**
+     * The Release is operator-blocked, including for its publisher.
+     */
+    451: RegistryError
+    /**
+     * Documentation content hosting is not configured.
+     */
+    503: RegistryError
   }
 
 export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetError =

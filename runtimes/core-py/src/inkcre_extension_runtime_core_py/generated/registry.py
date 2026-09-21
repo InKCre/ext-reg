@@ -99,6 +99,13 @@ class PythonEntryPoint(BaseModel):
     ) = Field(..., title="Object")
 
 
+class RegistryError(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    detail: str = Field(..., title="Detail")
+
+
 class ReleaseDocumentation(BaseModel):
     model_config = ConfigDict(
         extra="forbid",

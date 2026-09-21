@@ -49,6 +49,8 @@ staging and stale editors cannot replace the previous pointer. The Toolkit saves
 metadata, snapshot identity, and precondition as one candidate; recovery rereads identity and never
 adopts a newer ETag on the caller's behalf.
 
+作者的构建、上传限制、MIME 映射及恢复方式以[静态文档发布协议](documentation-admission.md)为准。JSON Schema 包含 upload、release、hosting 三种契约；OpenAPI 的 multipart `metadata` 是 JSON 编码的文本字段，其 `contentSchema` 给出内部结构，HTTP 错误与条件写入语义也在 OpenAPI 中声明。
+
 Management and content use separate origins. The stable management entry redirects to the selected
 snapshot; files, root-relative assets, browser storage, and Service Workers remain confined to that
 snapshot's origin. The content-origin middleware serves only GET and HEAD, never management routes,
@@ -59,7 +61,9 @@ and `blocked` denies discovery, stable entries, and every historical snapshot be
 
 ## Persistence and Security
 
-持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有查询与事务。Release、Distribution 和 File 使用独立内部主键，公开身份仍是 Extension Name / Version 或 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
+持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有 Release、Distribution 与发布身份的查询和事务，`service/documentation.py` 的 `DocumentationRepository` 拥有文档查询、对象 staging 和 current-set 替换事务。两者由 lifespan 创建，共享同一个 `ArtifactStore`，各自持有进程内并发额度；文档仓储不依赖另一个仓储的实例或内部状态。Release、Distribution 和 File 使用独立内部主键，公开身份仍是 Extension Name / Version 或 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
+
+文档指针由 PostgreSQL 的 `(snapshot_id, release_id, scope)` 复合外键保证归属一致。Tortoise 保留单列关系用于查询，复合外键由 `0004_documentation_ownership` 原生 DDL 补充；已有指针不能关联其他 Release/scope，所指快照也不能在保留该指针时改变归属。
 
 准备关联时，namespace 行锁串行化同一发布者的身份创建，release 行锁保护关联和状态。唯一约束保证 Python Project / Version 不被另一个 release 占用；失败会回滚同一事务中的 Extension、Release 和关联创建。上传、发布、撤回和恢复均重新检查锁定后的 release 状态。关联、文件名和内容身份不可变，相同提交可以重试。模型的联合约束明确使用数据库外键列名；不依赖迁移生成器猜测关系字段的物理列名。
 
