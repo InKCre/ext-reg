@@ -11,6 +11,7 @@ from typing import Any
 from inkcre_extension_toolkit.preview import PreviewInventory
 
 from inkcre_extension_registry.contracts.models import (
+    DocumentationContracts,
     ExtensionRecord,
     InstalledExtension,
     PrepareReleaseRequest,
@@ -30,6 +31,7 @@ def _encoded(value: Any) -> bytes:
 
 def generated_contracts() -> dict[Path, bytes]:
     models = {
+        "documentation.schema.json": DocumentationContracts.model_json_schema(mode="serialization"),
         "extension.schema.json": ExtensionRecord.model_json_schema(mode="serialization"),
         "prepare-release.schema.json": PrepareReleaseRequest.model_json_schema(
             mode="serialization"
@@ -44,7 +46,8 @@ def generated_contracts() -> dict[Path, bytes]:
     outputs[CONTRACTS / "openapi.json"] = _encoded(create_app().openapi())
     outputs[CONTRACTS / "revision.json"] = _encoded(
         {
-            "contract_revision": 2,
+            "contract_revision": 3,
+            "documentation_scopes": ["global", "module-federation", "python"],
             "distribution_kinds": ["module_federation", "python"],
             "extension_version": "strict-semver-without-build-metadata",
             "python_upload_filetypes": ["bdist_wheel"],
@@ -95,6 +98,10 @@ def _generate_python_binding(schema: bytes, output: Path) -> bytes:
 
 def generated_python_bindings() -> dict[Path, bytes]:
     return {
+        TOOLKIT_GENERATED / "documentation.py": _generate_python_binding(
+            _encoded(DocumentationContracts.model_json_schema(mode="serialization")),
+            TOOLKIT_GENERATED / "documentation.py",
+        ),
         TOOLKIT_GENERATED / "contracts.py": _generate_python_binding(
             _encoded(PythonConsumerContracts.model_json_schema(mode="serialization")),
             TOOLKIT_GENERATED / "contracts.py",

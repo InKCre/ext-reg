@@ -6,6 +6,10 @@ export class RegistryReleaseError extends WebExtensionRuntimeError {
   override name = 'RegistryReleaseError'
 }
 
+export class RegistryDocumentationError extends WebExtensionRuntimeError {
+  override name = 'RegistryDocumentationError'
+}
+
 export class HostSdkCompatibilityError extends WebExtensionRuntimeError {
   override name = 'HostSdkCompatibilityError'
 }

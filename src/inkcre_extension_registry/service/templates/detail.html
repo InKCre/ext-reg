@@ -51,6 +51,21 @@
         <a class="button" href="{{ release.module_federation.manifest_url }}">Manifest ↗</a>
       </section>
       {% endif %}
+      {% if documentation and documentation.sets %}
+      <section class="distribution-panel">
+        <h3>Documentation</h3>
+        <p>Guides published for this exact Extension release.</p>
+        <ul>
+          {% for item in documentation.sets %}
+          <li>
+            <a href="{{ item.entry_url }}" rel="noopener noreferrer">
+              {% if item.scope == 'global' %}General{% elif item.scope == 'python' %}Python{% else %}Web{% endif %} guide ↗
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
     </article>
     <aside class="detail-sidebar">
       <section class="sidebar-panel">

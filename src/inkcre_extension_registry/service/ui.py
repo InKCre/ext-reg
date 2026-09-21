@@ -7,7 +7,12 @@ from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from semantic_version import Version
 
-from ..contracts.models import ExtensionRecord, ExtensionSummary, ReleaseRecord
+from ..contracts.models import (
+    ExtensionRecord,
+    ExtensionSummary,
+    ReleaseDocumentation,
+    ReleaseRecord,
+)
 
 ROOT = Path(__file__).parent
 TEMPLATES = Environment(
@@ -64,7 +69,7 @@ def extension_catalog_html(
     )
 
 
-def extension_detail_html(extension: ExtensionRecord, version: str | None = None) -> str | None:
+def select_release(extension: ExtensionRecord, version: str | None = None) -> ReleaseRecord | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
     if not releases:
         return None
@@ -77,6 +82,18 @@ def extension_detail_html(extension: ExtensionRecord, version: str | None = None
         release = next(
             (item for item in releases if not Version(item.version).prerelease), releases[0]
         )
+    return release
+
+
+def extension_detail_html(
+    extension: ExtensionRecord,
+    version: str | None = None,
+    documentation: ReleaseDocumentation | None = None,
+) -> str | None:
+    releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
+    release = select_release(extension, version)
+    if release is None:
+        return None
     return page(
         "detail.html",
         title=extension.nickname,
@@ -85,4 +102,5 @@ def extension_detail_html(extension: ExtensionRecord, version: str | None = None
         release=release,
         releases=releases,
         publisher=extension.name.split("/")[0],
+        documentation=documentation,
     )

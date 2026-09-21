@@ -3,6 +3,58 @@
 import * as z from 'zod'
 
 /**
+ * DocumentationHosting
+ */
+export const zDocumentationHosting = z.object({
+  origin_template: z.string(),
+})
+
+/**
+ * DocumentationReceipt
+ */
+export const zDocumentationReceipt = z.object({
+  build_id: z.string().max(256).nullish(),
+  committed_at: z.string(),
+  content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  entry: z.string().min(1).max(768).optional().default('index.html'),
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  scope: z.enum(['global', 'python', 'module-federation']),
+  snapshot_etag: z.string(),
+  snapshot_id: z.string().regex(/^[0-9a-f]{32}$/),
+  snapshot_url: z.string(),
+  source_repository: z.string().min(1).max(2048),
+  source_revision: z.string().min(1).max(256),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
+ * DocumentationRecord
+ */
+export const zDocumentationRecord = z.object({
+  build_id: z.string().max(256).nullish(),
+  content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  entry: z.string().min(1).max(768).optional().default('index.html'),
+  entry_url: z.string(),
+  etag: z.string(),
+  scope: z.enum(['global', 'python', 'module-federation']),
+  snapshot_id: z.string().regex(/^[0-9a-f]{32}$/),
+  snapshot_url: z.string(),
+  source_repository: z.string().min(1).max(2048),
+  source_revision: z.string().min(1).max(256),
+  updated_at: z.string(),
+})
+
+/**
  * ExtensionSummary
  */
 export const zExtensionSummary = z.object({
@@ -138,6 +190,33 @@ export const zPublisherWorkspace = z.object({
 })
 
 /**
+ * RegistryError
+ */
+export const zRegistryError = z.object({
+  detail: z.string(),
+})
+
+/**
+ * ReleaseDocumentation
+ */
+export const zReleaseDocumentation = z.object({
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  sets: z.array(zDocumentationRecord),
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
  * ReleaseRecord
  */
 export const zReleaseRecord = z.object({
@@ -241,6 +320,11 @@ export const zSimpleProjectSimpleProjectGetPath = z.object({
 })
 
 /**
+ * Successful Response
+ */
+export const zDocumentationHostingV1DocumentationHostingGetResponse = zDocumentationHosting
+
+/**
  * Response List Extensions V1 Extensions Get
  *
  * Successful Response
@@ -313,6 +397,72 @@ export const zGetReleaseV1ExtensionsNamespaceNameReleasesVersionGetPath = z.obje
  * Successful Response
  */
 export const zGetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponse = zReleaseRecord
+
+export const zGetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetPath =
+  z.object({
+    namespace: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    version: z
+      .string()
+      .min(5)
+      .max(128)
+      .regex(
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+      ),
+  })
+
+/**
+ * Successful Response
+ */
+export const zGetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
+  zReleaseDocumentation
+
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostBody =
+  z.object({
+    content: z.string(),
+    metadata: z.string(),
+  })
+
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostHeaders =
+  z.object({
+    authorization: z.string().nullish(),
+  })
+
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostPath =
+  z.object({
+    namespace: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    version: z
+      .string()
+      .min(5)
+      .max(128)
+      .regex(
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+      ),
+    scope: z.enum(['global', 'python', 'module-federation']),
+  })
+
+/**
+ * Historical commit confirmed; current may differ.
+ */
+export const zUploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponse =
+  zDocumentationReceipt
 
 export const zUploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostHeaders =
   z.object({
@@ -453,3 +603,35 @@ export const zPublisherWorkspaceV1PublisherGetQuery = z.object({
  * Successful Response
  */
 export const zPublisherWorkspaceV1PublisherGetResponse = zPublisherWorkspace
+
+export const zPublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetHeaders =
+  z.object({
+    authorization: z.string().nullish(),
+  })
+
+export const zPublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetPath =
+  z.object({
+    namespace: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    version: z
+      .string()
+      .min(5)
+      .max(128)
+      .regex(
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+      ),
+  })
+
+/**
+ * Successful Response
+ */
+export const zPublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
+  zReleaseDocumentation

@@ -7,26 +7,36 @@ import logging
 import mimetypes
 import os
 import re
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from time import perf_counter
 from typing import Annotated, Any
+from urllib.parse import urlparse
 
+import anyio
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from inkcre_extension_toolkit.documentation import document_path, inspect_documentation
 from packaging.version import InvalidVersion
 from packaging.version import Version as Pep440Version
+from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from .. import __version__
 from ..contracts.models import (
+    DocumentationHosting,
+    DocumentationPublication,
+    DocumentationReceipt,
+    DocumentationScope,
     ExtensionRecord,
     ExtensionSummary,
     PrepareReleaseRequest,
     PublisherWorkspace,
     PythonEntryPoint,
+    RegistryError,
     RegistrySegment,
+    ReleaseDocumentation,
     ReleaseRecord,
     StrictSemVer,
     YankRequest,
@@ -34,6 +44,7 @@ from ..contracts.models import (
     validate_segment,
     validate_version,
 )
+from . import documentation
 from .module_federation import (
     ModuleFederationValidationError,
     inspect_module_federation_snapshot,
@@ -64,19 +75,46 @@ from .simple import (
     root_json,
 )
 from .storage import ArtifactStore
-from .ui import SCRIPT, extension_catalog_html, extension_detail_html, html_response, page
+from .ui import (
+    SCRIPT,
+    extension_catalog_html,
+    extension_detail_html,
+    html_response,
+    page,
+    select_release,
+)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 logger = logging.getLogger(__name__)
 
 BEARER_PATTERN = re.compile(r"^Bearer ([A-Za-z0-9._~-]{24,512})$")
 UPLOAD_PATH_PATTERN = re.compile(
-    r"^/legacy/$|^/v1/extensions/[^/]+/[^/]+/releases/[^/]+/module-federation$"
+    r"^/legacy/$|^/v1/extensions/[^/]+/[^/]+/releases/[^/]+/(module-federation|documentation/[^/]+)$"
 )
+
+DOCUMENTATION_ERRORS = {
+    code: {"model": RegistryError, "description": description}
+    for code, description in {
+        400: "Malformed conditional headers, multipart fields, metadata, or static ZIP.",
+        401: "Publisher credential is missing or invalid.",
+        403: "Publisher does not own this namespace.",
+        404: "Release or publicly readable documentation does not exist.",
+        409: "Publication identity conflict, stale expected_etag, or missing association.",
+        411: "A non-chunked Content-Length is required.",
+        413: "The complete multipart request exceeds 20 MiB.",
+        415: "The request must use multipart/form-data.",
+        451: "The Release is operator-blocked, including for its publisher.",
+        503: "Documentation content hosting is not configured.",
+    }.items()
+}
 
 
 def _repository(request: Request) -> RegistryRepository:
     return request.app.state.repository
+
+
+def _documentation(request: Request) -> documentation.DocumentationRepository:
+    return request.app.state.documentation
 
 
 def _credential_from_authorization(authorization: str | None) -> str | None:
@@ -144,8 +182,21 @@ async def _form(request: Request) -> Any:
     content_type = request.headers.get("content-type", "")
     if not content_type.lower().startswith("multipart/form-data"):
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "multipart/form-data required")
+    received = 0
+
+    async def limited_receive():
+        nonlocal received
+        message = await request.receive()
+        received += len(message.get("body", b""))
+        if received > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "multipart upload exceeds 20 MiB")
+        return message
+
     try:
-        return await request.form(max_files=1, max_fields=64, max_part_size=MAX_UPLOAD_BYTES)
+        bounded = Request(request.scope, receive=limited_receive)
+        return await bounded.form(max_files=1, max_fields=64, max_part_size=MAX_UPLOAD_BYTES)
+    except HTTPException:
+        raise
     except Exception as error:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid multipart upload") from error
 
@@ -200,6 +251,7 @@ async def lifespan(app: FastAPI):
         async with RegisterTortoise(app, config=database_config(settings.database_url)):
             app.state.settings = settings
             app.state.repository = RegistryRepository(artifacts)
+            app.state.documentation = documentation.DocumentationRepository(artifacts)
             yield
     finally:
         await artifacts.close()
@@ -215,13 +267,13 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET", "HEAD", "OPTIONS", "POST"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT"],
+        allow_headers=["Authorization", "Content-Type", "If-Match", "If-None-Match"],
     )
 
     @app.middleware("http")
     async def bound_uploads(request: Request, call_next: Any) -> Response:
-        if request.method == "POST" and UPLOAD_PATH_PATTERN.fullmatch(request.url.path):
+        if request.method in {"POST", "PUT"} and UPLOAD_PATH_PATTERN.fullmatch(request.url.path):
             content_length = request.headers.get("content-length")
             if (
                 content_length is None
@@ -250,6 +302,260 @@ def create_app() -> FastAPI:
         }:
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.middleware("http")
+    async def content_origin(request: Request, call_next: Any) -> Response:
+        settings: Settings = request.app.state.settings
+        if settings.documentation_origin_template is None:
+            return await call_next(request)
+        authority = request.headers.get("host", "").lower()
+        snapshot_id = settings.documentation_snapshot(authority)
+        if snapshot_id is None:
+            if authority != urlparse(settings.public_origin).netloc.lower():
+                return JSONResponse(
+                    {"detail": "unrecognized Registry host"},
+                    status_code=421,
+                    headers={"Cache-Control": "no-store"},
+                )
+            return await call_next(request)
+        # This branch never enters the management router, even for /v1/*.
+        try:
+            if request.method not in {"GET", "HEAD"}:
+                raise HTTPException(
+                    405, "content origins are read-only", headers={"Allow": "GET, HEAD"}
+                )
+            snapshot = await _documentation(request).public_snapshot(snapshot_id)
+            path = request.url.path.removeprefix("/")
+            if path:
+                document_path(path.removesuffix("/"))
+            target, redirect = documentation.static_path(snapshot, path)
+            if redirect:
+                response = RedirectResponse(
+                    documentation.snapshot_link(settings, snapshot_id, path + "/"), status_code=308
+                )
+                response.headers["Cache-Control"] = "no-store"
+            else:
+                file = snapshot.files[target]
+                response = await _public_response(
+                    request,
+                    PublicObject(
+                        documentation.object_key(snapshot.content_sha256, target),
+                        file["media_type"],
+                        file["sha256"],
+                    ),
+                )
+        except (RegistryBlockedError, RegistryNotFoundError) as error:
+            mapped = _map_repository_error(error)
+            response = JSONResponse(
+                {"detail": mapped.detail},
+                status_code=mapped.status_code,
+                headers={"Cache-Control": "no-store"},
+            )
+        except ValueError:
+            response = JSONResponse(
+                {"detail": "invalid documentation path"},
+                status_code=404,
+                headers={"Cache-Control": "no-store"},
+            )
+        except HTTPException as error:
+            response = JSONResponse(
+                {"detail": error.detail},
+                status_code=error.status_code,
+                headers={"Cache-Control": "no-store", **(error.headers or {})},
+            )
+        response.headers["Origin-Agent-Cluster"] = "?1"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def documentation_settings(request: Request) -> Settings:
+        settings = request.app.state.settings
+        if settings.documentation_origin_template is None:
+            raise HTTPException(503, "documentation content hosting is not configured")
+        return settings
+
+    @app.get(
+        "/v1/documentation-hosting",
+        response_model=DocumentationHosting,
+        responses={503: DOCUMENTATION_ERRORS[503]},
+    )
+    async def documentation_hosting(request: Request, response: Response) -> DocumentationHosting:
+        settings = documentation_settings(request)
+        response.headers["Cache-Control"] = "no-store"
+        assert settings.documentation_origin_template is not None
+        return DocumentationHosting(origin_template=settings.documentation_origin_template)
+
+    async def read_documentation(
+        namespace: str,
+        name: str,
+        version: str,
+        request: Request,
+        response: Response,
+        *,
+        public: bool,
+    ) -> ReleaseDocumentation:
+        extension = _validate_identity(namespace, name, version)
+        settings = documentation_settings(request)
+        response.headers["Cache-Control"] = "no-store"
+        try:
+            return await _documentation(request).discover(
+                extension, version, settings, public=public
+            )
+        except (RegistryBlockedError, RegistryNotFoundError) as error:
+            raise _map_repository_error(error) from error
+
+    @app.get(
+        "/v1/extensions/{namespace}/{name}/releases/{version}/documentation",
+        response_model=ReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (404, 451, 503)},
+    )
+    async def get_documentation(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        request: Request,
+        response: Response,
+    ) -> ReleaseDocumentation:
+        return await read_documentation(namespace, name, version, request, response, public=True)
+
+    @app.get(
+        "/v1/publisher/extensions/{namespace}/{name}/releases/{version}/documentation",
+        response_model=ReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (401, 403, 404, 451, 503)},
+    )
+    async def publisher_documentation(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        request: Request,
+        response: Response,
+        _publisher: Annotated[str, Depends(_publisher_namespace)],
+    ) -> ReleaseDocumentation:
+        return await read_documentation(namespace, name, version, request, response, public=False)
+
+    @app.post(
+        "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}",
+        response_model=DocumentationReceipt,
+        responses={
+            **DOCUMENTATION_ERRORS,
+            200: {
+                "description": "Historical commit confirmed; current may differ.",
+            },
+        },
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["metadata", "content"],
+                            "properties": {
+                                "metadata": {
+                                    "type": "string",
+                                    "contentMediaType": "application/json",
+                                    "contentSchema": DocumentationPublication.model_json_schema(),
+                                    "description": (
+                                        "JSON-encoded DocumentationPublication; "
+                                        "send as a text form field, not a file."
+                                    ),
+                                },
+                                "content": {"type": "string", "format": "binary"},
+                            },
+                        }
+                    }
+                },
+            }
+        },
+    )
+    async def upload_documentation(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        scope: DocumentationScope,
+        request: Request,
+        response: Response,
+        _publisher: Annotated[str, Depends(_publisher_namespace)],
+    ) -> DocumentationReceipt:
+        extension = _validate_identity(namespace, name, version)
+        settings = documentation_settings(request)
+        form = await _form(request)
+        try:
+            upload = form.get("content")
+            if not isinstance(upload, UploadFile):
+                raise HTTPException(400, "content ZIP file is required")
+            try:
+                payload = DocumentationPublication.model_validate_json(
+                    _form_string(form, "metadata") or ""
+                )
+                bundle = await anyio.to_thread.run_sync(
+                    inspect_documentation, await upload.read(), payload.entry
+                )
+            except (ValueError, ValidationError) as error:
+                raise HTTPException(400, str(error)) from error
+            try:
+                result = await _documentation(request).publish(
+                    extension,
+                    version,
+                    scope,
+                    payload,
+                    bundle,
+                    settings,
+                )
+            except documentation.DocumentationPreconditionError as error:
+                raise HTTPException(409, str(error)) from error
+            except (RegistryConflictError, RegistryStateError, RegistryNotFoundError) as error:
+                raise _map_repository_error(error) from error
+        finally:
+            await form.close()
+        response.headers["Cache-Control"] = "no-store"
+        return result
+
+    @app.api_route(
+        "/documentation/{namespace}/{name}/{version}/{scope}/{path:path}",
+        methods=["GET", "HEAD"],
+        include_in_schema=False,
+    )
+    async def documentation_entry(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        scope: DocumentationScope,
+        path: str,
+        request: Request,
+    ) -> Response:
+        settings = documentation_settings(request)
+        extension = _validate_identity(namespace, name, version)
+        try:
+            found = await _documentation(request).discover(extension, version, settings)
+            selected = next((item for item in found.sets if item.scope == scope), None)
+            if selected is None:
+                raise RegistryNotFoundError("documentation scope does not exist")
+            if path:
+                document_path(path.removesuffix("/"))
+            snapshot = await _documentation(request).public_snapshot(selected.snapshot_id)
+            documentation.static_path(snapshot, path)
+        except ValueError as error:
+            raise HTTPException(404, "invalid documentation path") from error
+        except (RegistryBlockedError, RegistryNotFoundError) as error:
+            raise _map_repository_error(error) from error
+        target = documentation.snapshot_link(settings, selected.snapshot_id, path)
+        if found.state == "yanked":
+            return html_response(
+                page(
+                    "documentation-yanked.html",
+                    title="Withdrawn release documentation",
+                    version=version,
+                    name=extension,
+                    target=target,
+                    noindex=True,
+                )
+            )
+        return RedirectResponse(
+            target,
+            status_code=307,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
 
     @app.get("/livez")
     async def livez() -> dict[str, str]:
@@ -289,7 +595,14 @@ def create_app() -> FastAPI:
     ) -> HTMLResponse:
         extension_name = _validate_identity(namespace, name)
         extension = await _repository(request).get_extension(extension_name)
-        document = extension_detail_html(extension, version) if extension else None
+        selected = select_release(extension, version) if extension else None
+        hosted = None
+        if selected is not None and request.app.state.settings.documentation_origin_template:
+            with suppress(RegistryBlockedError, RegistryNotFoundError):
+                hosted = await _documentation(request).discover(
+                    extension_name, selected.version, request.app.state.settings
+                )
+        document = extension_detail_html(extension, version, hosted) if extension else None
         if document is None:
             return html_response(
                 page(

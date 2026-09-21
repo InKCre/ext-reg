@@ -7,7 +7,9 @@ pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 ```
 
-配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
+配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，并且不能与管理 origin 共站。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
+
+生产内容域必须使用不同的可注册域，例如 `registry.example.com` 与 `{snapshot}.exampleusercontent.net`；`{snapshot}.docs.example.com` 会被拒绝。配置校验使用 `publicsuffixlist` 包内的 Public Suffix List（含 private section），不在启动时访问网络；PSL 随锁定依赖升级更新，未知后缀和没有固定可注册域的模板被拒绝。域名应采用 ASCII/Punycode 配置。仅管理端是 HTTP loopback、内容端是 HTTP `.localhost` 的配对配置获得本地例外。内容域必须专用于不可信静态内容，不得部署 SSO、转发认证 Cookie，或与其他持有认证 Cookie 的服务共用父域；PSL 校验只验证所配置的管理域与内容域，无法盘点其他服务的 Cookie 配置。
 
 ```bash
 pnpm db:migrate
@@ -24,10 +26,12 @@ pdm run python -m inkcre_extension_registry
 REGISTRY_TEST_DATABASE_URL=postgres://registry:registry-check@localhost:5432/registry_check pnpm check
 ```
 
-CI 创建 PostgreSQL 17 service；本地使用独立、一次性的 PostgreSQL 实例或 Neon 测试分支。授权迁移会创建实例级角色，因此仅在共享实例内增加一个空数据库不足以隔离这些检查。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、blocked 读取、GET / HEAD 和 ETag 重验证。迁移使用 owner，业务验收使用 `registry_app`，并验证创建表、修改业务表、写迁移记录和创建角色均被拒绝。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
+CI 创建 PostgreSQL 17 service；本地使用独立、一次性的 PostgreSQL 实例或 Neon 测试分支。授权迁移会创建实例级角色，因此仅在共享实例内增加一个空数据库不足以隔离这些检查。不得指向共享开发、PR 预览或生产库。验收运行真实迁移，检查模型漂移，通过真实 ORM / PostgreSQL 和本地 Moto S3 服务验证发布、重试、并发冲突、失败回滚、私有分页、文档条件替换与快照域隔离、blocked 读取、GET / HEAD 和 ETag 重验证。迁移使用 owner，业务验收使用 `registry_app`，并验证创建表、修改业务表、写迁移记录和创建角色均被拒绝。D1 导入验收使用临时 SQLite 快照，比较所有逻辑字段的内容摘要。测试仅在空库插入测试记录，并在退出时清理；失败可能保留 schema 和迁移记录，目标库仍须属于一次性验证生命周期。
 
 `pnpm registry:check` 单独执行上述验收，仍需要同一个测试变量。CI 另外拒绝修改或删除已在 base 中存在的迁移，并构建完整服务镜像。测试数据不会写入共享预览。
 
 Registry 通过不可变 Git commit 安装 `InKCre/ui` 的 `@inkcre/ui-web` 公共 Sass 包。修改 `web/registry.scss` 后运行 `pnpm web:build`；生成 CSS 提交到源码，并由 `pnpm web:check` 比对。模板、CSS 和 JavaScript 都随 Python wheel 打包。视觉验收覆盖空态、详情版本选择、Publisher、键盘操作、窄屏和明暗主题。
 
 Toolkit、Core Runtime 与 Web Runtime 保持各自的版本和发布机制。`pnpm build` 构建这些独立产物；Registry 的容器部署不会发布它们，也不会引入单独的前端部署流程。
+
+`pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.3,<0.4`，Toolkit 版本通过 Changie 准备，合并后的正常 release 流程才发布产物。

@@ -1,6 +1,199 @@
 {
   "components": {
     "schemas": {
+      "DocumentationHosting": {
+        "additionalProperties": false,
+        "properties": {
+          "origin_template": {
+            "title": "Origin Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "origin_template"
+        ],
+        "title": "DocumentationHosting",
+        "type": "object"
+      },
+      "DocumentationReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "build_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Id"
+          },
+          "committed_at": {
+            "title": "Committed At",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "entry": {
+            "default": "index.html",
+            "maxLength": 768,
+            "minLength": 1,
+            "title": "Entry",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "python",
+              "module-federation"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "snapshot_etag": {
+            "title": "Snapshot Etag",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_url": {
+            "title": "Snapshot Url",
+            "type": "string"
+          },
+          "source_repository": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Repository",
+            "type": "string"
+          },
+          "source_revision": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "content_sha256",
+          "source_repository",
+          "source_revision",
+          "name",
+          "version",
+          "scope",
+          "snapshot_etag",
+          "snapshot_url",
+          "committed_at"
+        ],
+        "title": "DocumentationReceipt",
+        "type": "object"
+      },
+      "DocumentationRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "build_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Id"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "entry": {
+            "default": "index.html",
+            "maxLength": 768,
+            "minLength": 1,
+            "title": "Entry",
+            "type": "string"
+          },
+          "entry_url": {
+            "title": "Entry Url",
+            "type": "string"
+          },
+          "etag": {
+            "title": "Etag",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "python",
+              "module-federation"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_url": {
+            "title": "Snapshot Url",
+            "type": "string"
+          },
+          "source_repository": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Repository",
+            "type": "string"
+          },
+          "source_revision": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "content_sha256",
+          "source_repository",
+          "source_revision",
+          "scope",
+          "etag",
+          "entry_url",
+          "snapshot_url",
+          "updated_at"
+        ],
+        "title": "DocumentationRecord",
+        "type": "object"
+      },
       "ExtensionRecord": {
         "additionalProperties": false,
         "properties": {
@@ -428,6 +621,64 @@
         "title": "PythonEntryPoint",
         "type": "object"
       },
+      "RegistryError": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "RegistryError",
+        "type": "object"
+      },
+      "ReleaseDocumentation": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "sets": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentationRecord"
+            },
+            "title": "Sets",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "published",
+              "yanked",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "state",
+          "sets"
+        ],
+        "title": "ReleaseDocumentation",
+        "type": "object"
+      },
       "ReleaseRecord": {
         "additionalProperties": false,
         "properties": {
@@ -799,6 +1050,34 @@
         "summary": "Simple Project"
       }
     },
+    "/v1/documentation-hosting": {
+      "get": {
+        "operationId": "documentation_hosting_v1_documentation_hosting_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentationHosting"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Documentation Hosting"
+      }
+    },
     "/v1/extensions": {
       "get": {
         "operationId": "list_extensions_v1_extensions_get",
@@ -1019,6 +1298,390 @@
           }
         },
         "summary": "Get Release"
+      }
+    },
+    "/v1/extensions/{namespace}/{name}/releases/{version}/documentation": {
+      "get": {
+        "operationId": "get_documentation_v1_extensions__namespace___name__releases__version__documentation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDocumentation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Get Documentation"
+      }
+    },
+    "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}": {
+      "post": {
+        "operationId": "upload_documentation_v1_extensions__namespace___name__releases__version__documentation__scope__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "global",
+                "python",
+                "module-federation"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "content": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "contentMediaType": "application/json",
+                    "contentSchema": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "build_id": {
+                          "anyOf": [
+                            {
+                              "maxLength": 256,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Build Id"
+                        },
+                        "content_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Content Sha256",
+                          "type": "string"
+                        },
+                        "entry": {
+                          "default": "index.html",
+                          "maxLength": 768,
+                          "minLength": 1,
+                          "title": "Entry",
+                          "type": "string"
+                        },
+                        "expected_etag": {
+                          "anyOf": [
+                            {
+                              "pattern": "^\"[0-9a-f]{64}\"$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Expected Etag"
+                        },
+                        "snapshot_id": {
+                          "pattern": "^[0-9a-f]{32}$",
+                          "title": "Snapshot Id",
+                          "type": "string"
+                        },
+                        "source_repository": {
+                          "maxLength": 2048,
+                          "minLength": 1,
+                          "title": "Source Repository",
+                          "type": "string"
+                        },
+                        "source_revision": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "title": "Source Revision",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "snapshot_id",
+                        "content_sha256",
+                        "source_repository",
+                        "source_revision",
+                        "expected_etag"
+                      ],
+                      "title": "DocumentationPublication",
+                      "type": "object"
+                    },
+                    "description": "JSON-encoded DocumentationPublication; send as a text form field, not a file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "metadata",
+                  "content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentationReceipt"
+                }
+              }
+            },
+            "description": "Historical commit confirmed; current may differ."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Malformed conditional headers, multipart fields, metadata, or static ZIP."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publication identity conflict, stale expected_etag, or missing association."
+          },
+          "411": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "A non-chunked Content-Length is required."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The complete multipart request exceeds 20 MiB."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The request must use multipart/form-data."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Upload Documentation"
       }
     },
     "/v1/extensions/{namespace}/{name}/releases/{version}/module-federation": {
@@ -1422,6 +2085,138 @@
           }
         },
         "summary": "Publisher Workspace"
+      }
+    },
+    "/v1/publisher/extensions/{namespace}/{name}/releases/{version}/documentation": {
+      "get": {
+        "operationId": "publisher_documentation_v1_publisher_extensions__namespace___name__releases__version__documentation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDocumentation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Publisher Documentation"
       }
     }
   }
