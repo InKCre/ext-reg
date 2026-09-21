@@ -17,7 +17,7 @@
   },
   "scripts": {
     "prepare:sdk": "node prepare-sdk.mjs",
-    "build": "pnpm prepare:sdk && tsdown",
+    "build": "pnpm prepare:sdk && tsdown --platform neutral",
     "check:boundaries": "pnpm build && node check-boundaries.mjs",
     "check:bindings": "pnpm generate:bindings && git diff --exit-code -- src/generated",
     "generate:bindings": "openapi-ts -f openapi-ts.config.ts && prettier --write src/generated",
@@ -38,7 +38,7 @@
     "@types/semver": "7.7.1",
     "@vueuse/core": "14.1.0",
     "pinia": "3.0.3",
-    "tsdown": "0.15.11",
+    "tsdown": "0.22.13",
     "typescript": "5.9.3",
     "vue": "3.5.18"
   }
