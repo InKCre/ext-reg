@@ -4,7 +4,7 @@
 
 `production.yml` 只接受精确 current-main SHA。`verify` 执行仓库检查和容器构建，不修改远程资源。`deploy` 在受保护 production 环境中，重新核验 main 后对已配置 app 向前迁移、配置数据库和单桶 S3 凭据、发布同一镜像，并验证 Heroku app origin。它不自动导入 D1、不改变域名、不创建示例数据，也不删除旧资源。
 
-production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET`、`DOCUMENTATION_ORIGIN_TEMPLATE` variables，以及 `HEROKU_API_KEY`、`MIGRATION_DATABASE_URL`、`DATABASE_URL`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` secrets。文档模板必须指向已经配置 wildcard DNS/TLS 的专用内容域，并符合本仓库的跨站校验。首次配置保持既有 R2 桶，S3 token 仅授予该桶的对象读写。`MIGRATION_DATABASE_URL` 使用 `registry_owner`，仅交给迁移容器与可信角色配置命令；`DATABASE_URL` 使用同一数据库的普通 `registry_app` 角色和独立密码。迁移创建该角色及业务表授权，控制器设置密码后以 `web=1:eco` 启动应用。owner 连接与平台控制 token 不进入运行服务配置。数据库连接属于独立 Registry 项目，不复用 core-py 的数据库或发布生命周期。
+production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET`、`DOCUMENTATION_ORIGIN_TEMPLATE` variables，以及 `HEROKU_API_KEY`、`MIGRATION_DATABASE_URL`、`DATABASE_URL`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` secrets。文档模板必须指向已经配置 wildcard DNS/TLS 的专用内容 origin。生产当前使用 `https://{snapshot}.docs.registry.inkcre.dev`；它与管理站同属 `inkcre.dev`，因此部署接受作者 HTML/JS 与管理站同站、可能接收或干扰父域 Cookie 的风险。`inkcre.dev` 下的服务不得设置可发送到该内容域的敏感父域 Cookie。首次配置保持既有 R2 桶，S3 token 仅授予该桶的对象读写。`MIGRATION_DATABASE_URL` 使用 `registry_owner`，仅交给迁移容器与可信角色配置命令；`DATABASE_URL` 使用同一数据库的普通 `registry_app` 角色和独立密码。迁移创建该角色及业务表授权，控制器设置密码后以 `web=1:eco` 启动应用。owner 连接与平台控制 token 不进入运行服务配置。数据库连接属于独立 Registry 项目，不复用 core-py 的数据库或发布生命周期。
 
 Heroku 交付为 Uvicorn 设置 `FORWARDED_ALLOW_IPS=*`，由平台 HTTP 入口提供外部请求协议，补斜杠跳转保持 HTTPS。转发头不参与 namespace 授权或身份判断；认证仍由 publisher credential 决定。部署 smoke 同时检查 `/simple` 跳转到该 origin 的 HTTPS `/simple/`。
 

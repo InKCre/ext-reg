@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:5597c6ce7689a33aa9b862a4fbedaf1367988150d44be8e092ca73185a564aba"
+content_hash = "sha256:72ae9e70826955d7d25bde377160b76698338d79c888e38b6dc466fcff46a13e"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.14"
@@ -1148,17 +1148,6 @@ dependencies = [
 files = [
     {file = "psycopg-3.3.5-py3-none-any.whl", hash = "sha256:ce5aa5cdb4f9379f00f487590e5890bfa7df9a164648c969ffa628505e21af4e"},
     {file = "psycopg-3.3.5.tar.gz", hash = "sha256:d0a3d9ccf5788af054cbd745278cb02401b5c312aeaafbf2c6144460aec47da4"},
-]
-
-[[package]]
-name = "publicsuffixlist"
-version = "1.0.2.20260919"
-requires_python = ">=3.5"
-summary = "publicsuffixlist implement"
-groups = ["default"]
-files = [
-    {file = "publicsuffixlist-1.0.2.20260919-py2.py3-none-any.whl", hash = "sha256:60cd2c1e09a2bd66044e562d4f977b96f21e6b151d161a02e41e001fff42fb27"},
-    {file = "publicsuffixlist-1.0.2.20260919.tar.gz", hash = "sha256:d9383e510e3464fde4478b9d0f97a24911b6c2bd397aa149c84a88534e98e3eb"},
 ]
 
 [[package]]
