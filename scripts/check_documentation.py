@@ -34,6 +34,8 @@ def check_content_sites() -> None:
         ("https://registry.example.com", "https://{snapshot}.exampleusercontent.net", True),
         ("https://registry.team.github.io", "https://{snapshot}.docs.team.github.io", True),
         ("https://registry.team.github.io", "https://{snapshot}.other.github.io", True),
+        ("https://registry.example.com", "https://registry-docs-{snapshot}.example.com", True),
+        ("https://registry.example.com", "https://docs.registry-{snapshot}.example.com", False),
         ("http://localhost", "http://{snapshot}.docs.localhost", True),
         ("https://registry.example.com", "http://{snapshot}.docs.localhost", False),
     ):
