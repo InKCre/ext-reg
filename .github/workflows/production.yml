@@ -26,6 +26,9 @@ concurrency:
 jobs:
   deploy:
     name: ext-reg deployment
+    permissions:
+      contents: read
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -75,6 +78,8 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@inkcre'
 
       - name: Install frozen delivery dependencies
         run: |
@@ -82,6 +87,8 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Verify exact delivery source
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm check
 
       - name: Build the same CPython service artifact used by previews

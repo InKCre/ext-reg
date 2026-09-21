@@ -55,6 +55,7 @@ jobs:
     name: Publish Extension package releases
     permissions:
       contents: write
+      packages: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -94,13 +95,19 @@ jobs:
         with:
           node-version-file: package.json
           cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@inkcre'
 
       - name: Install frozen dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pdm install --frozen-lockfile
           pnpm install --frozen-lockfile
 
       - name: Check package contracts before building release assets
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check
 
       - name: Verify managed package versions
@@ -115,6 +122,7 @@ jobs:
       - name: Build independent package assets
         env:
           SOURCE_DATE_EPOCH: '315532800'
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-client-web
           pdm build --project toolkit --dest "$GITHUB_WORKSPACE/release-assets/toolkit"
