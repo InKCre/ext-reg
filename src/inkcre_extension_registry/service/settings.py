@@ -105,7 +105,7 @@ class Settings:
             )
             if (
                 documentation_origin.count("{snapshot}") != 1
-                or not (content.hostname or "").startswith("{snapshot}.")
+                or "{snapshot}" not in (content.hostname or "").split(".", 1)[0]
                 or (content.scheme != "https" and not local_content)
                 or (local_content and not local_http)
                 or content.username is not None
@@ -119,7 +119,7 @@ class Settings:
             ):
                 raise ValueError(
                     "DOCUMENTATION_ORIGIN_TEMPLATE must be a separate wildcard HTTPS origin "
-                    "with a leading {snapshot} label"
+                    "with {snapshot} in the leading label"
                 )
         return cls(
             database_url=os.environ["DATABASE_URL"],

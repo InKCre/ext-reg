@@ -7,7 +7,7 @@ pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 ```
 
-配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，使每份不可变快照拥有独立 origin。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
+配置 `DATABASE_URL`、`PUBLIC_ORIGIN`、`S3_ENDPOINT_URL`、`S3_BUCKET` 和标准 AWS 凭据 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`。启用插件文档托管时，另设 `DOCUMENTATION_ORIGIN_TEMPLATE`，例如本地的 `http://{snapshot}.docs.localhost`；模板必须把 32 位快照标识放在第一个 DNS label，可带固定前后缀，使每份不可变快照拥有独立 origin。数据库必须是 PostgreSQL；远程连接默认验证 TLS，localhost 可以不启用 TLS。`PUBLIC_ORIGIN` 是 HTTPS origin，本地允许 localhost HTTP，不含路径。文档内容 origin 在生产必须使用 HTTPS；本地只允许 `.localhost`。文件配置是 dotenv 数据，不应当作 shell 脚本执行；应用从进程环境读取配置。
 
 生产内容域可以与管理站使用同一可注册域。这样部署时，作者提供的 HTML/JS 可能接收或干扰父域 Cookie；不得在共享父域设置敏感 Cookie。需要浏览器级站点隔离时，应改用独立可注册域，例如 `registry.example.com` 与 `{snapshot}.exampleusercontent.net`。域名应采用 ASCII/Punycode 配置。
 
