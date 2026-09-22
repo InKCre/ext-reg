@@ -16,6 +16,7 @@
     }
   },
   "scripts": {
+    "prepare": "pnpm build",
     "prepare:sdk": "node prepare-sdk.mjs",
     "build": "pnpm prepare:sdk && tsdown --platform neutral",
     "check:boundaries": "pnpm build && node check-boundaries.mjs",
