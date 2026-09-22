@@ -42,20 +42,29 @@ local Wrangler state, generated dependency directories, or unrelated changes.
 
 Package release intent uses the ecosystem-native release tool:
 
-- Toolkit and Core Python Runtime changes use Changie. Add a project-scoped
-  fragment with `changie new --projects toolkit` or
-  `changie new --projects runtime-core-py`, then batch and merge that project
-  before review.
+- Registry, Toolkit and Core Python Runtime changes use Towncrier. Create one
+  fragment in the changed project's `.changes/` directory, for example
+  `pdm run towncrier create --config towncrier.toml --dir toolkit 123.added.md`.
+  The root `.changes/` belongs to the Registry service; `toolkit/.changes/` and
+  `runtimes/core-py/.changes/` belong to those independently versioned packages.
 - Client Web Runtime changes use `pnpm changeset`. Changesets creates the
   protected-main Version PR and updates its version and changelog.
 
-The three package versions are independent. Registry Worker deployment has its
-own release lifecycle and is never versioned by either package tool.
+The four versions are independent. A Python Version PR consumes pending
+Towncrier fragments and updates only versions, changelogs and the workspace
+lock. The Web Version PR consumes Changesets. Registry production deployment
+remains separate from package publication even though the service has its own
+version and changelog.
 
-Every protected-main update checks the prepared package versions and publishes
-missing GitHub Releases. Existing releases are left unchanged. Publication does
-not depend on a commit-title prefix: Python packages prepared with Changie and
-the Web Runtime Version PR both use this same publication path.
+Every protected-main update reconciles both kinds of Version PR and publishes
+prepared package versions. Python packages with pending fragments wait for the
+Python Version PR instead of silently treating an existing tag as successful
+publication. Existing releases are left unchanged.
+
+Generated Version PR branches are checked through an explicit workflow dispatch.
+GitHub deliberately prevents ordinary `GITHUB_TOKEN` pushes from recursively
+starting `pull_request` workflows; the dispatch attaches the normal required
+check to the generated head commit without bypassing branch protection.
 
 Package publication runs static and generated-contract checks, then builds its
 own release assets. The Registry database journey remains in repository CI; it
