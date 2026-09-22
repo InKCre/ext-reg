@@ -283,6 +283,15 @@ def prepare() -> None:
                 "--yes",
             ]
         )
+        run(
+            [
+                "pnpm",
+                "exec",
+                "prettier",
+                "--write",
+                str(project.changelog.relative_to(ROOT)),
+            ]
+        )
         replace_version(project.pyproject, version)
     if items:
         run(["pdm", "lock", "--update-reuse"])
