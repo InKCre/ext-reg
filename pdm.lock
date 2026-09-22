@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "inkcre-extension-toolkit"
-version = "0.3.0"
+version = "0.4.0"
 requires_python = ">=3.12,<3.14"
 editable = true
 path = "./toolkit"

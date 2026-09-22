@@ -4,3 +4,9 @@ This changelog records notable changes to the Registry service. It is generated 
 [Towncrier](https://towncrier.readthedocs.io/).
 
 <!-- towncrier release notes start -->
+
+## 0.2.1 - 2026-09-22
+
+### Changed
+
+- Admit Toolkit 0.4 releases so the Registry can consume the static catalog projection API. (#51)
