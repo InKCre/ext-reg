@@ -4,18 +4,20 @@
   "description": "InKCre Client Web Extension Host Runtime",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "import": "./dist/index.js"
     }
   },
   "scripts": {
+    "prepare": "pnpm build",
     "prepare:sdk": "node prepare-sdk.mjs",
     "build": "pnpm prepare:sdk && tsdown --platform neutral",
     "check:boundaries": "pnpm build && node check-boundaries.mjs",

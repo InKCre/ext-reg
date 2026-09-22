@@ -7,7 +7,10 @@ import {
   getExtensionDocumentation,
   listAdvertisedExtensionManagementPeers,
   manageExtensionOnPeer,
+  preferredPublishedRelease,
   RegistryDocumentationError,
+  RegistryReleaseReader,
+  sortPublishedReleases,
 } from './dist/index.js'
 
 // Exercise the built package and real SDK over HTTP, without a deployment or real credentials.
@@ -29,6 +32,32 @@ let dropManagement = false
 let docStatus = 200
 let docBody
 let dropDocumentation = false
+const catalogReleases = [
+  {
+    name: 'inkcre/catalog',
+    nickname: 'Catalog check',
+    version: '2.0.0-beta.1',
+    state: 'published',
+    module_federation: null,
+    python: null,
+  },
+  {
+    name: 'inkcre/catalog',
+    nickname: 'Catalog check',
+    version: '1.10.0',
+    state: 'published',
+    module_federation: null,
+    python: null,
+  },
+  {
+    name: 'inkcre/catalog',
+    nickname: 'Catalog check',
+    version: '1.2.0',
+    state: 'published',
+    module_federation: null,
+    python: null,
+  },
+]
 const requests = []
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, origin)
@@ -67,6 +96,19 @@ const server = createServer(async (request, response) => {
     if (dropManagement) return request.socket.destroy()
     response.statusCode = managementStatus
     response.end(JSON.stringify(managementBody))
+  } else if (url.pathname === '/v1/extensions') {
+    response.end(JSON.stringify([{ name: 'inkcre/catalog', nickname: 'Catalog check' }]))
+  } else if (url.pathname === '/v1/extensions/inkcre/catalog') {
+    response.end(
+      JSON.stringify({
+        name: 'inkcre/catalog',
+        nickname: 'Catalog check',
+        releases: catalogReleases,
+      }),
+    )
+  } else if (url.pathname.startsWith('/v1/extensions/inkcre/catalog/releases/')) {
+    const version = url.pathname.split('/').at(-1)
+    response.end(JSON.stringify(catalogReleases.find((release) => release.version === version)))
   } else {
     if (dropDocumentation) return request.socket.destroy()
     response.statusCode = docStatus
@@ -84,6 +126,22 @@ try {
     INKCRE_JWT_SECRET: 'isolated-check-signing-secret-at-least-32-characters',
   }
   PeerManager.setupBuiltinOutbounds()
+  const releases = new RegistryReleaseReader({
+    registryOrigin: origin,
+    hostSdk: { name: '@inkcre/core', version: '0.3.0' },
+  })
+  assert.deepEqual(await releases.list(), [{ name: 'inkcre/catalog', nickname: 'Catalog check' }])
+  assert.equal((await releases.getExtension('inkcre/catalog')).releases.length, 3)
+  assert.deepEqual(
+    sortPublishedReleases(catalogReleases).map(({ version }) => version),
+    ['2.0.0-beta.1', '1.10.0', '1.2.0'],
+  )
+  assert.equal(preferredPublishedRelease(catalogReleases).version, '1.10.0')
+  assert.equal((await releases.getRelease('inkcre/catalog', '1.10.0', true)).version, '1.10.0')
+  await assert.rejects(
+    releases.get('inkcre/catalog', '1.10.0', true),
+    /no Module Federation Distribution/,
+  )
   assert.deepEqual(
     (await listAdvertisedExtensionManagementPeers()).map(({ id }) => id),
     [target, current],

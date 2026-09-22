@@ -3,6 +3,11 @@ export * from './documentation'
 export * from './manager'
 export * from './module'
 export * from './peer-management'
-export { RegistryReleaseReader } from './registry'
-export type { HostSdkIdentity, RegistryReleaseReaderOptions } from './registry'
-export type { ReleaseRecord, ModuleFederationDistribution } from './generated/types.gen'
+export { preferredPublishedRelease, RegistryReleaseReader, sortPublishedReleases } from './registry'
+export type { HostSdkIdentity, RegistryReleaseReaderOptions, WebReleaseRecord } from './registry'
+export type {
+  ExtensionRecord,
+  ExtensionSummary,
+  ReleaseRecord,
+  ModuleFederationDistribution,
+} from './generated/types.gen'
