@@ -3,6 +3,11 @@ name: Registry checks
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      base_revision:
+        description: Base revision for release-contract validation
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -19,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Reject new high-severity vulnerabilities
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
@@ -44,9 +51,12 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       REGISTRY_TEST_DATABASE_URL: postgres://registry:registry-check@localhost:5432/registry_check
+      BASE_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base_revision || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0

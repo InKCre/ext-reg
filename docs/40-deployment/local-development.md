@@ -34,4 +34,4 @@ Registry 通过不可变 Git commit 安装 `InKCre/ui` 的 `@inkcre/ui-web` 公�
 
 Toolkit、Core Runtime 与 Web Runtime 保持各自的版本和发布机制。`pnpm build` 构建这些独立产物；Registry 的容器部署不会发布它们，也不会引入单独的前端部署流程。
 
-`pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.3,<0.4`，Toolkit 版本通过 Changie 准备，合并后的正常 release 流程才发布产物。
+`pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.3,<0.5`。Python 改动在所属 project 的 `.changes/` 记录 Towncrier fragment；Web Runtime 使用 `.changeset/`。合并普通改动后，Version PR 才准备版本与 changelog，正式产物只从准备完成的 `main` 发布。

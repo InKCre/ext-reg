@@ -8,7 +8,7 @@ license = "AGPL-3.0-only"
 authors = [{ name = "InKCre" }]
 dependencies = [
   "fastapi>=0.139.2,<0.142",
-  "inkcre-extension-toolkit>=0.3,<0.4",
+  "inkcre-extension-toolkit>=0.3,<0.5",
   "packaging>=25,<27",
   "python-multipart>=0.0.22,<0.1",
   "jinja2<4,>=3.1.6",
@@ -28,6 +28,7 @@ dev = [
   "pyright>=1.1.405,<2",
   "ruff>=0.14,<0.15",
   "typer>=0.21,<0.22",
+  "towncrier==25.8.0",
   "wheel>=0.46,<0.48",
   "moto[server,s3]>=5.1,<6",
   "psycopg[binary]<4,>=3.3",
@@ -45,6 +46,10 @@ allow-direct-references = true
 
 [tool.pdm.workspace]
 members = ["toolkit", "runtimes/core-py"]
+
+[tool.pdm.scripts]
+"check:releases" = "python scripts/release.py check {args}"
+"release:prepare" = "python scripts/release.py prepare {args}"
 
 [tool.ruff]
 target-version = "py312"
