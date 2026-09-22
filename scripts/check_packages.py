@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import email
+import json
 import os
 import subprocess
 import tempfile
@@ -11,12 +12,73 @@ import venv
 import zipfile
 from pathlib import Path
 
+from inkcre_extension_toolkit.preview import build_preview_registry
 from packaging.requirements import Requirement
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def check_preview_catalog() -> None:
+    with tempfile.TemporaryDirectory(prefix="registry-preview-check-") as temporary:
+        root = Path(temporary)
+        artifact = root / "remote"
+        artifact.mkdir()
+        (artifact / "mf-manifest.json").write_text(
+            json.dumps(
+                {
+                    "metaData": {
+                        "publicPath": "./",
+                        "remoteEntry": {"name": "remoteEntry.js", "path": ""},
+                    }
+                }
+            )
+        )
+        (artifact / "remoteEntry.js").write_text("export const check = true;")
+        producer = root / "package.json"
+        producer.write_text(
+            json.dumps(
+                {
+                    "version": "1.10.0",
+                    "inkcre": {
+                        "name": "check/catalog",
+                        "nickname": "Catalog check",
+                        "module_federation": {
+                            "host_sdk": "@inkcre/core",
+                            "host_sdk_version": ">=0.3.0 <0.4.0",
+                        },
+                    },
+                }
+            )
+        )
+        inventory = root / "inventory.json"
+        inventory.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "distributions": [
+                        {
+                            "kind": "module_federation",
+                            "producer": producer.name,
+                            "artifact": artifact.name,
+                        }
+                    ],
+                }
+            )
+        )
+        output = root / "output"
+        build_preview_registry(inventory, "https://registry.example.test", output)
+        assert json.loads((output / "v1/extensions.json").read_text()) == [
+            {"name": "check/catalog", "nickname": "Catalog check"}
+        ]
+        detail = json.loads((output / "v1/extensions/check/catalog.json").read_text())
+        assert detail["name"] == "check/catalog" and detail["releases"][0]["version"] == "1.10.0"
+        redirects = (output / "_redirects").read_text()
+        assert "/v1/extensions /v1/extensions.json 200" in redirects
+        assert "/v1/extensions/check/catalog /v1/extensions/check/catalog.json 200" in redirects
+
+
 def main() -> None:
+    check_preview_catalog()
     wheels = []
     for directory in (ROOT, ROOT / "toolkit"):
         project = tomllib.loads((directory / "pyproject.toml").read_text())["project"]

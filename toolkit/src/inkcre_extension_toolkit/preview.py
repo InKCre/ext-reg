@@ -14,6 +14,8 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from .contracts import (
+    ExtensionRecord,
+    ExtensionSummary,
     ModuleFederationDistribution,
     PythonDistribution,
     PythonEntryPoint,
@@ -176,8 +178,7 @@ def _write(path: Path, content: bytes) -> None:
     path.write_bytes(content)
 
 
-def _release_bytes(record: ReleaseRecord) -> bytes:
-    value = record.model_dump(mode="json", exclude_none=True)
+def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
 
 
@@ -377,15 +378,41 @@ def build_preview_registry(
                     output=staging,
                     releases=releases,
                 )
-        release_paths: list[str] = []
+        api_paths: list[str] = []
+        records_by_name: dict[str, list[ReleaseRecord]] = {}
         for (name, version), material in sorted(releases.items()):
             namespace, local_name = name.split("/", 1)
             release_path = f"/v1/extensions/{namespace}/{local_name}/releases/{version}"
+            record = material.record()
             _write(
                 staging / (release_path.lstrip("/") + ".json"),
-                _release_bytes(material.record()),
+                _json_bytes(record.model_dump(mode="json", exclude_none=True)),
             )
-            release_paths.append(release_path)
+            api_paths.append(release_path)
+            records_by_name.setdefault(name, []).append(record)
+        summaries: list[ExtensionSummary] = []
+        for name, records in sorted(records_by_name.items()):
+            nicknames = {record.nickname for record in records}
+            if len(nicknames) != 1:
+                raise PreviewBuildError(f"conflicting nickname across Releases for {name}")
+            nickname = nicknames.pop()
+            summary = ExtensionSummary(name=name, nickname=nickname)
+            detail = ExtensionRecord(name=name, nickname=nickname, releases=records)
+            namespace, local_name = name.split("/", 1)
+            detail_path = f"/v1/extensions/{namespace}/{local_name}"
+            _write(
+                staging / (detail_path.lstrip("/") + ".json"),
+                _json_bytes(detail.model_dump(mode="json", exclude_none=True)),
+            )
+            api_paths.append(detail_path)
+            summaries.append(summary)
+        _write(
+            staging / "v1" / "extensions.json",
+            _json_bytes(
+                [summary.model_dump(mode="json", exclude_none=True) for summary in summaries]
+            ),
+        )
+        api_paths.append("/v1/extensions")
         projects = sorted(files_by_project)
         if projects:
             _write(staging / "simple" / "index.html", root_html(projects).encode())
@@ -396,7 +423,7 @@ def build_preview_registry(
                     project_html(records).encode(),
                 )
         _write(staging / "_headers", _headers())
-        _write(staging / "_redirects", _redirects(release_paths))
+        _write(staging / "_redirects", _redirects(api_paths))
         if output_path.exists():
             output_path.rmdir()
         os.replace(staging, output_path)

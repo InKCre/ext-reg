@@ -38,7 +38,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
   }
 
   async install(input: InstallExtensionInput): Promise<ExtensionModel> {
-    const release = await this.#releases.get(input.name, input.version, true)
+    const release = await this.#releases.getRelease(input.name, input.version, true)
     return ExtensionModel.install({
       name: release.name,
       version: release.version,
@@ -50,7 +50,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     const extension = await this.#requireInstalled(name)
     this.#assertStoppedAndDisabled(extension)
     if (extension.version === version) return extension
-    const release = await this.#releases.get(name, version, true)
+    const release = await this.#releases.getRelease(name, version, true)
     return extension.changeVersion(release.version, release.nickname)
   }
 
