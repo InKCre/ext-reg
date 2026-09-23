@@ -127,7 +127,7 @@ jobs:
       name: preview
       deployment: false
     steps:
-      - name: Recheck PR identity after build and concurrency queue
+      - name: Verify PR identity after build and concurrency queue
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
@@ -207,6 +207,21 @@ jobs:
         with:
           name: registry-image
           path: ${{ runner.temp }}/registry-image
+      - name: Recheck PR identity before preview mutation
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        with:
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PULL_NUMBER),
+            })
+            if (pull.state !== 'open' || pull.base.ref !== 'main' ||
+                pull.head.repo?.full_name !== process.env.GITHUB_REPOSITORY ||
+                pull.head.sha !== process.env.SOURCE_SHA) {
+              throw new Error('PR closed or moved; no preview mutation is allowed.')
+            }
       - name: Apply migrations and deploy the isolated service
         id: deploy
         env:
