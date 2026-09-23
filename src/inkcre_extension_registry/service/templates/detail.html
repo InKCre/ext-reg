@@ -80,7 +80,7 @@
           {% for item in releases %}
           <li>
             <a
-              href="/explore/{{ extension.name }}?version={{ item.version | urlencode }}&client_origin={{ client_origin | urlencode }}"
+              href="/explore/{{ extension.name }}?version={{ item.version | urlencode }}&amp;client_origin={{ client_origin | urlencode }}"
               {% if item.version == release.version %}
               aria-current="true"
               {% endif %}
@@ -98,7 +98,7 @@
         <div>
           <dt>Publisher</dt>
           <dd>
-            <a href="/?publisher={{ publisher | urlencode }}&client_origin={{ client_origin | urlencode }}">{{ publisher }}</a>
+            <a href="/?publisher={{ publisher | urlencode }}&amp;client_origin={{ client_origin | urlencode }}">{{ publisher }}</a>
           </dd>
         </div>
       </dl>
