@@ -76,6 +76,7 @@ from .simple import (
 )
 from .storage import ArtifactStore
 from .ui import (
+    DEFAULT_CLIENT_WEB_ORIGIN,
     SCRIPT,
     extension_catalog_html,
     extension_detail_html,
@@ -91,6 +92,38 @@ BEARER_PATTERN = re.compile(r"^Bearer ([A-Za-z0-9._~-]{24,512})$")
 UPLOAD_PATH_PATTERN = re.compile(
     r"^/legacy/$|^/v1/extensions/[^/]+/[^/]+/releases/[^/]+/(module-federation|documentation/[^/]+)$"
 )
+
+
+def _client_web_origin(value: str | None) -> str:
+    if value is None:
+        return DEFAULT_CLIENT_WEB_ORIGIN
+    if (
+        not value
+        or any(character.isspace() for character in value)
+        or any(character in value for character in ("\\", "%"))
+    ):
+        raise HTTPException(400, "client_origin must be a Web origin")
+    try:
+        parsed = urlparse(value)
+        hostname = parsed.hostname
+        if parsed.port == 0:
+            raise ValueError("invalid port")
+    except ValueError as error:
+        raise HTTPException(400, "client_origin must be a Web origin") from error
+    local_http = parsed.scheme == "http" and hostname in {"localhost", "127.0.0.1", "::1"}
+    if (
+        not (parsed.scheme == "https" or local_http)
+        or not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise HTTPException(400, "client_origin must be a Web origin")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
 
 DOCUMENTATION_ERRORS = {
     code: {"model": RegistryError, "description": description}
@@ -569,10 +602,17 @@ def create_app() -> FastAPI:
         request: Request,
         q: Annotated[str, Query(max_length=200)] = "",
         publisher: Annotated[str, Query(max_length=64)] = "",
+        client_origin: Annotated[str | None, Query(max_length=512)] = None,
     ) -> HTMLResponse:
+        web_origin = _client_web_origin(client_origin)
         extensions = await _repository(request).list_extensions()
         return html_response(
-            extension_catalog_html(extensions, query=q.strip(), namespace=publisher)
+            extension_catalog_html(
+                extensions,
+                query=q.strip(),
+                namespace=publisher,
+                client_origin=web_origin,
+            )
         )
 
     @app.get("/assets/registry.js", include_in_schema=False)
@@ -592,7 +632,9 @@ def create_app() -> FastAPI:
         name: RegistrySegment,
         request: Request,
         version: Annotated[str | None, Query(max_length=128)] = None,
+        client_origin: Annotated[str | None, Query(max_length=512)] = None,
     ) -> HTMLResponse:
+        web_origin = _client_web_origin(client_origin)
         extension_name = _validate_identity(namespace, name)
         extension = await _repository(request).get_extension(extension_name)
         selected = select_release(extension, version) if extension else None
@@ -602,7 +644,11 @@ def create_app() -> FastAPI:
                 hosted = await _documentation(request).discover(
                     extension_name, selected.version, request.app.state.settings
                 )
-        document = extension_detail_html(extension, version, hosted) if extension else None
+        document = (
+            extension_detail_html(extension, version, hosted, client_origin=web_origin)
+            if extension
+            else None
+        )
         if document is None:
             return html_response(
                 page(

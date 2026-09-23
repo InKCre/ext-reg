@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from urllib.parse import urlencode, urlparse
 
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -21,6 +22,7 @@ TEMPLATES = Environment(
 )
 STYLES = (ROOT / "static" / "registry.css").read_text()
 SCRIPT = (ROOT / "static" / "registry.js").read_text()
+DEFAULT_CLIENT_WEB_ORIGIN = "https://app.inkcre.dev"
 
 
 def page(template: str, **context: object) -> str:
@@ -49,6 +51,7 @@ def extension_catalog_html(
     *,
     query: str = "",
     namespace: str = "",
+    client_origin: str = DEFAULT_CLIENT_WEB_ORIGIN,
 ) -> str:
     publishers = sorted({extension.name.split("/")[0] for extension in extensions})
     filtered = [
@@ -66,6 +69,7 @@ def extension_catalog_html(
         publishers=publishers,
         query=query,
         namespace=namespace,
+        client_origin=client_origin,
     )
 
 
@@ -89,11 +93,14 @@ def extension_detail_html(
     extension: ExtensionRecord,
     version: str | None = None,
     documentation: ReleaseDocumentation | None = None,
+    *,
+    client_origin: str = DEFAULT_CLIENT_WEB_ORIGIN,
 ) -> str | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
     release = select_release(extension, version)
     if release is None:
         return None
+    install_query = urlencode({"install": extension.name, "version": release.version})
     return page(
         "detail.html",
         title=extension.nickname,
@@ -103,4 +110,7 @@ def extension_detail_html(
         releases=releases,
         publisher=extension.name.split("/")[0],
         documentation=documentation,
+        client_origin=client_origin,
+        client_host=urlparse(client_origin).netloc,
+        install_url=f"{client_origin}/extensions?{install_query}",
     )

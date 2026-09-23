@@ -21,9 +21,20 @@ version. Missing or withdrawn versions return a human-readable 404. Existing
 `/v1`, `/simple`, `/packages`, and Module Federation asset paths retain their
 machine-facing semantics.
 
+The detail page links to client-web's `/extensions?install=<name>&version=<exact>`.
+The Registry neither reads deployment state nor installs the Release. When a
+client-web page opens the Registry, it passes only its Web origin as
+`client_origin`; the catalog preserves it through search, filters, and version
+links. The Registry accepts HTTPS origins (and local HTTP for development),
+then constructs a fixed client-web path and displays the destination host. A
+direct Registry visit defaults to `https://app.inkcre.dev`. The return query
+contains only the Extension name and exact version; client-web reads the
+Release anew from its own configured Registry and requires confirmation.
+
 The UI does not invent descriptions, popularity, trust badges, compatibility
 verdicts, installation state, or download counts that Registry does not own.
-Package inspection and copying an ID do not install or activate an Extension.
+Package inspection, copying an ID, and opening the install link do not install
+or activate an Extension.
 
 ## Publisher workspace
 

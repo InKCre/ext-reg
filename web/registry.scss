@@ -280,6 +280,13 @@ select {
   }
 }
 
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sys-space-sm);
+}
+
 .detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;
