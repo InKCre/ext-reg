@@ -5,6 +5,12 @@ This changelog records notable changes to the Registry service. It is generated 
 
 <!-- towncrier release notes start -->
 
+## 0.3.0 - 2026-09-23
+
+### Added
+
+- Registry Web release pages can return to a Web app with an exact Extension version for installation confirmation. (#56)
+
 ## 0.2.1 - 2026-09-22
 
 ### Changed
