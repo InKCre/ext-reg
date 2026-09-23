@@ -22,6 +22,7 @@ import boto3
 import httpx
 from botocore.config import Config
 from registry_database import configure_runtime_login
+from registry_preview_seed import seed
 
 
 def request(client: httpx.Client, method: str, path: str, *, missing=False, **kwargs):
@@ -245,6 +246,44 @@ def deploy(heroku, neon, cloudflare, name: str, branch_name: str, image: str, re
     run("heroku", "container:release", "web", "--app", name)
     run("heroku", "ps:scale", "web=1:eco", "--app", name)
     smoke(origin, revision)
+    seed_token = secrets.token_urlsafe(32)
+    run(
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--env",
+        "DATABASE_URL",
+        image,
+        "python",
+        "-m",
+        "inkcre_extension_registry.admin",
+        "grant",
+        "inkcre",
+        "--label",
+        "preview fixture",
+        env=database_env,
+        input=seed_token + "\n",
+    )
+    try:
+        seed(origin, seed_token)
+    finally:
+        run(
+            "docker",
+            "run",
+            "--rm",
+            "--env",
+            "DATABASE_URL",
+            image,
+            "python",
+            "-m",
+            "inkcre_extension_registry.admin",
+            "revoke",
+            "inkcre",
+            "--label",
+            "preview fixture",
+            env=database_env,
+        )
     print(f"Preview: {origin}\nSource: {revision}\nNeon branch: {branch['id']}")
     if os.environ.get("GITHUB_OUTPUT"):
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:

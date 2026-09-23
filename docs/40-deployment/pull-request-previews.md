@@ -21,7 +21,7 @@ GitHub `preview` 环境需要：
 | `CLOUDFLARE_PREVIEW_API_TOKEN` secret                        | 创建和清理 R2 桶、创建和撤销桶范围的账户 API token |
 | `REGISTRY_PREVIEW_PUBLISHER_TOKEN` secret                    | 随机审阅凭据，只登记 `reviewer` namespace          |
 
-Cloudflare 控制 token 的账户级权限只属于可信 runner。应用拿到的 S3 key 来自单个桶的 `Workers R2 Storage Bucket Item Write` token；不要直接把账户管理 token 放入应用。部署只登记审阅者凭据，不生成示例扩展、版本或文件。发布验收应在一次性环境完成，共享预览仅保留明确用于人工审阅的数据。
+Cloudflare 控制 token 的账户级权限只属于可信 runner。应用拿到的 S3 key 来自单个桶的 `Workers R2 Storage Bucket Item Write` token；不要直接把账户管理 token 放入应用。部署保留 `reviewer` namespace 的审阅凭据，并通过正式 Publisher API 在每个 PR 的隔离库和桶内发布一个固定的 `inkcre/rss` 0.2.1 Release。wheel 从公开生产 Registry 下载，按固定 SHA-256 核验后上传；关联元数据与生产发行的源码提交、构建号一致，不复制生产数据库或凭据。控制器为播种临时授予 `inkcre` namespace 凭据，发布后立即撤销。后续部署核对现有 Release 和 wheel，不覆盖人工审阅数据；固定产物不可用或预览中存在冲突时交付失败，不将空目录或错误产物报告为可用。此固定 Release 用于浏览目录、版本页和经预览 Registry 实际安装的验收，不代表生产目录快照。
 
 关闭 PR 由可信 cleanup 工作流核验同仓库与 closed 状态，先停止 app，再清理桶对象、桶和对象 token，删除数据库分支与 app。清理失败保留可定位的资源信息，重新运行同一 PR 的清理命令；不得通过范围搜索删除其他 PR、基础分支或生产资源。
 
