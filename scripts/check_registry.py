@@ -76,6 +76,8 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     }
     assert (await request("GET", "/v1/extensions")).json() == []
     await request("GET", "/")
+    await request("GET", "/?client_origin=https://example.invalid/path", 400)
+    await request("GET", "/?client_origin=https://user@example.invalid", 400)
     await request("GET", "/v1/publisher", 401)
     await request(
         "POST", "/v1/extensions/other/extension/releases", 403, private=True, json=association
@@ -156,7 +158,18 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     await request("POST", version_path + "/publish", private=True)
     await request("POST", version_path + "/publish", private=True)
     assert (await request("GET", "/v1/extensions")).json()[0]["name"] == "check/extension"
-    await request("GET", "/explore/check/extension?version=1.0.0")
+    catalog = await request("GET", "/?client_origin=https://preview.example")
+    assert 'name="client_origin" value="https://preview.example"' in catalog.text
+    assert "/explore/check/extension?client_origin=https%3A" in catalog.text
+    detail = await request(
+        "GET", "/explore/check/extension?version=1.0.0&client_origin=https://preview.example"
+    )
+    assert (
+        'href="https://preview.example/extensions?install=check%2Fextension&amp;version=1.0.0"'
+        in detail.text
+    )
+    assert "version=1.0.0&amp;client_origin=https%3A" in detail.text
+    assert "Install in preview.example" in detail.text
     await request("GET", "/v1/extensions/check/extension")
     assert (await request("GET", version_path)).json()["state"] == "published"
     await request("GET", "/simple/")

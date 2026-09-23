@@ -14,12 +14,12 @@
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
-      <a class="brand" href="/" aria-label="InKCre Registry home">
+      <a class="brand" href="/{% if client_origin %}?client_origin={{ client_origin | urlencode }}{% endif %}" aria-label="InKCre Registry home">
         <span aria-hidden="true">{% include "brand.html" %}</span>
         <span>InKCre</span>
       </a>
       <nav aria-label="Main navigation">
-        <a href="/" {% if active == 'catalog' %} aria-current="page" {% endif %}>Registry</a>
+        <a href="/{% if client_origin %}?client_origin={{ client_origin | urlencode }}{% endif %}" {% if active == 'catalog' %} aria-current="page" {% endif %}>Registry</a>
         <a href="/publish" {% if active == 'publish' %} aria-current="page" {% endif %}>
           Publisher
         </a>

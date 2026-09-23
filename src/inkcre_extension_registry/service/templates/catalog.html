@@ -8,6 +8,7 @@
     <a class="button" href="/publish">Publish</a>
   </div>
   <form class="search-form" role="search" method="get" action="/">
+    <input type="hidden" name="client_origin" value="{{ client_origin }}" />
     <label class="sr-only" for="search">Search extensions</label>
     <input
       id="search"
@@ -35,12 +36,12 @@
     <button class="button" type="submit">Search</button>
   </form>
   {% if query or namespace %}
-  <p class="search-summary"><a href="/">Clear filters</a></p>
+  <p class="search-summary"><a href="/?client_origin={{ client_origin | urlencode }}">Clear filters</a></p>
   {% endif %} {% if extensions %}
   <ul class="catalog-list" aria-label="Published extensions">
     {% for extension in extensions %}
     <li>
-      <a class="extension-card" href="/explore/{{ extension.name }}">
+      <a class="extension-card" href="/explore/{{ extension.name }}?client_origin={{ client_origin | urlencode }}">
         <div>
           <h2>{{ extension.nickname }}</h2>
           <p class="extension-name">{{ extension.name }}</p>
