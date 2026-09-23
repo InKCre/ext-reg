@@ -36,6 +36,7 @@ jobs:
     timeout-minutes: 15
     environment:
       name: preview
+      deployment: false
     steps:
       - name: Checkout the trusted cleanup controller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,3 +112,21 @@ jobs:
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
           PULL_NUMBER: ${{ steps.identity.outputs.pull_number }}
         run: pdm run python scripts/registry_preview.py retire --pull-number "$PULL_NUMBER"
+      - name: Mark the retired PR deployments inactive
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PULL_NUMBER: ${{ steps.identity.outputs.pull_number }}
+        with:
+          script: |
+            const deployments = await github.paginate(github.rest.repos.listDeployments, {
+              ...context.repo, environment: 'preview', per_page: 100,
+            })
+            for (const deployment of deployments) {
+              if (deployment.payload?.pull_number !== Number(process.env.PULL_NUMBER)) continue
+              await github.rest.repos.createDeploymentStatus({
+                ...context.repo,
+                deployment_id: deployment.id,
+                state: 'inactive',
+                auto_inactive: false,
+              })
+            }

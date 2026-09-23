@@ -120,12 +120,62 @@ jobs:
       contents: read
       pull-requests: read
       deployments: write
+      statuses: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: preview
-      url: ${{ steps.deploy.outputs.url }}
+      deployment: false
     steps:
+      - name: Recheck PR identity after build and concurrency queue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        with:
+          script: |
+            const { data: pull } = await github.rest.pulls.get({
+              ...context.repo, pull_number: Number(process.env.PULL_NUMBER),
+            })
+            if (pull.state !== 'open' || pull.base.ref !== 'main' ||
+                pull.head.repo?.full_name !== process.env.GITHUB_REPOSITORY ||
+                pull.head.sha !== process.env.SOURCE_SHA) {
+              throw new Error('PR closed or moved; no preview mutation is allowed.')
+            }
+      - name: Create the exact pull-request deployment
+        id: deployment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+        with:
+          script: |
+            const { data: deployment } = await github.rest.repos.createDeployment({
+              ...context.repo,
+              ref: process.env.SOURCE_SHA,
+              environment: 'preview',
+              auto_merge: false,
+              required_contexts: [],
+              transient_environment: true,
+              production_environment: false,
+              payload: { pull_number: Number(process.env.PULL_NUMBER) },
+              description: 'Registry pull-request preview',
+            })
+            core.setOutput('deployment_id', String(deployment.id))
+            await github.rest.repos.createDeploymentStatus({
+              ...context.repo,
+              deployment_id: deployment.id,
+              state: 'in_progress',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            })
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: process.env.SOURCE_SHA,
+              context: 'ext-reg preview',
+              state: 'pending',
+              description: 'Registry preview is deploying',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            })
       - name: Checkout only the trusted controller
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -157,21 +207,6 @@ jobs:
         with:
           name: registry-image
           path: ${{ runner.temp }}/registry-image
-      - name: Recheck PR identity after build and concurrency queue
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          PULL_NUMBER: ${{ needs.identity.outputs.pull_number }}
-          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
-        with:
-          script: |
-            const { data: pull } = await github.rest.pulls.get({
-              ...context.repo, pull_number: Number(process.env.PULL_NUMBER),
-            })
-            if (pull.state !== 'open' || pull.base.ref !== 'main' ||
-                pull.head.repo?.full_name !== process.env.GITHUB_REPOSITORY ||
-                pull.head.sha !== process.env.SOURCE_SHA) {
-              throw new Error('PR closed or moved; no preview mutation is allowed.')
-            }
       - name: Apply migrations and deploy the isolated service
         id: deploy
         env:
@@ -201,3 +236,34 @@ jobs:
             echo '- 目录、详情、Publisher 与原生分发运行同一 CPython 服务。'
             echo '- 每 PR 独立 Neon 分支与 R2 桶；不生成示例扩展。'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report the exact pull-request preview
+        if: ${{ always() && steps.deployment.outputs.deployment_id != '' }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DEPLOYMENT_ID: ${{ steps.deployment.outputs.deployment_id }}
+          SOURCE_SHA: ${{ needs.identity.outputs.head_sha }}
+          PREVIEW_RESULT: ${{ job.status }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const succeeded = process.env.PREVIEW_RESULT === 'success' && Boolean(process.env.PREVIEW_URL)
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            await github.rest.repos.createDeploymentStatus({
+              ...context.repo,
+              deployment_id: Number(process.env.DEPLOYMENT_ID),
+              state: succeeded ? 'success' : 'failure',
+              log_url: runUrl,
+              auto_inactive: false,
+              ...(succeeded ? { environment_url: process.env.PREVIEW_URL } : {}),
+            })
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha: process.env.SOURCE_SHA,
+              context: 'ext-reg preview',
+              state: succeeded ? 'success' : 'error',
+              description: succeeded ? 'Registry preview is ready' : 'Registry preview failed',
+              target_url: succeeded ? process.env.PREVIEW_URL : runUrl,
+            })
+            if (!succeeded && process.env.PREVIEW_RESULT === 'success') {
+              core.setFailed('Preview deployment did not report a URL.')
+            }
