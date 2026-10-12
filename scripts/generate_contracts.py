@@ -46,7 +46,7 @@ def generated_contracts() -> dict[Path, bytes]:
     outputs[CONTRACTS / "openapi.json"] = _encoded(create_app().openapi())
     outputs[CONTRACTS / "revision.json"] = _encoded(
         {
-            "contract_revision": 3,
+            "contract_revision": 4,
             "documentation_scopes": ["global", "module-federation", "python"],
             "distribution_kinds": ["module_federation", "python"],
             "extension_version": "strict-semver-without-build-metadata",

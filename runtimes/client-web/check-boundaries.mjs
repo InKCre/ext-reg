@@ -4,6 +4,8 @@ import { once } from 'node:events'
 import { configStore, PeerManager, PeerOutcomeUnknown } from '@inkcre/core'
 import {
   EXTENSION_MANAGEMENT_CAPABILITY,
+  ExtensionManager,
+  NativeDistributionSupportChangeError,
   getExtensionDocumentation,
   listAdvertisedExtensionManagementPeers,
   manageExtensionOnPeer,
@@ -58,6 +60,51 @@ const catalogReleases = [
     python: null,
   },
 ]
+const supportReleases = new Map([
+  [
+    '1.0.0',
+    {
+      name: 'inkcre/support',
+      nickname: 'Support',
+      version: '1.0.0',
+      state: 'published',
+      python: {
+        project: 'inkcre-support',
+        simple_url: '/simple/inkcre-support/',
+        host_sdk: 'core-py',
+        host_sdk_version: '^1.0.0',
+        entry_point: {
+          group: 'inkcre.core.extensions',
+          name: 'support',
+          object: 'support:Extension',
+        },
+      },
+      module_federation: {
+        manifest_url: '/extensions/inkcre/support/1.0.0/module-federation/mf-manifest.json',
+        host_sdk: '@inkcre/core',
+        host_sdk_version: '^1.0.0',
+      },
+    },
+  ],
+])
+supportReleases.set('2.0.0', {
+  ...supportReleases.get('1.0.0'),
+  version: '2.0.0',
+  module_federation: null,
+})
+let installedSupport = null
+let supportWrites = 0
+let previousReleaseStatus = 200
+let dropPreviousRelease = false
+let changeDuringPreflight = false
+const supportRow = (version) => ({
+  name: 'inkcre/support',
+  nickname: 'Support',
+  version,
+  enabled: [],
+  config: {},
+  config_schema: null,
+})
 const requests = []
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, origin)
@@ -65,7 +112,30 @@ const server = createServer(async (request, response) => {
   for await (const chunk of request) chunks.push(chunk)
   requests.push({ url, headers: request.headers, body: Buffer.concat(chunks).toString() })
   response.setHeader('Content-Type', 'application/json')
-  if (url.pathname === '/peers') {
+  if (url.pathname === '/extensions') {
+    if (request.method === 'POST') {
+      supportWrites++
+      installedSupport = { ...JSON.parse(Buffer.concat(chunks).toString()), enabled: [] }
+      response.end(JSON.stringify(installedSupport))
+    } else if (request.method === 'PATCH') {
+      supportWrites++
+      const matches =
+        installedSupport !== null &&
+        installedSupport.enabled.length === 0 &&
+        url.searchParams.get('version') === `eq.${installedSupport.version}`
+      if (matches)
+        installedSupport = { ...installedSupport, ...JSON.parse(Buffer.concat(chunks).toString()) }
+      response.end(JSON.stringify(matches ? [installedSupport] : []))
+    } else response.end(JSON.stringify(installedSupport === null ? [] : [installedSupport]))
+  } else if (url.pathname.startsWith('/v1/extensions/inkcre/support/releases/')) {
+    const version = url.pathname.split('/').at(-1)
+    if (version === '1.0.0') {
+      if (dropPreviousRelease) return request.socket.destroy()
+      response.statusCode = previousReleaseStatus
+      if (changeDuringPreflight) installedSupport = supportRow('3.0.0')
+    }
+    response.end(JSON.stringify(supportReleases.get(version)))
+  } else if (url.pathname === '/peers') {
     const peer = (id, capabilities) => ({
       id,
       name: id,
@@ -197,6 +267,87 @@ try {
       etag: 'test',
     })),
   }
+  const manager = new ExtensionManager({
+    releases,
+    moduleFederation: {
+      registerRemotes() {
+        throw new Error('Install must not load MF')
+      },
+      loadRemote() {
+        throw new Error('Install must not load MF')
+      },
+    },
+  })
+  assert.equal(
+    (await manager.install({ name: 'inkcre/support', version: '2.0.0' })).version,
+    '2.0.0',
+  )
+  assert.equal(supportWrites, 1, 'Python-only installation is a deployment choice')
+  await assert.rejects(manager.install({ name: 'inkcre/support', version: '1.0.0' }))
+  assert.equal(
+    installedSupport.version,
+    '2.0.0',
+    'Install cannot silently replace the exact version',
+  )
+  installedSupport = supportRow('1.0.0')
+  supportWrites = 0
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0'), (error) => {
+    assert.ok(error instanceof NativeDistributionSupportChangeError)
+    assert.equal(error.reason, 'reduced')
+    assert.equal(error.installedVersion, '1.0.0')
+    assert.deepEqual(error.removedFormats, ['module_federation'])
+    return true
+  })
+  assert.equal(supportWrites, 0)
+  await assert.rejects(
+    manager.changeVersion('inkcre/support', '2.0.0', { allowSupportChange: true }),
+    TypeError,
+  )
+  const confirmation = { expectedInstalledVersion: '1.0.0', allowSupportChange: true }
+  assert.equal(
+    (await manager.changeVersion('inkcre/support', '2.0.0', confirmation)).version,
+    '2.0.0',
+  )
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0', confirmation))
+  assert.equal(supportWrites, 1, 'A stale confirmation cannot mutate a different installed version')
+  installedSupport = { ...supportRow('1.0.0'), enabled: [target] }
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0', confirmation))
+  assert.equal(supportWrites, 1, 'All Peers must be disabled before a version change')
+  for (const status of [404, 451]) {
+    installedSupport = supportRow('1.0.0')
+    previousReleaseStatus = status
+    await assert.rejects(
+      manager.changeVersion('inkcre/support', '2.0.0'),
+      (error) =>
+        error instanceof NativeDistributionSupportChangeError && error.reason === 'unavailable',
+    )
+    assert.equal(
+      (await manager.changeVersion('inkcre/support', '2.0.0', confirmation)).version,
+      '2.0.0',
+    )
+  }
+  installedSupport = supportRow('1.0.0')
+  const beforeTemporaryFailure = supportWrites
+  previousReleaseStatus = 503
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0', confirmation))
+  previousReleaseStatus = 200
+  dropPreviousRelease = true
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0', confirmation))
+  dropPreviousRelease = false
+  assert.equal(
+    supportWrites,
+    beforeTemporaryFailure,
+    'Temporary failures cannot authorize skipping the check',
+  )
+  changeDuringPreflight = true
+  await assert.rejects(manager.changeVersion('inkcre/support', '2.0.0', confirmation))
+  changeDuringPreflight = false
+  assert.equal(
+    installedSupport.version,
+    '3.0.0',
+    'Atomic update preserves a concurrent version change',
+  )
+
   const readDocs = () => getExtensionDocumentation(origin, installed.name, installed.version)
   assert.deepEqual(
     await readDocs(),

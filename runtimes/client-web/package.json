@@ -35,7 +35,7 @@
     "@module-federation/runtime": ">=0.21.4 <0.23.0"
   },
   "devDependencies": {
-    "@inkcre/core": "github:InKCre/client-web#f29a407ae02980b221e9419bb38421aa95805771&path:/packages/core",
+    "@inkcre/core": "github:InKCre/client-web#503cb9a161e106da4aacd6a48aa811fe0f81238c&path:/packages/core",
     "@module-federation/runtime": "0.21.6",
     "@types/semver": "7.7.1",
     "@vueuse/core": "14.1.0",

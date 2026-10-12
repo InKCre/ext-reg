@@ -6,6 +6,34 @@ export class RegistryReleaseError extends WebExtensionRuntimeError {
   override name = 'RegistryReleaseError'
 }
 
+export class RegistryReleaseUnavailableError extends RegistryReleaseError {
+  override name = 'RegistryReleaseUnavailableError'
+
+  constructor(readonly status: 404 | 451) {
+    super(`Extension Release is unavailable (HTTP ${status}).`)
+  }
+}
+
+export type NativeDistributionFormat = 'python' | 'module_federation'
+
+export class NativeDistributionSupportChangeError extends WebExtensionRuntimeError {
+  override name = 'NativeDistributionSupportChangeError'
+
+  constructor(
+    readonly extensionName: string,
+    readonly installedVersion: string,
+    readonly targetVersion: string,
+    readonly removedFormats: readonly NativeDistributionFormat[],
+    readonly reason: 'reduced' | 'unavailable',
+  ) {
+    super(
+      reason === 'reduced'
+        ? `${extensionName}@${targetVersion} removes native support: ${removedFormats.join(', ')}.`
+        : `Cannot verify native support of installed ${extensionName}@${installedVersion}.`,
+    )
+  }
+}
+
 export class RegistryDocumentationError extends WebExtensionRuntimeError {
   override name = 'RegistryDocumentationError'
 }

@@ -33,6 +33,7 @@ def seed(origin: str, token: str) -> None:
                 json={
                     "nickname": "RSS/Atom Feeds",
                     "version": VERSION,
+                    "required_native_formats": ["python"],
                     "python": {
                         "project": "inkcre-ext-rss",
                         "host_sdk": "core-py",

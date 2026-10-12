@@ -11,3 +11,16 @@
 Runtime 的 Core peer dependency 以实际类型与构建验证为准，不使用 ambient SDK stub。新公共 API 通过 Changesets 声明 minor 发行意图，源包版本由正式版本流程修改。
 
 Core SDK 尚未提供独立发布产物，因此开发依赖固定 client-web 的 Git revision；该子目录包只提供 manifest 和依赖，不能冒充构建产物。`prepare:sdk` 在临时目录只检出同一 revision 的 `packages/core`，沿用其真实源码、TypeScript 配置及原始 tsdown 配置，用 ext-reg 自身冻结的工具和 SDK 依赖构建 ESM 与类型声明，再将产物放入当前 workspace 的 node_modules 私有目录。它不安装生产者 workspace，不需要 GitHub Packages 凭据，也不改 pnpm store、生产依赖、源码或锁文件；首次构建只需读取公开 GitHub 源码。type-check 与 build 共用这一准备步骤，仓库门禁还通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`。正式 SDK 产物可用后，应改为固定产物开发依赖并删除准备脚本，而不是继续维护另一套 SDK 声明。
+
+安装只保存部署选择的精确发行，因此 `install` 允许纯 Python Release，并禁止用安装命令
+隐式替换不同的已安装版本。MF 存在及 SDK 兼容仍只在浏览器启用时要求。
+`changeVersion` 读取旧、新版本实际公开原生关联，默认拒绝减少 Python 或 MF 支持。
+`NativeDistributionSupportChangeError` 提供原版本、目标版本、减少的格式及 `reason`，
+应用展示确认后用 `{ expectedInstalledVersion, allowSupportChange: true }` 重试。
+明确的旧发行 404 或 451 使用 `unavailable` 原因，允许确认无法核对支持后继续；
+网络、5xx 与无效描述继续失败，确认不能绕过这些临时错误。
+
+确认与原安装版本绑定，Core SDK 的持久化更新同时匹配原版本和空 `enabled` 集合，
+防止检查期间的并发版本变更或重新启用被覆盖。Runtime 继续要求所有 Peer 已停用且
+本地实例已停止，不清除其他 Peer 的启用意图。测试使用完整构建包、真实 Core SDK 与
+本地 HTTP 验证这些边界；开发依赖固定到包含该条件写入的 client-web Git revision。

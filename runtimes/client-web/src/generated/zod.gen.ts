@@ -131,6 +131,11 @@ export const zPrepareReleaseRequest = z.object({
   module_federation: zModuleFederationAssociationInput.nullish(),
   nickname: z.string().min(1).max(128),
   python: zPythonAssociationInput.nullish(),
+  required_native_formats: z
+    .array(z.enum(['python', 'module_federation']))
+    .min(1)
+    .max(2)
+    .nullish(),
   version: z
     .string()
     .min(5)
@@ -164,6 +169,7 @@ export const zPublisherRelease = z.object({
   nickname: z.string(),
   python: zPythonDistribution.nullish(),
   python_uploaded: z.boolean(),
+  required_native_formats: z.array(z.enum(['python', 'module_federation'])).nullish(),
   state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
   version: z
     .string()

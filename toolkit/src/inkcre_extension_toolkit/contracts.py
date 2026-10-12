@@ -51,6 +51,10 @@ class PythonEntryPoint(GeneratedPythonEntryPoint):
 class PrepareReleaseRequest(GeneratedPrepareReleaseRequest):
     @model_validator(mode="after")
     def association_is_declared(self) -> "PrepareReleaseRequest":
+        if self.required_native_formats is not None and len(
+            set(self.required_native_formats.root)
+        ) != len(self.required_native_formats.root):
+            raise ValueError("required_native_formats must not contain duplicates")
         if self.python is None and self.module_federation is None:
             raise ValueError("at least one native Distribution association is required")
         if self.python is not None:

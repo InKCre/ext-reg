@@ -242,11 +242,18 @@ class ModuleFederationAssociationInput(ContractModel):
 class PrepareReleaseRequest(ContractModel):
     nickname: str = Field(min_length=1, max_length=128)
     version: StrictSemVer
+    required_native_formats: tuple[Literal["python", "module_federation"], ...] | None = Field(
+        default=None, min_length=1, max_length=2
+    )
     python: PythonAssociationInput | None = None
     module_federation: ModuleFederationAssociationInput | None = None
 
     @model_validator(mode="after")
     def association_is_declared(self) -> PrepareReleaseRequest:
+        if self.required_native_formats is not None and len(
+            set(self.required_native_formats)
+        ) != len(self.required_native_formats):
+            raise ValueError("required_native_formats must not contain duplicates")
         if self.python is None and self.module_federation is None:
             raise ValueError("at least one native Distribution association is required")
         if self.python is not None:
@@ -289,6 +296,7 @@ class ExtensionRecord(ContractModel):
 
 
 class PublisherRelease(ReleaseRecord):
+    required_native_formats: tuple[Literal["python", "module_federation"], ...] | None = None
     python_uploaded: bool
     web_uploaded: bool
 

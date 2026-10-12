@@ -1,6 +1,6 @@
 """PostgreSQL models. Checked-in Tortoise migrations own schema changes."""
 
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from tortoise import fields
 from tortoise.migrations.constraints import CheckConstraint, UniqueConstraint
@@ -65,6 +65,9 @@ class Release(Model):
     )
     version = fields.CharField(max_length=128)
     state = fields.CharField(max_length=16, default="preparing")
+    required_native_formats: list[Literal["python", "module_federation"]] | None = fields.JSONField(
+        null=True
+    )
     yank_reason: str | None = fields.TextField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     published_at = fields.DatetimeField(null=True)
@@ -79,7 +82,14 @@ class Release(Model):
         constraints: ClassVar = [
             CheckConstraint(
                 "state IN ('preparing', 'published', 'yanked', 'blocked')", "release_state"
-            )
+            ),
+            CheckConstraint(
+                "required_native_formats IS NULL OR required_native_formats IN "
+                "('[\"python\"]'::jsonb, '[\"module_federation\"]'::jsonb, "
+                '\'["python","module_federation"]\'::jsonb, '
+                '\'["module_federation","python"]\'::jsonb)',
+                "release_required_native_formats",
+            ),
         ]
 
 

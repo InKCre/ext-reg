@@ -56,6 +56,16 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: Annotated[str, Field(title="Manifest Url")]
 
 
+class RequiredNativeFormats(RootModel[list[Literal["python", "module_federation"]]]):
+    model_config = ConfigDict(
+        frozen=True,
+    )
+    root: Annotated[
+        list[Literal["python", "module_federation"]],
+        Field(max_length=2, min_length=1, title="Required Native Formats"),
+    ]
+
+
 class PythonEntryPoint(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -197,6 +207,9 @@ class PrepareReleaseRequest(BaseModel):
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
     python: PythonAssociationInput | None = None
+    required_native_formats: Annotated[
+        RequiredNativeFormats | None, Field(title="Required Native Formats")
+    ] = None
     version: Annotated[
         str,
         Field(

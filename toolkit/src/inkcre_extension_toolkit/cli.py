@@ -12,6 +12,7 @@ from .contracts import PrepareReleaseRequest
 from .documentation import DocumentationCandidate, inspect_documentation, pack_documentation
 from .preview import build_preview_registry
 from .python_distribution import finalize_wheel
+from .release_intent import load_release_intent
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 preview_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
@@ -178,6 +179,9 @@ def prepare_release(
     namespace: Annotated[str, typer.Option("--namespace")],
     name: Annotated[str, typer.Option("--name")],
     request_path: Annotated[Path, typer.Option("--request", exists=True, dir_okay=False)],
+    release_intent: Annotated[
+        Path | None, typer.Option("--release-intent", exists=True, dir_okay=False)
+    ] = None,
     token: Annotated[
         str | None,
         typer.Option("--token", envvar="INKCRE_EXTENSION_REGISTRY_TOKEN", hidden=True),
@@ -186,6 +190,8 @@ def prepare_release(
     """Prepare immutable typed native associations for one Extension Release."""
 
     payload = PrepareReleaseRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
+    if release_intent is not None:
+        payload = load_release_intent(release_intent).prepare(payload)
     with _client(registry_url, token) as client:
         release = client.prepare(namespace, name, payload)
     typer.echo(release.model_dump_json(exclude_none=True))

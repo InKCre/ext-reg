@@ -6,6 +6,7 @@ import asyncio
 import importlib
 import logging
 import typing
+from contextlib import suppress
 from dataclasses import dataclass
 
 from .base import ExtensionBase
@@ -14,11 +15,13 @@ from .distribution import AcquiredDistribution, PipDistributionConsumer
 from .errors import (
     ExtensionCompatibilityError,
     ExtensionNotInstalledError,
+    ExtensionReleaseUnavailableError,
     ExtensionStateConflictError,
     translate_host_model_error,
 )
 from .modules import DistributionModules
 from .release import RegistryReleaseClient, require_python_association, validate_coordinate
+from .support import NativeDistributionFormat, require_native_support_preserved
 
 logger = logging.getLogger(__name__)
 
@@ -64,14 +67,31 @@ class ExtensionManager:
             raise ExtensionNotInstalledError(f"{name} is not installed")
         return model
 
-    def install(self, name: str, version: str) -> typing.Any:
+    def install(
+        self,
+        name: str,
+        version: str,
+        *,
+        expected_installed_version: str | None = None,
+        allow_support_change: bool = False,
+    ) -> typing.Any:
         validate_coordinate(name, version)
         try:
             current = _host_model().get(name)
         except Exception as error:
             translate_host_model_error(error)
+        if allow_support_change and expected_installed_version is None:
+            raise ValueError("Support change confirmation requires expected_installed_version")
+        if expected_installed_version is not None and (
+            current is None or current.version != expected_installed_version
+        ):
+            raise ExtensionStateConflictError("Installed version changed after confirmation")
         if current is not None and current.version == version:
             return current
+        if current is not None and current.enabled:
+            raise ExtensionStateConflictError(
+                "Disable every Peer before changing Extension version"
+            )
         loaded = self._loaded_versions.get(name)
         if loaded is not None and loaded != version:
             raise ExtensionStateConflictError(
@@ -82,7 +102,35 @@ class ExtensionManager:
         if release.state is not ReleaseState.published:
             raise ExtensionCompatibilityError("Release is not published")
         require_python_association(release, _host_version())
+        if current is not None:
+            old_release = None
+            with suppress(ExtensionReleaseUnavailableError):
+                old_release = RegistryReleaseClient(origin).get(name, current.version)
+            formats: tuple[NativeDistributionFormat, ...] = ("python", "module_federation")
+            require_native_support_preserved(
+                name,
+                current.version,
+                version,
+                tuple(
+                    format_name
+                    for format_name in formats
+                    if getattr(old_release, format_name) is not None
+                )
+                if old_release is not None
+                else None,
+                tuple(
+                    format_name
+                    for format_name in formats
+                    if getattr(release, format_name) is not None
+                ),
+                expected_installed_version=expected_installed_version,
+                allow_support_change=allow_support_change,
+            )
         try:
+            if current is not None:
+                return _host_model().install(
+                    name, version, release.nickname, expected_version=current.version
+                )
             return _host_model().install(name, version, release.nickname)
         except Exception as error:
             translate_host_model_error(error)

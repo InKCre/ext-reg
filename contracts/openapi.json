@@ -362,6 +362,26 @@
               }
             ]
           },
+          "required_native_formats": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "python",
+                    "module_federation"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 2,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Native Formats"
+          },
           "version": {
             "maxLength": 128,
             "minLength": 5,
@@ -414,6 +434,24 @@
           "python_uploaded": {
             "title": "Python Uploaded",
             "type": "boolean"
+          },
+          "required_native_formats": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "python",
+                    "module_federation"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Native Formats"
           },
           "state": {
             "enum": [

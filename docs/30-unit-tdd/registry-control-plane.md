@@ -14,9 +14,19 @@ one Python association and one Module Federation association; either is
 optional. Association metadata, filenames, and bytes are immutable. Identical
 retries are idempotent; conflicts require a new Release.
 
-`preparing` is private and publication requires at least one admitted native
-Distribution. `published` and `yanked` preserve descriptors and bytes;
-`blocked` is a separate operator read-denial state.
+`preparing` 是私有状态。新 Release 必须在准备请求中声明非空、无重复的
+`required_native_formats`，只能包含 `python` 与 `module_federation`；它是精确版本的
+不可变最小交付集合，并不禁止随后追加另一种原生关联。发布要求承诺的关联全部存在，
+以及每个已有关联的产物齐备。对象检查在事务外进行，提交时重新核对关联、文件和快照身份；
+检查期间新增分发会导致冲突，发布者须重试，不能把未经检查的新关联一起发布。
+
+承诺存于 Release 的可空 JSON 列，只在准备与发布者工作台接口暴露，公开
+`ReleaseRecord` 保持原有字段。历史已发布记录保留空值，不推断或回填；它们仍可读取并
+首次追加缺少的分发。历史准备记录需要发布者声明后才能发布。旧发布工具未提供声明时，
+新建 Release 返回 409 并明确要求升级，而不是默认推断当前上传的格式。生产启用此边界前，
+各发布者必须采用新版 Toolkit 或直接发送合法声明。
+
+`published` 与 `yanked` 保留描述和产物；`blocked` 是独立的操作员读拒绝状态。
 
 ## Native Admission and Reads
 
