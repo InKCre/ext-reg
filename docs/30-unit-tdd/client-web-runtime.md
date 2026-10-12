@@ -24,3 +24,9 @@ Core SDK 尚未提供独立发布产物，因此开发依赖固定 client-web �
 防止检查期间的并发版本变更或重新启用被覆盖。Runtime 继续要求所有 Peer 已停用且
 本地实例已停止，不清除其他 Peer 的启用意图。测试使用完整构建包、真实 Core SDK 与
 本地 HTTP 验证这些边界；开发依赖固定到包含该条件写入的 client-web Git revision。
+
+Web Runtime 的公开 Core peer 下界是 `0.3.1`，旧版本条件更新将由这次 Core SDK patch 发行交付；不能仅用
+开发依赖的 Git pin 来保证下游正式产物具备此行为。生产先发布 Core SDK `0.3.1`，再发布
+Web Runtime `0.4.0`。版本准备前开发 Git 包仍标记 `0.3.0`，因此依赖安装可能报告 peer
+版本警告；资格检查固定到包含条件写入的源码，并验证实际 HTTP 写入，不据此宣称旧
+`0.3.0` 正式 SDK 获得了同样保障。

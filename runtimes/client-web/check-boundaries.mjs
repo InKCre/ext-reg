@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
+import { readFile } from 'node:fs/promises'
+import { satisfies } from 'semver'
 import { configStore, PeerManager, PeerOutcomeUnknown } from '@inkcre/core'
 import {
   EXTENSION_MANAGEMENT_CAPABILITY,
@@ -14,6 +16,16 @@ import {
   RegistryReleaseReader,
   sortPublishedReleases,
 } from './dist/index.js'
+
+const coreRequirement = JSON.parse(await readFile(new URL('./package.json', import.meta.url)))
+  .peerDependencies['@inkcre/core']
+assert.equal(
+  satisfies('0.3.0', coreRequirement),
+  false,
+  'Older SDKs do not provide atomic version changes',
+)
+assert.equal(satisfies('0.3.1', coreRequirement), true)
+assert.equal(satisfies('0.4.0', coreRequirement), false)
 
 // Exercise the built package and real SDK over HTTP, without a deployment or real credentials.
 const target = '11111111-1111-4111-8111-111111111111'
