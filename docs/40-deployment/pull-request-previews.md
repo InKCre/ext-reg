@@ -21,8 +21,18 @@ GitHub `preview` 环境需要：
 | `CLOUDFLARE_PREVIEW_API_TOKEN` secret                        | 创建和清理 R2 桶、创建和撤销桶范围的账户 API token |
 | `REGISTRY_PREVIEW_PUBLISHER_TOKEN` secret                    | 随机审阅凭据，只登记 `reviewer` namespace          |
 
-Cloudflare 控制 token 的账户级权限只属于可信 runner。应用拿到的 S3 key 来自单个桶的 `Workers R2 Storage Bucket Item Write` token；不要直接把账户管理 token 放入应用。部署保留 `reviewer` namespace 的审阅凭据，并通过正式 Publisher API 在每个 PR 的隔离库和桶内发布一个固定的 `inkcre/rss` 0.2.1 Release。wheel 从公开生产 Registry 下载，按固定 SHA-256 核验后上传；关联元数据与生产发行的源码提交、构建号一致，不复制生产数据库或凭据。控制器为播种临时授予 `inkcre` namespace 凭据，发布后立即撤销。后续部署核对现有 Release 和 wheel，不覆盖人工审阅数据；固定产物不可用或预览中存在冲突时交付失败，不将空目录或错误产物报告为可用。此固定 Release 用于浏览目录、版本页和经预览 Registry 实际安装的验收，不代表生产目录快照。
+Cloudflare 控制 token 的账户级权限只属于可信 runner。应用拿到的 S3 key 来自单个桶的 `Workers R2 Storage Bucket Item Write` token；不要直接把账户管理 token 放入应用。部署保留 `reviewer` namespace 的审阅凭据，并通过正式 Publisher API 在每个 PR 的隔离库和桶内发布一个固定的 `inkcre/rss` 0.2.1 Release。wheel 从公开生产 Registry 下载，按固定 SHA-256 核验后上传；关联元数据与生产发行的源码提交、构建号一致，不复制生产数据库或凭据。控制器为播种临时授予 `inkcre` namespace 凭据，准备固定发行时明确声明 `required_native_formats: ["python"]`，发布后立即撤销。后续部署核对现有 Release 和 wheel，不覆盖人工审阅数据；固定产物不可用或预览中存在冲突时交付失败，不将空目录或错误产物报告为可用。此固定 Release 用于浏览目录、版本页和经预览 Registry 实际安装的验收，不代表生产目录快照。
 
 关闭 PR 由可信 cleanup 工作流核验同仓库与 closed 状态，先停止 app，再清理桶对象、桶和对象 token，删除数据库分支与 app。清理失败保留可定位的资源信息，重新运行同一 PR 的清理命令；不得通过范围搜索删除其他 PR、基础分支或生产资源。
 
 首次采用新控制器时，它必须先进入默认分支，GitHub 环境配置也必须完成。PR 中的代码可通过本机已授权控制器先行验收，但不能把旧 Worker 的成功日志当作 CPython 预览证据。部署产物、真实 URL 和观察结果记录在活动 task packet。
+
+发布准入规则变更必须同时检查默认分支控制器所发送的请求。delivery runner 使用可信默认分支，
+因此 PR 内已经修正的播种脚本要进入 `main` 后才会用于首次创建预览样本。候选服务不能为了
+兼容旧控制器而给新 Release 推断声明或绕过准入检查。
+
+如果候选服务已部署，而旧控制器在首次播种时被新规则拒绝，可以在已授权的本任务隔离预览
+中使用已审查的新请求创建同一个固定样本；平台控制凭据仍只属于可信控制器，临时发布凭据
+须撤销并核验失效。之后重跑旧控制器只验证已有样本与产物，不能将其成功报告为新控制器
+首次创建路径已经通过。准入拒绝、未留下发行记录、正确声明后的公开产物和精确服务 revision
+分别记录为资格证据；后续新预览的首次创建仍依赖控制器更新进入默认分支。
