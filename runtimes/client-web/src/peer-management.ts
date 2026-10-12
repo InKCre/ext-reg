@@ -11,7 +11,13 @@ import { WebExtensionRuntimeError } from './errors'
 export const EXTENSION_MANAGEMENT_CAPABILITY = 'core.extension.management.v1'
 
 export type ExtensionManagementCommand =
-  | { action: 'install'; extension: string; version: string }
+  | {
+      action: 'install'
+      extension: string
+      version: string
+      expected_installed_version?: string | null
+      allow_support_change?: boolean
+    }
   | { action: 'enable' | 'disable'; extension: string }
   | { action: 'patch_config'; extension: string; patch: Record<string, JsonValue> }
 

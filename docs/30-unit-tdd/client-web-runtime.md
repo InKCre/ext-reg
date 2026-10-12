@@ -2,7 +2,7 @@
 
 `@inkcre/extension-runtime-client-web` 是独立发行的浏览器 Runtime。Host SDK `@inkcre/core` 拥有部署持久化模型、Peer 发现、传输和错误分类；Runtime 拥有 Extension 生命周期编排、管理命令消费和 Registry 发行读取。应用继续决定操作当前浏览器 Runtime、在线远端 Host，还是只改变部署中的 desired state。
 
-`listAdvertisedExtensionManagementPeers()` 读取 `PeerManager.listLive()`，只保留宣告精确管理 capability 的 Peer。宣告不是协议支持、路由就绪或运行证明。`manageExtensionOnPeer(peerId, command)` 使用调用者指定的精确 Peer 和固定 capability，发送一次 install、enable、disable 或 patch_config 命令。它不替换目标、不重试、不改写 PeerManager 的传输失败分类；管理 HTTP 错误及无效业务响应不附带可能回显配置凭据的原始正文或校验详情。返回的安装记录仍不证明插件持续运行。
+`listAdvertisedExtensionManagementPeers()` 读取 `PeerManager.listLive()`，只保留宣告精确管理 capability 的 Peer。宣告不是协议支持、路由就绪或运行证明。`manageExtensionOnPeer(peerId, command)` 使用调用者指定的精确 Peer 和固定 capability，发送一次 install、enable、disable 或 patch_config 命令。install 命令可原样携带 `expected_installed_version` 与 `allow_support_change`；支持变化判断仍由目标 Host 拥有。它不替换目标、不重试、不改写 PeerManager 的传输失败分类；管理 HTTP 错误及无效业务响应不附带可能回显配置凭据的原始正文或校验详情。返回的安装记录仍不证明插件持续运行。
 
 `getExtensionDocumentation(origin, name, version)` 使用调用者已解析的 Registry origin 和生成 HTTP 合同查询精确发行，只返回实际存在的 scope 与 entry_url。404 返回 null，成功但没有文档返回空数组；网络、其他 HTTP 错误、错误坐标和无效响应抛出 `RegistryDocumentationError`。调用者可以将不可用帮助入口降级为提示，不应据此阻止插件初始化。文档查询不执行安装预检，不要求 MF Distribution 或匹配的 Host SDK，不读取作者正文，也不回退到另一版本或 scope。
 

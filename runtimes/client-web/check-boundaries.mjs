@@ -231,6 +231,20 @@ try {
   assert.equal(requests.at(-1).url.searchParams.get('lease_expires_at'), 'gt.now')
   for (const command of [
     { action: 'install', extension: installed.name, version: installed.version },
+    {
+      action: 'install',
+      extension: installed.name,
+      version: installed.version,
+      expected_installed_version: '0.1.0',
+      allow_support_change: true,
+    },
+    {
+      action: 'install',
+      extension: installed.name,
+      version: installed.version,
+      expected_installed_version: null,
+      allow_support_change: false,
+    },
     { action: 'enable', extension: installed.name },
     { action: 'disable', extension: installed.name },
     { action: 'patch_config', extension: installed.name, patch: { personal_access_token: secret } },
