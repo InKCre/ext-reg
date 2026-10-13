@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 
 from .client import DocumentationOutcomeUnknown, RegistryClient
-from .contracts import PrepareReleaseRequest
+from .contracts import NativePrepareReleaseRequest
 from .documentation import DocumentationCandidate, inspect_documentation, pack_documentation
 from .preview import build_preview_registry
 from .python_distribution import finalize_wheel
@@ -51,6 +51,7 @@ def docs_pack(
     name: Annotated[str, typer.Option("--name")],
     version: Annotated[str, typer.Option("--version")],
     scope: Annotated[str, typer.Option("--scope")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     source_repository: Annotated[str, typer.Option("--source-repository")],
     source_revision: Annotated[str, typer.Option("--source-revision")],
     entry: Annotated[str, typer.Option("--entry")] = "index.html",
@@ -111,6 +112,7 @@ def docs_publish(
                 saved.metadata,
                 archive,
                 expected_etag=saved.expected_etag,
+                distribution=saved.distribution,
             )
         except DocumentationOutcomeUnknown as error:
             typer.echo(str(error), err=True)
@@ -125,6 +127,7 @@ def docs_show(
     ],
     name: Annotated[str, typer.Option("--name")],
     version: Annotated[str, typer.Option("--version")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     private: Annotated[bool, typer.Option("--private")] = False,
     token: Annotated[
         str | None, typer.Option("--token", envvar="INKCRE_EXTENSION_REGISTRY_TOKEN", hidden=True)
@@ -136,7 +139,9 @@ def docs_show(
     namespace, extension = validate_extension_name(name).split("/", 1)
     validate_version(version)
     with _client(registry_url, token) if private else RegistryClient(registry_url) as client:
-        result = client.get_documentation(namespace, extension, version, private=private)
+        result = client.get_documentation(
+            namespace, extension, version, private=private, distribution=distribution
+        )
     typer.echo(result.model_dump_json())
 
 
@@ -177,6 +182,7 @@ def prepare_release(
     ],
     namespace: Annotated[str, typer.Option("--namespace")],
     name: Annotated[str, typer.Option("--name")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     request_path: Annotated[Path, typer.Option("--request", exists=True, dir_okay=False)],
     token: Annotated[
         str | None,
@@ -185,9 +191,11 @@ def prepare_release(
 ) -> None:
     """Prepare immutable typed native associations for one Extension Release."""
 
-    payload = PrepareReleaseRequest.model_validate_json(request_path.read_text(encoding="utf-8"))
+    payload = NativePrepareReleaseRequest.model_validate_json(
+        request_path.read_text(encoding="utf-8")
+    )
     with _client(registry_url, token) as client:
-        release = client.prepare(namespace, name, payload)
+        release = client.prepare_native(namespace, name, distribution, payload)
     typer.echo(release.model_dump_json(exclude_none=True))
 
 
@@ -208,7 +216,9 @@ def upload_module_federation(
     """Validate and upload one immutable native Module Federation ZIP snapshot."""
 
     with _client(registry_url, token) as client:
-        release = client.upload_module_federation(namespace, name, version, archive.read_bytes())
+        release = client.upload_native_module_federation(
+            namespace, name, version, archive.read_bytes()
+        )
     typer.echo(release.model_dump_json(exclude_none=True))
 
 
@@ -219,6 +229,7 @@ def publish_release(
     ],
     namespace: Annotated[str, typer.Option("--namespace")],
     name: Annotated[str, typer.Option("--name")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     version: Annotated[str, typer.Option("--version")],
     token: Annotated[
         str | None,
@@ -228,7 +239,7 @@ def publish_release(
     """Publish a Release after at least one native Distribution is ready."""
 
     with _client(registry_url, token) as client:
-        release = client.publish(namespace, name, version)
+        release = client.publish_native(namespace, name, distribution, version)
     typer.echo(release.model_dump_json(exclude_none=True))
 
 
@@ -239,6 +250,7 @@ def yank_release(
     ],
     namespace: Annotated[str, typer.Option("--namespace")],
     name: Annotated[str, typer.Option("--name")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     version: Annotated[str, typer.Option("--version")],
     reason: Annotated[str, typer.Option("--reason")],
     token: Annotated[
@@ -249,7 +261,7 @@ def yank_release(
     """Yank a Release while retaining exact descriptor and native bytes."""
 
     with _client(registry_url, token) as client:
-        release = client.yank(namespace, name, version, reason)
+        release = client.yank_native(namespace, name, distribution, version, reason)
     typer.echo(release.model_dump_json(exclude_none=True))
 
 
@@ -260,6 +272,7 @@ def unyank_release(
     ],
     namespace: Annotated[str, typer.Option("--namespace")],
     name: Annotated[str, typer.Option("--name")],
+    distribution: Annotated[str, typer.Option("--distribution")],
     version: Annotated[str, typer.Option("--version")],
     token: Annotated[
         str | None,
@@ -269,7 +282,7 @@ def unyank_release(
     """Restore a yanked Release to normal discovery."""
 
     with _client(registry_url, token) as client:
-        release = client.unyank(namespace, name, version)
+        release = client.unyank_native(namespace, name, distribution, version)
     typer.echo(release.model_dump_json(exclude_none=True))
 
 
@@ -280,10 +293,11 @@ def show_release(
     ],
     coordinate: Annotated[str, typer.Option("--coordinate")],
     version: Annotated[str, typer.Option("--version")],
+    distribution: Annotated[str, typer.Option("--distribution")],
 ) -> None:
     """Read one exact public Extension Release, including a yanked Release."""
 
     namespace, name = coordinate.split("/", 1)
     with RegistryClient(registry_url) as client:
-        release = client.get_release(namespace, name, version)
+        release = client.get_native_release(namespace, name, distribution, version)
     typer.echo(json.dumps(release.model_dump(mode="json", exclude_none=True), sort_keys=True))

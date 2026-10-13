@@ -118,6 +118,72 @@ class DocumentationUpload(BaseModel):
     source_revision: Annotated[str, Field(max_length=256, min_length=1, title="Source Revision")]
 
 
+class NativeDocumentationReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    build_id: Annotated[BuildId | None, Field(title="Build Id")] = None
+    committed_at: Annotated[str, Field(title="Committed At")]
+    content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$", title="Content Sha256")]
+    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    entry: Annotated[str, Field(max_length=768, min_length=1, title="Entry")] = "index.html"
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    scope: Annotated[Literal["global", "python", "module-federation"], Field(title="Scope")]
+    snapshot_etag: Annotated[str, Field(title="Snapshot Etag")]
+    snapshot_id: Annotated[str, Field(pattern="^[0-9a-f]{32}$", title="Snapshot Id")]
+    snapshot_url: Annotated[str, Field(title="Snapshot Url")]
+    source_repository: Annotated[
+        str, Field(max_length=2048, min_length=1, title="Source Repository")
+    ]
+    source_revision: Annotated[str, Field(max_length=256, min_length=1, title="Source Revision")]
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
+class NativeReleaseDocumentation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    sets: Annotated[list[DocumentationRecord], Field(title="Sets")]
+    state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
 class ReleaseDocumentation(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -151,6 +217,8 @@ class DocumentationContracts(BaseModel):
         frozen=True,
     )
     hosting: DocumentationHosting
+    native_receipt: NativeDocumentationReceipt
+    native_release: NativeReleaseDocumentation
     publication: DocumentationPublication
     receipt: DocumentationReceipt
     release: ReleaseDocumentation
