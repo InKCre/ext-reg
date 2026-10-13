@@ -30,6 +30,63 @@ def check_production_delivery_boundary() -> None:
     import httpx
     import registry_production
 
+    client_type = httpx.Client
+    for status, stack, expected_error in [
+        (200, "container", None),
+        (401, "container", httpx.HTTPStatusError),
+        (200, "cedar", ValueError),
+    ]:
+        events = []
+        raw_output = io.BytesIO()
+        output = io.TextIOWrapper(raw_output, encoding="utf-8")
+
+        def provider(request, events=events, status=status, stack=stack, raw=raw_output):
+            # A redirected, buffered stdout must expose the phase before provider I/O.
+            assert b"phase=app_access status=started" in raw.getvalue()
+            assert request.headers["Authorization"] == "Bearer synthetic-token"
+            events.append((request.method, request.url.path))
+            return httpx.Response(status, json={"stack": {"name": stack}})
+
+        def client_factory(*args, provider=provider, **kwargs):
+            return client_type(*args, transport=httpx.MockTransport(provider), **kwargs)
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "HEROKU_API_KEY": "synthetic-token",
+                    "HEROKU_APP_NAME": "owned-fixture",
+                    "SOURCE_SHA": "exact-sha",
+                },
+                clear=True,
+            ),
+            patch.object(sys, "argv", ["registry_production.py", "--verify"]),
+            patch.object(registry_production.httpx, "Client", client_factory),
+            patch.object(
+                registry_production, "run", side_effect=AssertionError("command in verify")
+            ),
+            patch.object(
+                registry_production,
+                "configure_runtime_login",
+                side_effect=AssertionError("database mutation in verify"),
+            ),
+            patch.object(
+                registry_production, "smoke", side_effect=AssertionError("smoke in verify")
+            ),
+            redirect_stdout(output),
+        ):
+            try:
+                registry_production.main()
+            except Exception as error:
+                assert expected_error is not None and isinstance(error, expected_error)
+            else:
+                assert expected_error is None
+        assert events == [("GET", "/apps/owned-fixture")]
+        visible = raw_output.getvalue().decode()
+        assert f"status={'failed' if expected_error else 'success'}" in visible
+        assert "synthetic-token" not in visible
+        output.close()
+
     environment = {
         "MIGRATION_DATABASE_URL": "postgres://owner:synthetic@localhost/registry",
         "DATABASE_URL": "postgres://registry_app:synthetic@localhost/registry",

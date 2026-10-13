@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       operation:
-        description: Verify production authority without mutation, or deploy exact main
+        description: Check exact source and read-only Heroku app access, or deploy exact main
         required: true
         default: verify
         type: choice
@@ -83,6 +83,12 @@ jobs:
 
       - name: Verify exact delivery source
         run: pnpm check
+
+      - name: Verify existing production app access without mutation
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ vars.HEROKU_APP_NAME }}
+        run: pdm run python scripts/registry_production.py --verify
 
       - name: Build the same CPython service artifact used by previews
         run: docker build --build-arg SOURCE_REVISION="$SOURCE_SHA" --tag registry-production .

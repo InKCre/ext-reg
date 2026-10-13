@@ -2,7 +2,7 @@
 
 公开 origin 保持 `https://registry.inkcre.dev`。2026-09-13 起，由一个运行于 Heroku Eco dyno 的 CPython / FastAPI 服务容器、Registry 专属 Neon PostgreSQL 项目和既有私有 R2 桶提供服务。Web、API、静态资源和原生分发由同一镜像交付。旧 Worker / D1 已退出公开路由，保留为本次迁移的恢复依据。
 
-`production.yml` 只接受精确 current-main SHA。`verify` 执行仓库检查和容器构建，不修改远程资源。`deploy` 在受保护 production 环境中，重新核验 main 后对已配置 app 向前迁移、配置数据库和单桶 S3 凭据、发布同一镜像，并验证 Heroku app origin。它不自动导入 D1、不改变域名、不创建示例数据，也不删除旧资源。
+`production.yml` 只接受精确 current-main SHA。`verify` 执行仓库检查、使用该 production 环境的既有 Heroku 凭据只读查询指定 app 并确认 container stack，然后构建镜像。401、app 不可访问或非 container stack 均在维护前暴露；不要求 web=0，不访问数据库或修改配置、release、formation。这个预检证明当前 app 读取可用，不模拟发布写入，也不保证凭据在以后仍有效。`deploy` 同样执行只读预检，在受保护 production 环境中重新核验 main 后，对已配置 app 向前迁移、配置数据库和单桶 S3 凭据、发布同一镜像，并验证 Heroku app origin。它不自动导入 D1、不改变域名、不创建示例数据，也不删除旧资源。
 
 production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET`、`DOCUMENTATION_ORIGIN_TEMPLATE` variables，以及 `HEROKU_API_KEY`、`MIGRATION_DATABASE_URL`、`DATABASE_URL`、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY` secrets。文档模板必须指向已经配置 wildcard DNS/TLS 的专用内容 origin。生产当前使用 `https://registry-docs-{snapshot}.inkcre.dev`；每个不可变快照拥有独立 origin。为复用免费 TLS，DNS 与证书使用范围更宽的 `*.inkcre.dev`，而不是只能匹配这类文档 hostname 的多层 wildcard。这个 catch-all 只负责把请求送达 Registry；应用仍按 `DOCUMENTATION_ORIGIN_TEMPLATE` 精确解析 Host，其他落入 wildcard 的 hostname 返回 421。DNS 解析成功或 TLS 握手成功都不代表该 Host 是文档 origin。内容域与管理站同属 `inkcre.dev`，因此部署接受作者 HTML/JS 可能接收或干扰父域 Cookie 的风险；`inkcre.dev` 下的服务不得设置可发送到内容域的敏感父域 Cookie。首次配置保持既有 R2 桶，S3 token 仅授予该桶的对象读写。`MIGRATION_DATABASE_URL` 使用 `registry_owner`，仅交给迁移容器与可信角色配置命令；`DATABASE_URL` 使用同一数据库的普通 `registry_app` 角色和独立密码。迁移创建该角色及业务表授权，控制器设置密码后以 `web=1:eco` 启动应用。owner 连接与平台控制 token 不进入运行服务配置。数据库连接属于独立 Registry 项目，不复用 core-py 的数据库或发布生命周期。
 
@@ -10,14 +10,22 @@ Heroku 交付为 Uvicorn 设置 `FORWARDED_ALLOW_IPS=*`，由平台 HTTP 入口�
 
 ## 当前 PostgreSQL 原生发行切换
 
-PR58 的 0005/0006 向前迁移将分发关联改为原生发行坐标，保留历史文件、R2 key、URL 和文档 receipt。迁移后的关联不能由旧镜像解释，因此这次切换必须有维护窗口，不能只暂停发布写入而保持旧服务读取。合并 main 会触发独立 SDK 包资产发布；Registry 服务迁移与镜像发布仍由 `production.yml` 手动执行。
+生产 Registry 已于 2026-10-13 完成原生发行 v2 切换，服务来源为 `ab5a225f632a83c067269f92967b2307ba79c1b1`，数据库迁移位置为 `0006_auto_20261013_1914`。正式发布资产为 Toolkit 0.5.0、Python Runtime 0.2.0 和 Web Runtime 0.4.0；合并后的 controller 修复不意味着生产服务已部署到新的 main。
+
+0005/0006 将分发关联改为原生发行坐标，保留历史文件、R2 key、URL 和文档 receipt。迁移后的关联不能由旧镜像解释，因此这种切换必须有维护窗口，不能只暂停发布写入而保持旧服务读取。合并 main 会触发独立 SDK 包资产发布；Registry 服务迁移与镜像发布仍由 `production.yml` 手动执行。
 
 1. 固定已验证的 current-main SHA，先运行 `operation=verify`。保存当前镜像 revision、数据库迁移位置、数据库可恢复快照及历史下载和文档身份摘要。
 2. 暂停所有 publisher 并等待在途请求结束。由获准的操作员将既有 app 的 web formation 缩至 0，等待旧 web dyno 停止；维护窗口内不允许其他操作员或自动化重新扩容。Heroku maintenance 页面或 Eco 休眠不能替代停止进程。
 3. 对同一 SHA 运行 `operation=deploy`。控制器在任何数据库、配置和发布变更之前读取 [Heroku Formation Info 和 Dyno List](https://devcenter.heroku.com/articles/platform-api-reference)。它要求 web quantity 为 0，且完整 dyno 列表中的 web 状态仅为 down/crashed；idle、starting、up、未知状态及不完整列表均拒绝。不自动停机，也不自动回滚。
 4. 控制器依次迁移、配置 runtime 登录和 app、推送目标镜像、发布镜像、恢复 `web=1:eco`，最后验证 exact `/livez`。再检查 v1 历史只读、旧写 410、v2 坐标、原 wheel/MF 字节与文档 receipt，确认后恢复已采用 v2 的 publisher。恢复 publisher 不包含新 Extension 正式发行授权。
 
-日志以 app、目标 revision 和 phase 标识失败位置。migration 或 release 失败时控制器不执行 scale-up，保持旧进程停止；调查迁移记录及实际 release 后，以兼容当前 schema 的镜像向前恢复。smoke 失败发生在新镜像已启动之后，不能当作部署未发生；保持 publisher 暂停，核验实际 revision 和服务状态后修复。迁移后直接启动旧镜像不是安全回滚。恢复旧数据库快照需要单独确认维护期间的写入及恢复范围，不能把 schema 不兼容视为自动回滚依据。
+日志以 app、目标 revision 和 phase 标识失败位置，并立即 flush，使非交互 runner 在 provider 操作完成前也能看到当前阶段。migration 或 release 失败时控制器不执行 scale-up，保持旧进程停止；调查迁移记录及实际 release 后，以兼容当前 schema 的镜像向前恢复。smoke 失败发生在新镜像已启动之后，不能当作部署未发生；保持 publisher 暂停，核验实际 revision 和服务状态后修复。迁移后直接启动旧镜像不是安全回滚。恢复旧数据库快照需要单独确认维护期间的写入及恢复范围，不能把 schema 不兼容视为自动回滚依据。
+
+本次 PostgreSQL 恢复材料位于执行机的 `~/.local/state/inkcre/ext-reg/native-v2-cutover-2026-10-13/`，目录为 0700，dump、逻辑数据、原凭据状态和 receipts 为 0600。维护前和停止旧 web 后分别保存一致快照；最终 `final.dump` 的 SHA256 为 `d7f682c89a1464d23d68809a2479c5860711cc03b80a2ebfed15cf39ebfbe574`。两份快照均在隔离 PostgreSQL 17 实际恢复并逐字节核对规范逻辑数据；生产快照的 0005/0006 重放也通过。备份包含凭据哈希和私有元数据，不得上传到 Git 或公开日志。
+
+上海时间 2026-10-13 23:41:10 停止旧 web，23:55:30 确认新服务 smoke 成功，次日 00:03:08 恢复原先活跃的 1 行 publisher，00:06:10 完成 ready 确认。旧 controller 的 stdout 缓冲使 phase 日志时间集中，因此 23:55:30 是 smoke 成功日志的确认点，不是精确进程启动时间。验收核对了 42 个原生发行读取、149 个历史公开对象哈希、文档 snapshot/ETag/旧入口身份、旧写 410，以及全部凭据哈希和原停用状态保持；没有为身份测试创建发行或新 token。生产 raw publisher token 不在执行机，独立的 HTTP 认证只读探测未做，后续既有 producer 使用其现有 production secret 完成真实发布认证。
+
+首次部署因 GitHub production 环境的旧 `HEROKU_API_KEY` 失效，在读取 app 的 `stopped_web_check` 阶段返回 401，未进入数据库迁移。操作员确认 schema、旧 release、formation 和恢复材料未变后，将同名 secret 更新为同一现有 Heroku 主体的有效授权，再对同一精确来源重试成功；没有新建 token、增加权限或修改数据库/R2 凭据。这也是维护前只读凭据预检与即时阶段日志的必要性。
 
 以下 D1 导入、路由切换和恢复坐标记载的是 2026-09-13 的历史迁移。其旧入口只读可继续的做法，不适用于上述同库不兼容迁移。
 

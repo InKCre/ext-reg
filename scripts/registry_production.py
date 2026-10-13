@@ -9,6 +9,31 @@ from registry_database import configure_runtime_login
 from registry_preview import request, run, smoke
 
 
+def require_container_app(heroku: httpx.Client, app: str) -> None:
+    existing = request(heroku, "GET", f"apps/{app}")
+    if existing["stack"]["name"] != "container":
+        raise ValueError("Production app must already use the container stack")
+
+
+def verify(heroku: httpx.Client, app: str, revision: str) -> None:
+    print(
+        f"production_verify app={app} revision={revision} phase=app_access status=started",
+        flush=True,
+    )
+    try:
+        require_container_app(heroku, app)
+    except Exception:
+        print(
+            f"production_verify app={app} revision={revision} phase=app_access status=failed",
+            flush=True,
+        )
+        raise
+    print(
+        f"production_verify app={app} revision={revision} phase=app_access status=success",
+        flush=True,
+    )
+
+
 def require_stopped_web(heroku: httpx.Client, app: str) -> None:
     formation = request(heroku, "GET", f"apps/{app}/formation/web")
     if (
@@ -29,14 +54,17 @@ def deploy(heroku: httpx.Client, app: str, image: str, revision: str) -> None:
         raise ValueError("Production DATABASE_URL must use registry_app")
     origin = "https://registry.inkcre.dev"
     phase = "stopped_web_check"
-    print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+    print(
+        f"production_deploy app={app} revision={revision} phase={phase} status=started", flush=True
+    )
     try:
-        existing = request(heroku, "GET", f"apps/{app}")
-        if existing["stack"]["name"] != "container":
-            raise ValueError("Production app must already use the container stack")
+        require_container_app(heroku, app)
         require_stopped_web(heroku, app)
         phase = "migration"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         run(
             "docker",
             "run",
@@ -50,7 +78,10 @@ def deploy(heroku: httpx.Client, app: str, image: str, revision: str) -> None:
             "upgrade",
         )
         phase = "runtime_config"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         configure_runtime_login(owner_url, unquote(runtime.password))
         config = {
             key: os.environ[key]
@@ -71,7 +102,10 @@ def deploy(heroku: httpx.Client, app: str, image: str, revision: str) -> None:
         )
         request(heroku, "PATCH", f"apps/{app}/config-vars", json=config)
         phase = "image_push"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         run(
             "docker",
             "login",
@@ -85,23 +119,40 @@ def deploy(heroku: httpx.Client, app: str, image: str, revision: str) -> None:
         run("docker", "tag", image, target)
         run("docker", "push", target)
         phase = "release"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         run("heroku", "container:release", "web", "--app", app)
         phase = "start"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         run("heroku", "ps:scale", "web=1:eco", "--app", app)
         phase = "smoke"
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=started")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=started",
+            flush=True,
+        )
         smoke(origin, revision)
-        print(f"production_deploy app={app} revision={revision} phase=complete status=success")
+        print(
+            f"production_deploy app={app} revision={revision} phase=complete status=success",
+            flush=True,
+        )
     except Exception:
-        print(f"production_deploy app={app} revision={revision} phase={phase} status=failed")
+        print(
+            f"production_deploy app={app} revision={revision} phase={phase} status=failed",
+            flush=True,
+        )
         raise
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--image", required=True)
+    operation = parser.add_mutually_exclusive_group(required=True)
+    operation.add_argument("--verify", action="store_true")
+    operation.add_argument("--image")
     args = parser.parse_args()
     with httpx.Client(
         base_url="https://api.heroku.com/",
@@ -111,7 +162,10 @@ def main() -> None:
             "Accept": "application/vnd.heroku+json; version=3",
         },
     ) as heroku:
-        deploy(heroku, os.environ["HEROKU_APP_NAME"], args.image, os.environ["SOURCE_SHA"])
+        if args.verify:
+            verify(heroku, os.environ["HEROKU_APP_NAME"], os.environ["SOURCE_SHA"])
+        else:
+            deploy(heroku, os.environ["HEROKU_APP_NAME"], args.image, os.environ["SOURCE_SHA"])
 
 
 if __name__ == "__main__":
