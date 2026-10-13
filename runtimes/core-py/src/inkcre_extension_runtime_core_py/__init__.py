@@ -7,13 +7,14 @@ from .errors import (
     ExtensionAcquisitionError,
     ExtensionCompatibilityError,
     ExtensionEntryPointError,
+    ExtensionEnvironmentApplicationRequiredError,
     ExtensionLifecycleError,
     ExtensionNotInstalledError,
     ExtensionRegistryError,
     ExtensionRuntimeError,
     ExtensionStateConflictError,
 )
-from .manager import ExtensionManager, RunningExtension
+from .manager import ExtensionManager, ParticipationStore, RunningExtension
 
 if typing.TYPE_CHECKING:
     from .publication import PublicHTTPRoute
@@ -25,12 +26,14 @@ __all__ = [
     "ExtensionBase",
     "ExtensionCompatibilityError",
     "ExtensionEntryPointError",
+    "ExtensionEnvironmentApplicationRequiredError",
     "ExtensionLifecycleError",
     "ExtensionManager",
     "ExtensionNotInstalledError",
     "ExtensionRegistryError",
     "ExtensionRuntimeError",
     "ExtensionStateConflictError",
+    "ParticipationStore",
     "PublicHTTPRoute",
     "RunningExtension",
 ]

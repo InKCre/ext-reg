@@ -22,8 +22,8 @@ claim. Stop and failed-start cleanup remove those identities without reconstruct
 registrations are not overwritten. Source catalog persistence synchronizes the current monotonic registry explicitly after a
 successful startup.
 
-An imported exact Project version remains the process boundary. Install/upgrade may replace a Distribution only when no Peer
-is enabled, but a process that imported the previous Project must restart before executing the replacement. Re-enable of the
+An imported exact Project version remains the process boundary. Applying a wheel may replace shared environment dependencies,
+so the entire affected Peer must stop before installation and restart in a new process before executing the replacement. Re-enable of the
 same loaded version uses ordinary entry-point loading and the retained Python modules; active routes and Peer inbounds are
 published fresh.
 
@@ -57,3 +57,7 @@ Extension 启动期间再次启动会失败。任何失败或取消都会撤销�
 Core async-only API。采用方必须分别声明 Runtime 包版本与 Core Host SDK 版本窗口，并验证真实
 Host 的事务实现。Runtime 层的 scripted 验证可证明 await、typed round trip 和 publication 清理，
 不能替代 Core 对 PostgreSQL 提交、回滚及行锁的验证。
+
+Runtime 的精确选择是 `(Peer, Extension, python, version)`，不再读取部署级全局版本或 enabled 列表。`RegistryReleaseClient` 只读取 v2 Python 原生发行；历史 wheel 内 schema 1 安装记录保持不变，版本表示其 Python 分发版本。宿主注入共享 Extension 模型与 `ParticipationStore`，业务 config/state 继续共用，安装与启用意图只作用于当前 Peer。
+
+`PipDistributionConsumer.download` 在调用者目录下载并验证 wheel，不修改解释器环境；`apply` 才调用 pip 安装并重新发现精确安装记录。宿主必须先停止整个 Peer，在安装后从新进程启动。Runtime manager 的 enable 仅发现已安装包，缺包时抛出 `ExtensionEnvironmentApplicationRequiredError`，不会在运行进程里隐式安装或替换依赖。`acquire` 仅作为已停止 Peer 的宿主组合调用，不能作为在线预检。
