@@ -46,8 +46,8 @@ importers:
         version: 4.1.12
     devDependencies:
       '@inkcre/core':
-        specifier: github:InKCre/client-web#3541262e308c24ee571967e991479819b43a80af&path:/packages/core
-        version: https://codeload.github.com/InKCre/client-web/tar.gz/3541262e308c24ee571967e991479819b43a80af#path:/packages/core(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
+        specifier: github:InKCre/client-web#0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e&path:/packages/core
+        version: https://codeload.github.com/InKCre/client-web/tar.gz/0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e#path:/packages/core(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
       '@module-federation/runtime':
         specifier: 0.21.6
         version: 0.21.6
@@ -551,8 +551,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@inkcre/core@https://codeload.github.com/InKCre/client-web/tar.gz/3541262e308c24ee571967e991479819b43a80af#path:/packages/core':
-    resolution: {gitHosted: true, integrity: sha512-skUUUhbV/hkP1JlXN0i70mePIGstNIqo13S2KyAwaEQAeHYYwfZm5jLHU8aPH678My8DQx3BwOqjfutDDT3KSA==, path: /packages/core, tarball: https://codeload.github.com/InKCre/client-web/tar.gz/3541262e308c24ee571967e991479819b43a80af}
+  '@inkcre/core@https://codeload.github.com/InKCre/client-web/tar.gz/0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e#path:/packages/core':
+    resolution: {gitHosted: true, integrity: sha512-iix/s+X85C/whBoVJeGbW6Z7uCbOtH/uOtFU7JNWB7UqOSXuiUh8fMdklW44M3IFWyvXoviz0urXHtIkrefPKA==, path: /packages/core, tarball: https://codeload.github.com/InKCre/client-web/tar.gz/0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e}
     version: 0.4.0
     peerDependencies:
       '@vueuse/core': ^14.0.0
@@ -2142,7 +2142,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.2':
     optional: true
 
-  '@inkcre/core@https://codeload.github.com/InKCre/client-web/tar.gz/3541262e308c24ee571967e991479819b43a80af#path:/packages/core(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
+  '@inkcre/core@https://codeload.github.com/InKCre/client-web/tar.gz/0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e#path:/packages/core(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.12.0(@opentelemetry/api@1.9.1)

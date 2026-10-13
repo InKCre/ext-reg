@@ -19,7 +19,28 @@ import {
   RegistryReleaseReader,
   sortPublishedReleases,
   webExtensionRemoteName,
+  WebExtensionModuleHandle,
 } from './dist/index.js'
+
+// An initialization failure can leave registrations that the module owns.
+// The Host must call its existing dispose hook before returning that failure.
+const initialized = []
+const partialFailure = new Error('Partial initialization failed')
+const partialModule = new WebExtensionModuleHandle('inkcre/partial', '1.0.0', {
+  initialize() {
+    initialized.push('initialize')
+    throw partialFailure
+  },
+  activate() {
+    initialized.push('activate')
+  },
+  dispose() {
+    initialized.push('dispose')
+  },
+})
+await assert.rejects(partialModule.activate(), (error) => error === partialFailure)
+await partialModule.dispose()
+assert.deepEqual(initialized, ['initialize', 'dispose'])
 
 // Exercise the built package and real SDK over HTTP, without a deployment or real credentials.
 const target = '11111111-1111-4111-8111-111111111111'
