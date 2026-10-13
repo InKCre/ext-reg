@@ -6,7 +6,7 @@ the `cli` extra owns HTTP and command dependencies and exposes `inkcre-ext`.
 The Registry service may reuse the pure library, but the Toolkit must not
 depend on Registry implementation or service runtime state.
 
-Toolkit 0.5 使用 v2 `(name, distribution, version)` 独立发行入口；prepare/publish/yank/unyank 均显式指定 distribution。旧写接口不再被服务接受。
+Toolkit 0.5 使用 v2 `(name, distribution, version)` 独立发行入口；prepare/publish/yank/unyank 均显式指定 distribution。SDK 不再导出旧统一发行写方法；CLI 写入必须指定原生分发。历史 `get_release` 与文档读取继续保留，服务对旧 v1 写入返回 410。
 
 The Toolkit prepares native Release descriptors, uploads native Module Federation
 snapshots, and builds deterministic static preview facades from one explicit,

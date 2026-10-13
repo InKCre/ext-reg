@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from .contracts import (
     NativePrepareReleaseRequest,
     NativeReleaseRecord,
-    PrepareReleaseRequest,
     ReleaseRecord,
 )
 from .generated.documentation import (
@@ -148,47 +147,6 @@ class RegistryClient:
     def get_release(self, namespace: str, name: str, version: str) -> ReleaseRecord:
         response = self._require_success(
             self._client.get(self._release_path(namespace, name, version))
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def prepare(self, namespace: str, name: str, payload: PrepareReleaseRequest) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(
-                f"/v1/extensions/{namespace}/{name}/releases",
-                json=payload.model_dump(mode="json", exclude_none=True),
-            )
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def upload_module_federation(
-        self, namespace: str, name: str, version: str, archive: bytes
-    ) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(
-                self._release_path(namespace, name, version) + "/module-federation",
-                files={"content": ("module-federation.zip", archive, "application/zip")},
-            )
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def publish(self, namespace: str, name: str, version: str) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(self._release_path(namespace, name, version) + "/publish")
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def yank(self, namespace: str, name: str, version: str, reason: str) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(
-                self._release_path(namespace, name, version) + "/yank",
-                json={"reason": reason},
-            )
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def unyank(self, namespace: str, name: str, version: str) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(self._release_path(namespace, name, version) + "/unyank")
         )
         return ReleaseRecord.model_validate(response.json())
 

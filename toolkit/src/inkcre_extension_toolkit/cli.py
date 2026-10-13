@@ -65,6 +65,7 @@ def docs_pack(
     candidate = DocumentationCandidate.model_validate(
         {
             "name": name,
+            "distribution": distribution,
             "version": version,
             "scope": scope,
             "expected_etag": expected_etag,

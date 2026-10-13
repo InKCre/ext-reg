@@ -199,6 +199,61 @@ def check_preview_catalog() -> None:
         )
 
 
+def check_native_toolkit_cli(python: Path) -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        fixture = Path(directory)
+        site = fixture / "site"
+        site.mkdir()
+        (site / "index.html").write_text("<!doctype html><title>Native documentation</title>")
+        output = fixture / "candidate"
+        subprocess.run(
+            [
+                str(python),
+                "-I",
+                str(python.parent / "inkcre-ext"),
+                "docs",
+                "pack",
+                "--site",
+                str(site),
+                "--output",
+                str(output),
+                "--name",
+                "check/extension",
+                "--version",
+                "1.0.0",
+                "--distribution",
+                "python",
+                "--scope",
+                "global",
+                "--source-repository",
+                "https://example.invalid/check",
+                "--source-revision",
+                "exact",
+            ],
+            cwd=fixture,
+            check=True,
+        )
+        candidate = json.loads((output / "candidate.json").read_text())
+        assert candidate["distribution"] == "python" and candidate["scope"] == "global"
+        subprocess.run(
+            [
+                str(python),
+                "-I",
+                "-c",
+                "from inkcre_extension_toolkit.client import RegistryClient; "
+                "assert all(not hasattr(RegistryClient, method) for method in "
+                "('prepare','upload_module_federation','publish','yank','unyank')); "
+                "assert all(hasattr(RegistryClient, method) for method in "
+                "('prepare_native','publish_native','get_native_release','get_release','get_documentation'))",
+            ],
+            cwd=fixture,
+            check=True,
+        )
+    print(
+        "Installed Toolkit CLI persists native documentation identity; retired writes are absent."
+    )
+
+
 def check_coordinated_version_preparation() -> None:
     """Exercise the real CLI on a disposable Git history, without editing this checkout."""
     from release import projects
@@ -360,6 +415,21 @@ def main() -> None:
             cwd=environment,
             check=True,
         )
+        toolkit_wheel = next(path for path in wheels if "inkcre_extension_toolkit-" in path.name)
+        subprocess.run(
+            [
+                str(python),
+                "-I",
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                f"{toolkit_wheel}[cli]",
+            ],
+            cwd=environment,
+            check=True,
+        )
+        check_native_toolkit_cli(python)
     print("Registry and Toolkit wheel metadata, isolated installation and service import passed.")
 
 
