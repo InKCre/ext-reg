@@ -89,10 +89,14 @@ async def target_snapshot() -> dict[str, list[dict]]:
                 row["namespace"] = row.pop("namespace_id")
             if table == "releases":
                 row.pop("id")
+                row.pop("visible_distributions")
                 row["extension_name"] = row.pop("extension_id")
-            if "release_id" in row:
+            if "legacy_release_id" in row:
                 row.pop("id")
-                row["extension_name"], row["release_version"] = releases[row.pop("release_id")]
+                row.pop("release_id")
+                row["extension_name"], row["release_version"] = releases[
+                    row.pop("legacy_release_id")
+                ]
             if table == "python_files":
                 row.pop("id")
                 row["normalized_project"], row["project_version"] = projects[
@@ -118,10 +122,54 @@ async def import_snapshot(source: dict[str, list[dict]]) -> dict:
                     values["namespace_id"] = values.pop("namespace")
                 if model is db.Release:
                     values["extension_id"] = values.pop("extension_name")
+                    values["visible_distributions"] = []
+                    if any(
+                        f["extension_name"] == record["extension_name"]
+                        and f["release_version"] == record["version"]
+                        and any(
+                            p["normalized_project"] == f["normalized_project"]
+                            and p["project_version"] == f["project_version"]
+                            for p in source["python_files"]
+                        )
+                        for f in source["python_distributions"]
+                    ):
+                        values["visible_distributions"].append("python")
+                    if any(
+                        m["extension_name"] == record["extension_name"]
+                        and m["release_version"] == record["version"]
+                        and m.get("manifest_r2_key") is not None
+                        for m in source["module_federation_distributions"]
+                    ):
+                        values["visible_distributions"].append("module_federation")
                 elif "extension_name" in values:
-                    values["release_id"] = releases[
+                    values["legacy_release_id"] = releases[
                         values.pop("extension_name"), values.pop("release_version")
                     ]
+                if model in {db.PythonDistribution, db.ModuleFederationDistribution}:
+                    legacy = await db.Release.get(pk=values["legacy_release_id"])
+                    kind = "python" if model is db.PythonDistribution else "module_federation"
+                    complete = (
+                        any(
+                            f["normalized_project"] == record["normalized_project"]
+                            and f["project_version"] == record["project_version"]
+                            for f in source["python_files"]
+                        )
+                        if kind == "python"
+                        else values.get("manifest_r2_key") is not None
+                    )
+                    native = await db.NativeRelease.create(
+                        extension_id=legacy.extension_id,
+                        distribution=kind,
+                        version=legacy.version,
+                        state="preparing"
+                        if legacy.state in {"published", "yanked"} and not complete
+                        else legacy.state,
+                        yank_reason=legacy.yank_reason,
+                        created_at=legacy.created_at,
+                        updated_at=legacy.updated_at,
+                        published_at=legacy.published_at,
+                    )
+                    values["release_id"] = native.pk
                 if model is db.PythonFile:
                     values["distribution_id"] = projects[
                         values.pop("normalized_project"), values.pop("project_version")

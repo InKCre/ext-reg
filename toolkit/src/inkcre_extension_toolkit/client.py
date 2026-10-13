@@ -12,12 +12,11 @@ from .contracts import (
     ReleaseRecord,
 )
 from .generated.documentation import (
-    NativeDocumentationReceipt,
-    NativeReleaseDocumentation,
     DocumentationHosting,
     DocumentationPublication,
-    DocumentationReceipt,
     DocumentationUpload,
+    NativeDocumentationReceipt,
+    NativeReleaseDocumentation,
     ReleaseDocumentation,
 )
 

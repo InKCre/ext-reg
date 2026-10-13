@@ -2,21 +2,11 @@
 
 ## Authority Boundary
 
-The Registry owns Extension Name and Nickname, strict-SemVer Release identity
-and lifecycle, publisher scope, provenance, and typed associations to native
-Python and Module Federation Distributions. Native package metadata remains
-owned by its ecosystem. Deployment installation, Peer enablement, and runtime
-activity are not Registry state.
+Registry 以 `(Extension Name, distribution, version)` 标识独立不可变发行。`distribution` 为 `python` 或 `module_federation`，各生产者独立决定版本、准备、上传与发布；同一 Extension 的两种分发无需共用版本。Registry 保留名称、昵称、发布者权限、来源与生命周期，不拥有部署安装、Peer 启用或运行事实，也不解析插件业务数据兼容性。
 
-There is deliberately no generic target manifest, cross-format artifact, or
-Registry-owned compatibility predicate. One Release may independently append
-one Python association and one Module Federation association; either is
-optional. Association metadata, filenames, and bytes are immutable. Identical
-retries are idempotent; conflicts require a new Release.
+v2 prepare 只接受路径指定的一个原生元数据对象。关联元数据、文件名与字节不可变；相同提交幂等，冲突需要新版本。`preparing` 私有，自己的全部对象完整才能发布。`published` 和 `yanked` 保留描述与字节；`blocked` 拒绝读取。不存在跨分发 solver、中央业务协议或全格式一次发布要求。
 
-`preparing` is private and publication requires at least one admitted native
-Distribution. `published` and `yanked` preserve descriptors and bytes;
-`blocked` is a separate operator read-denial state.
+v1 仅保留历史统一发行读取；所有旧控制写入返回 410。新独立发行不进入 v1 目录。历史 DTO 不增加 distribution 字段，迁移时冻结当时已具有文件的可见关联，不能用后来完成的空关联改变历史 DTO。历史描述与全局文档采用保守状态投影：旧发行状态及关联原生状态共同约束，任一关联 blocked 不能经旧入口绕过。类型明确的 wheel/MF URL 检查自己的原生状态。
 
 ## Native Admission and Reads
 
@@ -37,9 +27,7 @@ models, routes, generated contracts, and build checks are the exact executable i
 ## Extension Documentation
 
 Documentation is a separate projection of one exact Release, not another Distribution and not an
-optional field added to `ReleaseRecord`. A set is addressed by Release and `global`, `python`, or
-`module-federation` scope. Channel scopes require their corresponding Distribution association;
-the global scope does not. Each publication submits a complete ZIP through POST, with a required
+optional field added to `ReleaseRecord`. 新文档按精确 native 坐标与 `global` 或本分发 scope 寻址；其他分发 scope 被拒绝。历史 global 快照保留旧发行 owner，不能猜测归属并迁成某个 native 发行。 Each publication submits a complete ZIP through POST, with a required
 `expected_etag` business field: null creates an absent set, while the observed strong ETag permits
 a correction. Every new publication uses a fresh opaque snapshot identity and origin.
 
@@ -72,9 +60,9 @@ and `blocked` denies discovery, stable entries, and every historical snapshot be
 
 ## Persistence and Security
 
-持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有 Release、Distribution 与发布身份的查询和事务，`service/documentation.py` 的 `DocumentationRepository` 拥有文档查询、对象 staging 和 current-set 替换事务。两者由 lifespan 创建，共享同一个 `ArtifactStore`，各自持有进程内并发额度；文档仓储不依赖另一个仓储的实例或内部状态。Release、Distribution 和 File 使用独立内部主键，公开身份仍是 Extension Name / Version 或 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
+持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有 Release、Distribution 与发布身份的查询和事务，`service/documentation.py` 的 `DocumentationRepository` 拥有文档查询、对象 staging 和 current-set 替换事务。两者由 lifespan 创建，共享同一个 `ArtifactStore`，各自持有进程内并发额度；文档仓储不依赖另一个仓储的实例或内部状态。Release、Distribution 和 File 使用独立内部主键，新公开发行身份是 Extension Name / Distribution / Version，原生文件仍是 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
 
-文档指针由 PostgreSQL 的 `(snapshot_id, release_id, scope)` 复合外键保证归属一致。Tortoise 保留单列关系用于查询，复合外键由 `0004_documentation_ownership` 原生 DDL 补充；已有指针不能关联其他 Release/scope，所指快照也不能在保留该指针时改变归属。
+文档指针由 PostgreSQL 的 `(snapshot_id, release_id, scope)` 复合外键保证归属一致。Tortoise 保留单列关系用于查询，复合外键由 `0004_documentation_ownership` 原生 DDL 补充；已有指针不能关联其他 Release/scope，所指快照也不能在保留该指针时改变归属。`0006` 对新 native owner 增加同等复合外键，并以 XOR 约束保证每个快照与指针恰有一个历史或原生 owner。
 
 准备关联时，namespace 行锁串行化同一发布者的身份创建，release 行锁保护关联和状态。唯一约束保证 Python Project / Version 不被另一个 release 占用；失败会回滚同一事务中的 Extension、Release 和关联创建。上传、发布、撤回和恢复均重新检查锁定后的 release 状态。关联、文件名和内容身份不可变，相同提交可以重试。模型的联合约束明确使用数据库外键列名；不依赖迁移生成器猜测关系字段的物理列名。
 
@@ -86,17 +74,8 @@ Publisher 持有 namespace 范围内的发布能力；原始 token 只用于请�
 
 Registry 验证文件结构与完整性，不证明发布者可信。Python 扩展在受信任 Core 进程中运行，Module Federation Remote 获得宿主页面权限；Host 继续拥有兼容性判断和运行时协商。
 
-## Publishing a Complete Release
+## 原生发行完整性与迁移
 
-Preparing a Release declares its native associations. Publication requires every declared association
-and its stored objects to be complete: a Python association needs at least one wheel and its metadata;
-a Module Federation association needs its manifest and all stored assets. A complete Python wheel
-cannot compensate for a declared but missing Module Federation snapshot, or vice versa. A Release
-with only one declared format remains valid. A producer intending both formats must prepare both
-associations before attempting publication; Registry cannot infer an omitted producer's intent.
+发布检查只覆盖当前原生发行自己的全部字节：Python 至少一个 wheel 及其 metadata，MF 为 manifest 与全部资产。对象检查不持有数据库锁；提交前锁定原生发行并重新读取文件与 snapshot 身份，检查期间新增文件会导致 409，发布者可重试当前集合。
 
-Object checks run outside database transactions. Before committing publication, Registry locks the
-Release and rereads association and immutable artifact identities. A concurrent association append
-or artifact upload changes that checked set and rejects publication with a conflict; the publisher
-can retry against the new set. Public Release models, native metadata, and prepare fields remain
-unchanged. Existing published Releases retain the existing first-append rule for missing associations.
+`0005` 为历史每个关联生成独立原生坐标并重挂原有关联；保留文件主键、R2 key、时间、来源及原生元数据。历史 published/yanked 关联若没有 wheel 或 MF manifest，原生状态降为 preparing；blocked 保留。`0006` 为新文档增加 native owner，不修改已有快照、receipt、稳定 URL 或历史 owner。非空旧 schema 回放、D1 导入对照及真实 HTTP 检查共同验证此边界。部署只前进迁移，不把新的应用回退到只能解释统一发行的版本。

@@ -5,6 +5,20 @@ This changelog records notable changes to the Registry service. It is generated 
 
 <!-- towncrier release notes start -->
 
+## 0.3.0 - 2026-10-13
+
+### Added
+
+- Registry Web release pages can return to a Web app with an exact Extension version for installation confirmation. (#56)
+
+### Removed
+
+- Python 与 Module Federation 使用独立版本和生命周期，历史统一版本保留只读兼容投影。 (#native-release)
+
+### Fixed
+
+- 发布必须验证所有已声明的原生分发及产物完整，检查期间关联变化会拒绝本次发布。
+
 ## 0.2.1 - 2026-09-22
 
 ### Changed

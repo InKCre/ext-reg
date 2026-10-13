@@ -33,6 +33,7 @@ ENTRY_OBJECT_PATTERN = re.compile(ENTRY_OBJECT_PATTERN_TEXT)
 HEX_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _PROJECT_NORMALIZER = re.compile(r"[-_.]+")
 
+NativeDistribution = Literal["python", "module_federation"]
 ReleaseState = Literal["preparing", "published", "yanked", "blocked"]
 
 
@@ -166,6 +167,14 @@ class ReleaseDocumentation(ContractModel):
     sets: list[DocumentationRecord]
 
 
+class NativeReleaseDocumentation(ReleaseDocumentation):
+    distribution: NativeDistribution
+
+
+class NativeDocumentationReceipt(DocumentationReceipt):
+    distribution: NativeDistribution
+
+
 class DocumentationHosting(ContractModel):
     origin_template: str
 
@@ -176,6 +185,8 @@ class DocumentationContracts(ContractModel):
     receipt: DocumentationReceipt
     release: ReleaseDocumentation
     hosting: DocumentationHosting
+    native_receipt: NativeDocumentationReceipt
+    native_release: NativeReleaseDocumentation
 
 
 class PythonEntryPoint(ContractModel):
@@ -277,6 +288,28 @@ class ReleaseRecord(ContractModel):
     module_federation: ModuleFederationDistribution | None = None
 
 
+class NativeReleaseRecord(ReleaseRecord):
+    distribution: NativeDistribution
+
+    @model_validator(mode="after")
+    def native_association_matches(self) -> NativeReleaseRecord:
+        if self.distribution == "python":
+            valid = self.python is not None and self.module_federation is None
+        else:
+            valid = self.module_federation is not None and self.python is None
+        if not valid:
+            raise ValueError("native Release must have exactly its own Distribution association")
+        return self
+
+
+class NativePrepareReleaseRequest(PrepareReleaseRequest):
+    @model_validator(mode="after")
+    def exactly_one_association(self) -> NativePrepareReleaseRequest:
+        if (self.python is None) == (self.module_federation is None):
+            raise ValueError("prepare exactly one native Distribution")
+        return self
+
+
 class ExtensionSummary(ContractModel):
     name: CanonicalExtensionName
     nickname: str
@@ -286,6 +319,23 @@ class ExtensionRecord(ContractModel):
     name: CanonicalExtensionName
     nickname: str
     releases: tuple[ReleaseRecord, ...] = ()
+
+
+class NativeExtensionRecord(ContractModel):
+    name: CanonicalExtensionName
+    nickname: str
+    releases: tuple[NativeReleaseRecord, ...] = ()
+
+
+class NativePublisherRelease(NativeReleaseRecord):
+    uploaded: bool
+
+
+class NativePublisherWorkspace(ContractModel):
+    namespace: RegistrySegment
+    releases: tuple[NativePublisherRelease, ...]
+    offset: int = Field(ge=0)
+    next_offset: int | None = Field(ge=0)
 
 
 class PublisherRelease(ReleaseRecord):
@@ -348,3 +398,6 @@ class PythonConsumerContracts(ContractModel):
     prepare_release: PrepareReleaseRequest
     release: ReleaseRecord
     yank: YankRequest
+    native_release: NativeReleaseRecord
+    native_prepare: NativePrepareReleaseRequest
+    native_extension: NativeExtensionRecord

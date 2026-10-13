@@ -192,7 +192,7 @@ if ($('#connect-form')) {
       const info = element('div')
       info.append(
         element('h3', release.nickname),
-        element('p', `${release.name} · ${release.version}`),
+        element('p', `${release.name} · ${release.distribution} · ${release.version}`),
       )
       const state = {
         preparing: 'Preparing',
@@ -205,8 +205,8 @@ if ($('#connect-form')) {
         .filter(Boolean)
         .join(' + ')
       const uploaded = [
-        release.python_uploaded && 'Python uploaded',
-        release.web_uploaded && 'Web uploaded',
+        release.distribution === 'python' && release.uploaded && 'Python uploaded',
+        release.distribution === 'module_federation' && release.uploaded && 'Web uploaded',
       ]
         .filter(Boolean)
         .join(' · ')
@@ -222,12 +222,13 @@ if ($('#connect-form')) {
       if (release.state === 'preparing') {
         if (release.module_federation) button('Upload Web ZIP', 'module-federation')
         const publish = button('Publish', 'publish')
-        publish.disabled = !release.python_uploaded && !release.web_uploaded
+        publish.disabled =
+          !release.distribution === 'python' && release.uploaded && !release.web_uploaded
         if (publish.disabled) publish.title = 'Upload a distribution before publishing'
       }
       if (release.state === 'published') {
         const link = element('a', 'View release ↗', 'button')
-        link.href = `/explore/${release.name}?version=${encodeURIComponent(release.version)}`
+        link.href = `/explore/${release.name}?distribution=${release.distribution}&version=${encodeURIComponent(release.version)}`
         actions.append(link)
         button('Withdraw', 'yank')
       }
@@ -240,7 +241,7 @@ if ($('#connect-form')) {
   }
   async function refresh(pageOffset = offset) {
     const current = connection
-    const data = await api(`/v1/publisher?offset=${pageOffset}`)
+    const data = await api(`/v2/publisher?offset=${pageOffset}`)
     if (current !== connection || current.signal.aborted) return
     renderWorkspace(data)
   }
@@ -349,19 +350,22 @@ if ($('#connect-form')) {
     submit(form, '#release-status', async () => {
       const fields = new FormData(form)
       const value = (key) => fields.get(key).trim()
-      await api(`/v1/extensions/${namespace}/${encodeURIComponent(value('slug'))}/releases`, {
-        method: 'POST',
-        body: {
-          nickname: value('nickname'),
-          version: value('version'),
-          module_federation: {
-            host_sdk: '@inkcre/core',
-            host_sdk_version: value('host_range'),
-            source_repository: value('repository'),
-            source_revision: value('revision'),
+      await api(
+        `/v2/extensions/${namespace}/${encodeURIComponent(value('slug'))}/distributions/module_federation/releases`,
+        {
+          method: 'POST',
+          body: {
+            nickname: value('nickname'),
+            version: value('version'),
+            module_federation: {
+              host_sdk: '@inkcre/core',
+              host_sdk_version: value('host_range'),
+              source_repository: value('repository'),
+              source_revision: value('revision'),
+            },
           },
         },
-      })
+      )
       $('#release-dialog').close()
       await updateAfterChange('Release prepared.', 0)
     })
@@ -380,7 +384,7 @@ if ($('#connect-form')) {
         body.append('content', file)
       }
       await api(
-        `/v1/extensions/${release.name}/releases/${encodeURIComponent(release.version)}/${kind}`,
+        `/v2/extensions/${release.name}/distributions/${release.distribution}/releases/${encodeURIComponent(release.version)}/${kind}`,
         { method: 'POST', body },
       )
       $('#action-dialog').close()

@@ -16,7 +16,12 @@ from ..contracts.models import (
     ExtensionSummary,
     ModuleFederationAssociationInput,
     ModuleFederationDistribution,
-    PrepareReleaseRequest,
+    NativeDistribution,
+    NativeExtensionRecord,
+    NativePrepareReleaseRequest,
+    NativePublisherRelease,
+    NativePublisherWorkspace,
+    NativeReleaseRecord,
     PublisherRelease,
     PublisherWorkspace,
     PythonAssociationInput,
@@ -109,13 +114,74 @@ def _prepared_python(row: db.PythonDistribution) -> PreparedPythonDistribution:
 
 def _release_query():
     return (
-        db.Release.all()
+        db.NativeRelease.all()
         .select_related("extension")
         .prefetch_related("python", "python__files", "module_federation")
     )
 
 
-def _publication_snapshot(row: db.Release) -> tuple:
+def _legacy_query():
+    return (
+        db.Release.all()
+        .select_related("extension")
+        .prefetch_related(
+            "python",
+            "python__files",
+            "python__release",
+            "module_federation",
+            "module_federation__release",
+        )
+    )
+
+
+def legacy_state(row: db.Release) -> ReleaseState:
+    states = {row.state}
+    for association in (row.python, row.module_federation):
+        if association is not None:
+            states.add(association.release.state)
+    if "blocked" in states:
+        return "blocked"
+    if "yanked" in states:
+        return "yanked"
+    return cast(ReleaseState, row.state)
+
+
+def legacy_descriptor(row: db.Release) -> ReleaseRecord:
+    python = None
+    mf = None
+    if "python" in row.visible_distributions and row.python is not None and list(row.python.files):
+        native = row.python
+        python = PythonDistribution(
+            project=native.normalized_project,
+            simple_url=f"/simple/{native.normalized_project}/",
+            host_sdk="core-py",
+            host_sdk_version=native.host_sdk_range,
+            entry_point=PythonEntryPoint(
+                group=native.entry_group, name=native.entry_name, object=native.entry_object
+            ),
+        )
+    if (
+        "module_federation" in row.visible_distributions
+        and row.module_federation is not None
+        and row.module_federation.manifest_r2_key is not None
+    ):
+        native = row.module_federation
+        mf = ModuleFederationDistribution(
+            manifest_url=f"/extensions/{row.extension.name}/{row.version}/module-federation/mf-manifest.json",
+            host_sdk="@inkcre/core",
+            host_sdk_version=native.host_sdk_range,
+        )
+    return ReleaseRecord(
+        name=row.extension.name,
+        nickname=row.extension.nickname,
+        version=row.version,
+        state=legacy_state(row),
+        python=python,
+        module_federation=mf,
+    )
+
+
+def _publication_snapshot(row: db.NativeRelease) -> tuple:
     return (
         (row.python.pk, tuple(sorted(file.pk for file in row.python.files)))
         if row.python is not None
@@ -126,7 +192,7 @@ def _publication_snapshot(row: db.Release) -> tuple:
     )
 
 
-def _descriptor(row: db.Release, *, public: bool) -> ReleaseRecord:
+def _descriptor(row: db.NativeRelease, *, public: bool) -> NativeReleaseRecord:
     python_row = row.python
     mf_row = row.module_federation
     python = None
@@ -149,7 +215,8 @@ def _descriptor(row: db.Release, *, public: bool) -> ReleaseRecord:
             host_sdk=cast(Literal["@inkcre/core"], mf_row.host_sdk),
             host_sdk_version=mf_row.host_sdk_range,
         )
-    return ReleaseRecord(
+    return NativeReleaseRecord(
+        distribution=cast(NativeDistribution, row.distribution),
         name=row.extension.name,
         nickname=row.extension.nickname,
         version=row.version,
@@ -203,9 +270,16 @@ class RegistryRepository:
         return row.namespace.name if row else None
 
     async def prepare_release(
-        self, namespace: str, name: str, request: PrepareReleaseRequest
-    ) -> ReleaseRecord:
+        self,
+        namespace: str,
+        name: str,
+        request: NativePrepareReleaseRequest,
+        *,
+        distribution: NativeDistribution,
+    ) -> NativeReleaseRecord:
         extension_name = f"{namespace}/{name}"
+        if (distribution == "python") != (request.python is not None):
+            raise RegistryConflictError("prepare association must match the selected distribution")
         try:
             async with in_transaction():
                 # Serialize creation of the publisher's extension identity. Release locks
@@ -217,10 +291,10 @@ class RegistryRepository:
                 )
                 if extension.nickname != request.nickname:
                     raise RegistryConflictError("Extension nickname is immutable")
-                release, _created = await db.Release.get_or_create(
-                    extension=extension, version=request.version
+                release, _created = await db.NativeRelease.get_or_create(
+                    extension=extension, distribution=distribution, version=request.version
                 )
-                release = await db.Release.filter(pk=release.pk).select_for_update().get()
+                release = await db.NativeRelease.filter(pk=release.pk).select_for_update().get()
                 for model, association, values, label in (
                     (
                         db.PythonDistribution,
@@ -253,21 +327,34 @@ class RegistryRepository:
             raise RegistryConflictError(
                 "Release association conflicts with existing data"
             ) from error
-        result = await self.get_release(extension_name, request.version, public=False)
+        result = await self.get_native_release(
+            extension_name, request.version, distribution=distribution, public=False
+        )
         assert result is not None
         return result
 
-    async def get_release(
-        self, extension_name: str, version: str, *, public: bool = True
-    ) -> ReleaseRecord | None:
-        row = await _release_query().filter(extension_id=extension_name, version=version).first()
+    async def get_native_release(
+        self,
+        extension_name: str,
+        version: str,
+        *,
+        distribution: NativeDistribution,
+        public: bool = True,
+    ) -> NativeReleaseRecord | None:
+        row = (
+            await _release_query()
+            .filter(extension_id=extension_name, distribution=distribution, version=version)
+            .first()
+        )
         if row is None or (public and row.state == "preparing"):
             return None
         if public and row.state == "blocked":
             raise RegistryBlockedError("Release is operator-blocked")
         return _descriptor(row, public=public)
 
-    async def publisher_workspace(self, namespace: str, offset: int) -> PublisherWorkspace:
+    async def native_publisher_workspace(
+        self, namespace: str, offset: int
+    ) -> NativePublisherWorkspace:
         rows = (
             await _release_query()
             .filter(extension__namespace_id=namespace)
@@ -276,22 +363,60 @@ class RegistryRepository:
             .limit(11)
         )
         records = [
-            PublisherRelease(
+            NativePublisherRelease(
                 **_descriptor(row, public=False).model_dump(),
-                python_uploaded=row.python is not None and bool(list(row.python.files)),
-                web_uploaded=(
-                    row.module_federation is not None
+                uploaded=(
+                    bool(list(row.python.files))
+                    if row.python is not None
+                    else row.module_federation is not None
                     and row.module_federation.manifest_r2_key is not None
                 ),
             )
             for row in rows[:10]
         ]
-        return PublisherWorkspace(
+        return NativePublisherWorkspace(
             namespace=namespace,
             releases=tuple(records),
             offset=offset,
             next_offset=offset + 10 if len(rows) > 10 else None,
         )
+
+    async def list_native_extensions(self) -> list[ExtensionSummary]:
+        rows = (
+            await db.Extension.filter(native_releases__state="published")
+            .distinct()
+            .order_by("name")
+        )
+        return [ExtensionSummary(name=row.name, nickname=row.nickname) for row in rows]
+
+    async def get_native_extension(
+        self, extension_name: str, distribution: NativeDistribution
+    ) -> NativeExtensionRecord | None:
+        rows = (
+            await _release_query()
+            .filter(extension_id=extension_name, distribution=distribution, state="published")
+            .order_by("-created_at", "-version")
+        )
+        if not rows:
+            return None
+        return NativeExtensionRecord(
+            name=extension_name,
+            nickname=rows[0].extension.nickname,
+            releases=tuple(_descriptor(row, public=True) for row in rows),
+        )
+
+    async def get_release(
+        self, extension_name: str, version: str, *, public: bool = True
+    ) -> ReleaseRecord | None:
+        row = await _legacy_query().filter(extension_id=extension_name, version=version).first()
+        if row is None:
+            return None
+        projected = legacy_descriptor(row)
+        if public and projected.state == "preparing":
+            return None
+        if public and projected.state == "blocked":
+            raise RegistryBlockedError("historical Release is operator-blocked")
+        return projected
 
     async def list_extensions(self) -> list[ExtensionSummary]:
         rows = await db.Extension.filter(releases__state="published").distinct().order_by("name")
@@ -299,21 +424,49 @@ class RegistryRepository:
 
     async def get_extension(self, extension_name: str) -> ExtensionRecord | None:
         rows = (
-            await _release_query()
+            await _legacy_query()
             .filter(extension_id=extension_name, state="published")
             .order_by("-created_at", "-version")
         )
-        if not rows:
-            return None
-        return ExtensionRecord(
-            name=extension_name,
-            nickname=rows[0].extension.nickname,
-            releases=tuple(_descriptor(row, public=True) for row in rows),
+        records = tuple(legacy_descriptor(row) for row in rows if legacy_state(row) != "blocked")
+        return (
+            ExtensionRecord(
+                name=extension_name, nickname=rows[0].extension.nickname, releases=records
+            )
+            if rows
+            else None
         )
 
-    async def _locked_release(self, extension_name: str, version: str) -> db.Release:
+    async def publisher_workspace(self, namespace: str, offset: int) -> PublisherWorkspace:
+        rows = (
+            await _legacy_query()
+            .filter(extension__namespace_id=namespace)
+            .order_by("-created_at", "extension_id", "-version")
+            .offset(offset)
+            .limit(11)
+        )
+        return PublisherWorkspace(
+            namespace=namespace,
+            releases=tuple(
+                PublisherRelease(
+                    **legacy_descriptor(row).model_dump(),
+                    python_uploaded=row.python is not None and bool(list(row.python.files)),
+                    web_uploaded=row.module_federation is not None
+                    and row.module_federation.manifest_r2_key is not None,
+                )
+                for row in rows[:10]
+            ),
+            offset=offset,
+            next_offset=offset + 10 if len(rows) > 10 else None,
+        )
+
+    async def _locked_release(
+        self, extension_name: str, version: str, distribution: NativeDistribution
+    ) -> db.NativeRelease:
         row = (
-            await db.Release.filter(extension_id=extension_name, version=version)
+            await db.NativeRelease.filter(
+                extension_id=extension_name, distribution=distribution, version=version
+            )
             .select_for_update()
             .first()
         )
@@ -321,8 +474,14 @@ class RegistryRepository:
             raise RegistryNotFoundError("Release does not exist")
         return row
 
-    async def publish(self, extension_name: str, version: str) -> ReleaseRecord:
-        row = await _release_query().filter(extension_id=extension_name, version=version).first()
+    async def publish(
+        self, extension_name: str, version: str, *, distribution: NativeDistribution
+    ) -> NativeReleaseRecord:
+        row = (
+            await _release_query()
+            .filter(extension_id=extension_name, distribution=distribution, version=version)
+            .first()
+        )
         if row is None:
             raise RegistryNotFoundError("Release does not exist")
         if row.state in {"yanked", "blocked"}:
@@ -333,7 +492,7 @@ class RegistryRepository:
                 "Release native Distribution objects are not completely available"
             )
         async with in_transaction():
-            locked = await self._locked_release(extension_name, version)
+            locked = await self._locked_release(extension_name, version, distribution)
             if locked.state in {"yanked", "blocked"}:
                 raise RegistryStateError(f"cannot publish a {locked.state} Release")
             if locked.state == "preparing":
@@ -349,11 +508,11 @@ class RegistryRepository:
                 await locked.save(
                     update_fields=["state", "yank_reason", "published_at", "updated_at"]
                 )
-        result = await self.get_release(extension_name, version)
+        result = await self.get_native_release(extension_name, version, distribution=distribution)
         assert result is not None
         return result
 
-    async def _release_objects_available(self, row: db.Release) -> bool:
+    async def _release_objects_available(self, row: db.NativeRelease) -> bool:
         files = list(row.python.files) if row.python is not None else []
         if row.python is not None and not files:
             return False
@@ -402,9 +561,11 @@ class RegistryRepository:
                 return False
         return bool(files or mf_ready)
 
-    async def yank(self, extension_name: str, version: str, reason: str) -> ReleaseRecord:
+    async def yank(
+        self, extension_name: str, version: str, reason: str, *, distribution: NativeDistribution
+    ) -> NativeReleaseRecord:
         async with in_transaction():
-            row = await self._locked_release(extension_name, version)
+            row = await self._locked_release(extension_name, version, distribution)
             if row.state == "yanked":
                 if row.yank_reason != reason:
                     raise RegistryConflictError("Yank reason conflicts with the existing yank")
@@ -413,19 +574,21 @@ class RegistryRepository:
                 await row.save(update_fields=["state", "yank_reason", "updated_at"])
             else:
                 raise RegistryStateError(f"cannot yank a {row.state} Release")
-        result = await self.get_release(extension_name, version)
+        result = await self.get_native_release(extension_name, version, distribution=distribution)
         assert result is not None
         return result
 
-    async def unyank(self, extension_name: str, version: str) -> ReleaseRecord:
+    async def unyank(
+        self, extension_name: str, version: str, *, distribution: NativeDistribution
+    ) -> NativeReleaseRecord:
         async with in_transaction():
-            row = await self._locked_release(extension_name, version)
+            row = await self._locked_release(extension_name, version, distribution)
             if row.state == "yanked":
                 row.state, row.yank_reason, row.updated_at = "published", None, datetime.now(UTC)
                 await row.save(update_fields=["state", "yank_reason", "updated_at"])
             elif row.state != "published":
                 raise RegistryStateError(f"cannot unyank a {row.state} Release")
-        result = await self.get_release(extension_name, version)
+        result = await self.get_native_release(extension_name, version, distribution=distribution)
         assert result is not None
         return result
 
@@ -494,7 +657,7 @@ class RegistryRepository:
         try:
             async with in_transaction():
                 release = await self._locked_release(
-                    distribution.extension_name, distribution.release_version
+                    distribution.extension_name, distribution.release_version, "python"
                 )
                 if release.state not in {"preparing", "published"}:
                     raise RegistryStateError(
@@ -594,7 +757,7 @@ class RegistryRepository:
         snapshot_hash: str,
         files: dict[str, bytes],
         media_types: dict[str, str],
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
         started = perf_counter()
         row = (
             await db.ModuleFederationDistribution.filter(
@@ -652,7 +815,7 @@ class RegistryRepository:
         )
         started = perf_counter()
         async with in_transaction():
-            release = await self._locked_release(extension_name, version)
+            release = await self._locked_release(extension_name, version, "module_federation")
             current = await db.ModuleFederationDistribution.get(release=release)
             if current.internal_snapshot_hash is not None:
                 if current.internal_snapshot_hash != snapshot_hash:
@@ -676,7 +839,9 @@ class RegistryRepository:
                         "uploaded_at",
                     ]
                 )
-        result = await self.get_release(extension_name, version, public=False)
+        result = await self.get_native_release(
+            extension_name, version, distribution="module_federation", public=False
+        )
         assert result is not None
         logger.info(
             "mf_upload extension=%s version=%s phase=commit duration_ms=%.1f",

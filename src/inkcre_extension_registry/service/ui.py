@@ -11,6 +11,7 @@ from semantic_version import Version
 from ..contracts.models import (
     ExtensionRecord,
     ExtensionSummary,
+    NativeExtensionRecord,
     ReleaseDocumentation,
     ReleaseRecord,
 )
@@ -73,7 +74,9 @@ def extension_catalog_html(
     )
 
 
-def select_release(extension: ExtensionRecord, version: str | None = None) -> ReleaseRecord | None:
+def select_release(
+    extension: ExtensionRecord | NativeExtensionRecord, version: str | None = None
+) -> ReleaseRecord | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
     if not releases:
         return None
@@ -90,17 +93,20 @@ def select_release(extension: ExtensionRecord, version: str | None = None) -> Re
 
 
 def extension_detail_html(
-    extension: ExtensionRecord,
+    extension: ExtensionRecord | NativeExtensionRecord,
     version: str | None = None,
     documentation: ReleaseDocumentation | None = None,
     *,
     client_origin: str = DEFAULT_CLIENT_WEB_ORIGIN,
+    distribution: str = "module_federation",
 ) -> str | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
     release = select_release(extension, version)
     if release is None:
         return None
-    install_query = urlencode({"install": extension.name, "version": release.version})
+    install_query = urlencode(
+        {"install": extension.name, "distribution": distribution, "version": release.version}
+    )
     return page(
         "detail.html",
         title=extension.nickname,
@@ -109,6 +115,7 @@ def extension_detail_html(
         release=release,
         releases=releases,
         publisher=extension.name.split("/")[0],
+        distribution=distribution,
         documentation=documentation,
         client_origin=client_origin,
         client_host=urlparse(client_origin).netloc,

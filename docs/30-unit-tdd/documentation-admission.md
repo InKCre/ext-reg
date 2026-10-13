@@ -1,6 +1,6 @@
 # 静态文档发布协议
 
-本文面向 Extension 文档作者。Registry 托管作者已构建的静态资源，不运行 SSG，也不解释 Markdown、导航或搜索结构。全局文档使用 `global`，渠道文档使用 `python` 或 `module-federation`；每组文档属于一个精确 Extension Release，渠道组要求该 Release 已关联对应 Distribution。
+本文面向 Extension 文档作者。Registry 托管作者已构建的静态资源，不运行 SSG，也不解释 Markdown、导航或搜索结构。全局文档使用 `global`，渠道文档使用 `python` 或 `module-federation`；新文档属于精确 `(name, distribution, version)` 原生发行，scope 只能为 global 或本分发渠道。历史统一发行文档继续按原 owner 读取，不能迁移猜测 global 归属。
 
 ## 构建与准入
 
@@ -53,7 +53,7 @@
 
 ```bash
 inkcre-ext docs pack --site ./site-output --output ./docs-candidate \
-  --name example/my-extension --version 1.0.0 --scope global \
+  --name example/my-extension --distribution python --version 1.0.0 --scope global \
   --source-repository https://github.com/example/my-extension \
   --source-revision COMMIT_SHA
 ```
@@ -65,7 +65,7 @@ inkcre-ext docs pack --site ./site-output --output ./docs-candidate \
 ```bash
 inkcre-ext docs publish --registry-url REGISTRY_URL --candidate ./docs-candidate
 inkcre-ext docs show --registry-url REGISTRY_URL \
-  --name example/my-extension --version 1.0.0
+  --name example/my-extension --distribution python --version 1.0.0
 ```
 
 首次发布的业务字段 `expected_etag` 为 null，表示只允许创建尚不存在的 scope。修订时先通过 `show` 读取对应 scope 的 ETag，审核当前内容，然后将完整的带引号 ETag 传给新候选的 `pack --if-match '"ETAG"'`；该 CLI 选项写入候选的 `expected_etag`，不会发送 HTTP `If-Match`。尚处于 preparing 的 Release 使用 `show --private`；文档可以准备，但在 Release 发布前不可公开阅读。
@@ -76,8 +76,10 @@ Toolkit 仅做 best-effort 交付：网络错误、500/502/503/504 或无法解�
 
 ## 直接使用 HTTP
 
-[JSON Schema](../../contracts/documentation.schema.json) 定义 upload、publication、receipt、release 和 hosting；[OpenAPI](../../contracts/openapi.json) 定义路径、认证、响应和错误。`POST /v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}` 接收 `metadata`（JSON 编码的 publication，必须含 `expected_etag`）和 `content`（ZIP 文件）两个 multipart 字段；`metadata` 不能作为带 filename 的文件字段发送。成功响应是提交回执，不携带 current 的 HTTP ETag。
+[JSON Schema](../../contracts/documentation.schema.json) 定义 upload、publication、receipt、release 和 hosting；[OpenAPI](../../contracts/openapi.json) 定义路径、认证、响应和错误。`POST /v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation/{scope}` 接收 `metadata`（JSON 编码的 publication，必须含 `expected_etag`）和 `content`（ZIP 文件）两个 multipart 字段；`metadata` 不能作为带 filename 的文件字段发送。成功响应是提交回执，不携带 current 的 HTTP ETag。
 
 `content_sha256` 是文件 manifest 的摘要，不是 ZIP 文件摘要。以文件路径为 key，每项包含文件字节的 `sha256`、字节数 `size` 和上表 `media_type`；对该对象执行 Python `json.dumps(manifest, sort_keys=True, separators=(",", ":"))` 的默认 ASCII 转义序列化，再对 UTF-8 字节计算 SHA-256。目录成员不进入 manifest。其他语言的实现应产生相同字节；Toolkit 的 `inspect_documentation` 提供可直接复用的实现。
 
 400 表示输入或归档不合法，401/403 表示发布权限错误，404 表示目标不存在或不公开，409 表示 association/内容/候选身份冲突或写入前提不满足，411/413/415 表示传输不被接受，451 表示 Release 被封禁，503 表示文档托管尚未配置。更换内容指针只发生在所有资源 staging 成功之后；提交前失败不会改变原指针，提交后丢失响应不会撤销已完成的发布。
+
+Toolkit 0.5 的文档 pack/show 命令必须提供 `--distribution`；新稳定入口为 `/v2/documentation/{namespace}/{name}/{distribution}/{version}/{scope}/{path}`。历史 `/documentation/...` 与隔离快照 URL 保留读取，旧 v1 写入返回 410。

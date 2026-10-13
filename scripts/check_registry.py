@@ -13,11 +13,9 @@ import json
 import logging
 import os
 import secrets
-import threading
 import zipfile
 from unittest.mock import patch
 
-import anyio
 import httpx
 import psycopg
 from check_d1_import import check_import
@@ -25,13 +23,15 @@ from check_documentation import check_documentation
 from moto.server import ThreadedMotoServer
 from registry_database import configure_runtime_login
 from tortoise import Tortoise
+from tortoise.backends.base.executor import EXECUTOR_CACHE
 from tortoise.context import TortoiseContext
 from tortoise.migrations.autodetector import MigrationAutodetector
-from tortoise.migrations.executor import MigrationExecutor
+from tortoise.migrations.executor import MigrationExecutor, MigrationTarget
+from tortoise.migrations.graph import MigrationKey
 
 from inkcre_extension_registry.service import database as db
 from inkcre_extension_registry.service.app import create_app
-from inkcre_extension_registry.service.module_federation import inspect_module_federation_snapshot
+from inkcre_extension_registry.service.repository import RegistryRepository
 from inkcre_extension_registry.service.settings import database_config
 
 
@@ -47,55 +47,99 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     authorization = {"Authorization": f"Bearer {token}"}
 
     async def request(method: str, path: str, expected: int = 200, *, private=False, **kwargs):
-        headers = {**(authorization if private else {}), **kwargs.pop("headers", {})}
-        response = await client.request(method, path, headers=headers, **kwargs)
+        response = await client.request(
+            method,
+            path,
+            headers={**(authorization if private else {}), **kwargs.pop("headers", {})},
+            **kwargs,
+        )
         assert response.status_code == expected, (
-            f"{method} {path}: expected {expected}, got {response.status_code}: "
-            f"{response.text[:800]}"
+            f"{method} {path}: {response.status_code}: {response.text[:800]}"
         )
         return response
 
-    release_path = "/v1/extensions/check/extension/releases"
-    version_path = release_path + "/1.0.0"
-    source = {"source_repository": "https://example.invalid/check", "source_revision": "rev' ? --"}
-    association = {
-        "nickname": "Publisher's extension",
-        "version": "1.0.0",
-        "python": {
-            **source,
-            "project": "check-extension",
-            "host_sdk": "core-py",
-            "host_sdk_version": "^1.0.0",
-            "entry_point": {
-                "group": "inkcre.core.extensions",
-                "name": "check",
-                "object": "check:Extension",
-            },
-        },
-        "module_federation": {**source, "host_sdk": "@inkcre/core", "host_sdk_version": "^1.0.0"},
+    root = "/v2/extensions/check/extension/distributions"
+    python_path, mf_path = (
+        root + "/python/releases/1.0.0",
+        root + "/module_federation/releases/2.0.0",
+    )
+    provenance = {
+        "source_repository": "https://example.invalid/check",
+        "source_revision": "fixed-revision",
     }
-    assert (await request("GET", "/v1/extensions")).json() == []
-    await request("GET", "/")
-    await request("GET", "/?client_origin=https://example.invalid/path", 400)
-    await request("GET", "/?client_origin=https://user@example.invalid", 400)
-    await request("GET", "/v1/publisher", 401)
+    python = {
+        **provenance,
+        "project": "check-extension",
+        "host_sdk": "core-py",
+        "host_sdk_version": "^1.0.0",
+        "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "check",
+            "object": "check:Extension",
+        },
+    }
+    mf = {**provenance, "host_sdk": "@inkcre/core", "host_sdk_version": "^1.0.0"}
+    py_prepare = {"nickname": "Check", "version": "1.0.0", "python": python}
+    mf_prepare = {"nickname": "Check", "version": "2.0.0", "module_federation": mf}
     await request(
-        "POST", "/v1/extensions/other/extension/releases", 403, private=True, json=association
+        "POST", "/v1/extensions/check/extension/releases", 410, private=True, json=py_prepare
     )
-    await request("POST", release_path, private=True, json=association)
-    await request("POST", release_path, private=True, json=association)
+    await request("POST", root + "/python/releases", 401, json=py_prepare)
     await request(
-        "POST", release_path, 409, private=True, json={**association, "nickname": "Changed"}
+        "POST",
+        root.replace("check/", "other/") + "/python/releases",
+        403,
+        private=True,
+        json=py_prepare,
     )
-    await request("GET", version_path, 404)
-    await request("POST", version_path + "/publish", 409, private=True)
-    workspace = (await request("GET", "/v1/publisher", private=True)).json()
-    assert len(workspace["releases"]) == 1
-    assert not workspace["releases"][0]["python_uploaded"]
-    assert not workspace["releases"][0]["web_uploaded"]
-    row = await db.PythonDistribution.get()
-    assert row.source_revision == source["source_revision"] and row.build_id is None
-
+    await request("POST", root + "/python/releases", private=True, json=py_prepare)
+    await request("POST", root + "/python/releases", private=True, json=py_prepare)
+    await request(
+        "POST",
+        root + "/python/releases",
+        409,
+        private=True,
+        json={**py_prepare, "python": {**python, "source_revision": "different"}},
+    )
+    await request("POST", root + "/python/releases", 409, private=True, json=mf_prepare)
+    await request(
+        "POST",
+        root + "/python/releases",
+        422,
+        private=True,
+        json={**py_prepare, "module_federation": mf},
+    )
+    await request("POST", root + "/module_federation/releases", private=True, json=mf_prepare)
+    await request("GET", python_path, 404)
+    await request("POST", python_path + "/publish", 409, private=True)
+    await request("POST", mf_path + "/publish", 409, private=True)
+    snapshot = archive(
+        {
+            "mf-manifest.json": json.dumps(
+                {
+                    "metaData": {
+                        "publicPath": "./",
+                        "remoteEntry": {"name": "remoteEntry.js", "path": ""},
+                    }
+                }
+            ),
+            "remoteEntry.js": "export const check = true;",
+        }
+    )
+    await request(
+        "POST",
+        mf_path + "/module-federation",
+        private=True,
+        files={"content": ("extension.zip", snapshot)},
+    )
+    stored_mf = await db.ModuleFederationDistribution.get()
+    remote_key = stored_mf.manifest_r2_key.removesuffix("mf-manifest.json") + "remoteEntry.js"
+    artifacts.client.delete_object(Bucket=artifacts.bucket, Key=remote_key)
+    await request("POST", mf_path + "/publish", 409, private=True)
+    await artifacts.put(remote_key, b"export const check = true;", content_type="text/javascript")
+    mf_record = (await request("POST", mf_path + "/publish", private=True)).json()
+    assert mf_record["distribution"] == "module_federation" and mf_record["python"] is None
+    await request("GET", python_path, 404)
     metadata = "Metadata-Version: 2.3\nName: check-extension\nVersion: 1.0.0\n\n"
     wheel = archive(
         {
@@ -111,296 +155,103 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
         }
     )
     wheel_name = "check_extension-1.0.0-py3-none-any.whl"
-    for _ in range(2):
-        await request(
-            "POST",
-            "/legacy/",
-            private=True,
-            data={
-                ":action": "file_upload",
-                "protocol_version": "1",
-                "name": "check-extension",
-                "version": "1.0.0",
-                "filetype": "bdist_wheel",
-                "metadata_version": "2.3",
-                "sha256_digest": hashlib.sha256(wheel).hexdigest(),
-            },
-            files={"content": (wheel_name, wheel)},
-        )
-    await request("POST", version_path + "/publish", 409, private=True)
-    await request("GET", version_path, 404)
-    snapshot = archive(
-        {
-            "mf-manifest.json": json.dumps(
-                {
-                    "metaData": {
-                        "publicPath": "./",
-                        "remoteEntry": {"name": "remoteEntry.js", "path": ""},
-                    }
-                }
-            ),
-            "remoteEntry.js": "export const check = true;",
-        }
+    upload = {
+        ":action": "file_upload",
+        "protocol_version": "1",
+        "name": "check-extension",
+        "version": "1.0.0",
+        "filetype": "bdist_wheel",
+        "metadata_version": "2.3",
+        "sha256_digest": hashlib.sha256(wheel).hexdigest(),
+    }
+    await request(
+        "POST",
+        "/legacy/",
+        409,
+        private=True,
+        data={**upload, "sha256_digest": "0" * 64},
+        files={"content": (wheel_name, wheel)},
     )
     for _ in range(2):
         await request(
-            "POST",
-            version_path + "/module-federation",
-            private=True,
-            files={"content": ("extension.zip", snapshot)},
+            "POST", "/legacy/", private=True, data=upload, files={"content": (wheel_name, wheel)}
         )
-    uploaded = (await request("GET", "/v1/publisher", private=True)).json()["releases"][0]
-    assert uploaded["python_uploaded"] and uploaded["web_uploaded"]
     file = await db.PythonFile.get()
     artifacts.client.delete_object(Bucket=artifacts.bucket, Key=file.metadata_r2_key)
-    await request("POST", version_path + "/publish", 409, private=True)
+    await request("POST", python_path + "/publish", 409, private=True)
     await artifacts.put(
         file.metadata_r2_key, metadata.encode(), content_type="application/octet-stream"
     )
-    await request("POST", version_path + "/publish", private=True)
-    await request("POST", version_path + "/publish", private=True)
-    assert (await request("GET", "/v1/extensions")).json()[0]["name"] == "check/extension"
-    catalog = await request("GET", "/?client_origin=https://preview.example")
-    assert 'name="client_origin" value="https://preview.example"' in catalog.text
-    assert "/explore/check/extension?client_origin=https%3A" in catalog.text
-    detail = await request(
-        "GET", "/explore/check/extension?version=1.0.0&client_origin=https://preview.example"
-    )
-    assert (
-        'href="https://preview.example/extensions?install=check%2Fextension&amp;version=1.0.0"'
-        in detail.text
-    )
-    assert "version=1.0.0&amp;client_origin=https%3A" in detail.text
-    assert "Install in preview.example" in detail.text
-    await request("GET", "/v1/extensions/check/extension")
-    assert (await request("GET", version_path)).json()["state"] == "published"
-    await request("GET", "/simple/")
-    await request("GET", "/simple/check-extension/")
-    package_path = f"/packages/check-extension/1.0.0/{wheel_name}"
-    web_path = "/extensions/check/extension/1.0.0/module-federation/remoteEntry.js"
-    assert (await request("GET", package_path)).content == wheel
-    assert (await request("GET", package_path + ".metadata")).text == metadata
-    await request("GET", web_path)
-    head = await request("HEAD", package_path)
-    assert head.content == b"" and head.headers["content-length"] == str(len(wheel))
-    assert head.headers["etag"] == f'"{hashlib.sha256(wheel).hexdigest()}"'
-    await request("HEAD", web_path)
-    await request("GET", package_path.replace("check-extension", "CHECK_extension"), 404)
-    await request("GET", web_path.replace("remoteEntry.js", "mf-manifest.json"))
-    for path in (package_path, package_path + ".metadata", web_path):
-        cached = await request("GET", path)
-        etag = cached.headers["etag"]
-        assert cached.headers["cache-control"] == "public, no-cache"
-        for condition in (etag, f'"other", W/{etag}', "*"):
-            for method in ("GET", "HEAD"):
-                validated = await request(method, path, 304, headers={"If-None-Match": condition})
-                assert validated.content == b"" and validated.headers["etag"] == etag
-        await request("GET", path, headers={"If-None-Match": '"different"'})
-    artifacts.client.delete_object(Bucket=artifacts.bucket, Key=file.metadata_r2_key)
-    await request("GET", package_path + ".metadata", 503, headers={"If-None-Match": "*"})
-    await artifacts.put(
-        file.metadata_r2_key, metadata.encode(), content_type="application/octet-stream"
-    )
+    original_check = RegistryRepository._release_objects_available
 
-    reason = "Publisher's withdrawal ?"
-    await request("POST", version_path + "/yank", private=True, json={"reason": reason})
-    assert (await request("GET", version_path)).json()["state"] == "yanked"
+    async def concurrent_file_upload(repository, row):
+        ready = await original_check(repository, row)
+        fields = await db.PythonFile.filter(id=file.id).values()
+        fields[0].pop("id")
+        fields[0]["filename"] = "check_extension-1.0.0-1-py3-none-any.whl"
+        fields[0]["r2_key"] += ".concurrent"
+        fields[0]["metadata_r2_key"] += ".concurrent"
+        await artifacts.put(fields[0]["r2_key"], wheel, content_type="application/octet-stream")
+        await artifacts.put(
+            fields[0]["metadata_r2_key"], metadata.encode(), content_type="application/octet-stream"
+        )
+        await db.PythonFile.create(**fields[0])
+        return ready
+
+    with patch.object(RegistryRepository, "_release_objects_available", concurrent_file_upload):
+        await request("POST", python_path + "/publish", 409, private=True)
+    assert (await db.NativeRelease.get(distribution="python")).state == "preparing"
+    py_record = (await request("POST", python_path + "/publish", private=True)).json()
+    assert py_record["distribution"] == "python" and py_record["module_federation"] is None
+    await request("POST", python_path + "/publish", private=True)
+    py_versions = (await request("GET", root + "/python")).json()["releases"]
+    mf_versions = (await request("GET", root + "/module_federation")).json()["releases"]
+    assert [r["version"] for r in py_versions] == ["1.0.0"] and [
+        r["version"] for r in mf_versions
+    ] == ["2.0.0"]
+    await request("GET", "/explore/check/extension?distribution=python&version=1.0.0")
+    await request("GET", "/explore/check/extension?distribution=module_federation&version=2.0.0")
     assert (await request("GET", "/v1/extensions")).json() == []
-    await request("GET", package_path)
-    simple = await client.get(
-        "/simple/check-extension/", headers={"Accept": "application/vnd.pypi.simple.v1+json"}
-    )
-    assert simple.json()["files"][0]["yanked"] == reason
-    await request("POST", version_path + "/unyank", private=True)
-    assert (await request("GET", version_path)).json()["state"] == "published"
-    row = await db.Release.get()
-    assert row.yank_reason is None and row.published_at and row.updated_at
-
-    # Exercise correlated readiness expressions and the private pagination boundary.
-    for minor in range(1, 11):
-        await request(
-            "POST",
-            release_path,
-            private=True,
-            json={
-                "nickname": association["nickname"],
-                "version": f"1.{minor}.0",
-                "module_federation": association["module_federation"],
-            },
-        )
-    first = (await request("GET", "/v1/publisher", private=True)).json()
-    last = (await request("GET", "/v1/publisher?offset=10", private=True)).json()
-    assert len(first["releases"]) == 10 and first["next_offset"] == 10
-    assert len(last["releases"]) == 1 and last["next_offset"] is None
-    entries = first["releases"] + last["releases"]
-    assert len({entry["version"] for entry in entries}) == 11
-    assert sum(entry["python_uploaded"] for entry in entries) == 1
-    assert sum(entry["web_uploaded"] for entry in entries) == 1
-    other = await client.get("/v1/publisher", headers={"Authorization": f"Bearer {other_token}"})
-    assert other.status_code == 200 and other.json()["namespace"] == "other"
-    assert other.json()["releases"] == []
-
-    # The project/version uniqueness conflict occurs after creating both identities.
+    await request("GET", "/v1/extensions/check/extension/releases/1.0.0", 404)
+    package = f"/packages/check-extension/1.0.0/{wheel_name}"
+    remote = "/extensions/check/extension/2.0.0/module-federation/remoteEntry.js"
+    assert (await request("GET", package)).content == wheel
+    assert (await request("GET", package + ".metadata")).text == metadata
+    assert (await request("GET", remote)).content == b"export const check = true;"
+    for path in (package, remote):
+        fetched = await request("GET", path)
+        await request("GET", path, 304, headers={"If-None-Match": fetched.headers["etag"]})
     await request(
-        "POST",
-        "/v1/extensions/check/atomic/releases",
-        409,
-        private=True,
-        json=association,
+        "POST", python_path + "/yank", private=True, json={"reason": "withdraw Python only"}
     )
-    assert not await db.Extension.filter(name="check/atomic").exists()
-    assert not await db.Release.filter(extension_id="check/atomic").exists()
-
-    # Concurrent conflicting associations must converge to one immutable release.
-    async def competing(revision: str):
-        payload = {
-            **association,
-            "version": "3.0.0",
-            "python": {
-                **association["python"],
-                "source_revision": revision,
-            },
-        }
-        return await client.post(release_path, json=payload, headers=authorization)
-
-    replies = await asyncio.gather(competing("first"), competing("second"))
-    assert sorted(reply.status_code for reply in replies) == [200, 409]
-    assert await db.Release.filter(version="3.0.0").count() == 1
-
-    # Two uploads share the S3 budget. A staging conflict must remain HTTP 409,
-    # wait for sibling I/O, and never make a partially uploaded snapshot visible.
-    staged_files = {
-        "mf-manifest.json": json.dumps(
-            {"metaData": {"publicPath": "./", "remoteEntry": {"name": "remoteEntry.js"}}}
-        ),
-        "remoteEntry.js": "export const check = true;",
-        **{f"chunk-{index}.js": f"export const value = {index};" for index in range(8)},
-    }
-    staged_zip = archive(staged_files)
-    staged_path = release_path + "/4.0.0"
-    await request(
-        "POST",
-        release_path,
-        private=True,
-        json={**association, "version": "4.0.0", "python": None},
+    assert (await request("GET", mf_path)).json()["state"] == "published"
+    await request("GET", package)
+    await request("POST", python_path + "/unyank", private=True)
+    legacy = await db.Release.create(
+        extension_id="check/extension",
+        version="1.0.0",
+        state="published",
+        visible_distributions=["python"],
     )
-    inspected = inspect_module_federation_snapshot(
-        staged_zip,
-        public_prefix="http://localhost/extensions/check/extension/4.0.0/module-federation/",
+    py = await db.PythonDistribution.get()
+    py.legacy_release = legacy
+    await py.save(update_fields=["legacy_release_id"])
+    historical = (await request("GET", "/v1/extensions/check/extension/releases/1.0.0")).json()
+    assert (
+        historical["python"]
+        and historical["module_federation"] is None
+        and "distribution" not in historical
     )
-    prefix = f"staging/module-federation/check/extension/4.0.0/{inspected.snapshot_hash}/"
-    conflict_key = prefix + "chunk-0.js"
-    await artifacts.put(conflict_key, b"truncated", content_type="text/javascript")
-    original_head = artifacts.client.head_object
-    active = peak = 0
-    lock = threading.Lock()
-    entered, proceed = threading.Event(), threading.Event()
-
-    def gated_head(**kwargs):
-        nonlocal active, peak
-        with lock:
-            active += 1
-            peak = max(peak, active)
-            if active == 4:
-                entered.set()
-        try:
-            assert proceed.wait(10), "MF object workers did not get released"
-            return original_head(**kwargs)
-        finally:
-            with lock:
-                active -= 1
-
-    async def conflicting_upload():
-        await request(
-            "POST",
-            staged_path + "/module-federation",
-            409,
-            private=True,
-            files={"content": ("staging.zip", staged_zip)},
-        )
-
-    with patch.object(artifacts.client, "head_object", gated_head):
-        async with anyio.create_task_group() as group:
-            group.start_soon(conflicting_upload)
-            group.start_soon(conflicting_upload)
-            try:
-                assert await anyio.to_thread.run_sync(entered.wait, 10), (
-                    "MF uploads serialized independent object requests"
-                )
-            finally:
-                proceed.set()
-    assert peak == 4 and active == 0
-    staged = await db.ModuleFederationDistribution.get(release__version="4.0.0")
-    assert staged.internal_snapshot_hash is None and staged.manifest_r2_key is None
-    await request("POST", staged_path + "/publish", 409, private=True)
-    await artifacts.put(conflict_key, inspected.files["chunk-0.js"], content_type="text/javascript")
-    for _ in range(2):
-        await request(
-            "POST",
-            staged_path + "/module-federation",
-            private=True,
-            files={"content": ("staging.zip", staged_zip)},
-        )
-    artifacts.client.delete_object(Bucket=artifacts.bucket, Key=prefix + "chunk-7.js")
-    await request("POST", staged_path + "/publish", 409, private=True)
-    await request(
-        "POST",
-        staged_path + "/module-federation",
-        private=True,
-        files={"content": ("staging.zip", staged_zip)},
-    )
-    await request("POST", staged_path + "/publish", private=True)
-    for path, content in inspected.files.items():
-        public = await request("GET", "/extensions/check/extension/4.0.0/module-federation/" + path)
-        assert public.content == content
-    changed_zip = archive({**staged_files, "chunk-0.js": "export const changed = true;"})
-    await request(
-        "POST",
-        staged_path + "/module-federation",
-        409,
-        private=True,
-        files={"content": ("staging.zip", changed_zip)},
-    )
-
-    # An association appended during object checks must not become public unchecked.
-    racing_path = release_path + "/9.0.0"
-    racing = {**association, "version": "9.0.0", "python": None}
-    await request("POST", release_path, private=True, json=racing)
-    await request(
-        "POST",
-        racing_path + "/module-federation",
-        private=True,
-        files={"content": ("racing.zip", snapshot)},
-    )
-    original_artifact_head = artifacts.head
-    appended = False
-
-    async def append_during_object_check(key):
-        nonlocal appended
-        if not appended:
-            appended = True
-            await request(
-                "POST", release_path, private=True, json={**association, "version": "9.0.0"}
-            )
-        return await original_artifact_head(key)
-
-    with patch.object(artifacts, "head", append_during_object_check):
-        conflict = await request("POST", racing_path + "/publish", 409, private=True)
-        assert "changed during publication" in conflict.json()["detail"]
-    await request("GET", racing_path, 404)
-
-    await db.Release.filter(version="1.0.0").update(state="blocked")
-    await request("GET", version_path, 451)
-    await request("GET", package_path, 451)
-    await request("GET", web_path, 451)
-    for path in (package_path, package_path + ".metadata", web_path):
-        for method in ("GET", "HEAD"):
-            denied = await request(method, path, 451, headers={"If-None-Match": "*"})
-            assert denied.headers["cache-control"] == "no-store"
-    assert "check-extension" not in (await request("GET", "/simple/")).text
+    await db.NativeRelease.filter(distribution="python").update(state="blocked")
+    await request("GET", python_path, 451)
+    await request("GET", package, 451, headers={"If-None-Match": "*"})
+    await request("GET", "/v1/extensions/check/extension/releases/1.0.0", 451)
+    await request("GET", mf_path)
+    await request("GET", remote)
+    await db.NativeRelease.filter(distribution="python").update(state="published")
     await check_documentation(client, token, other_token, artifacts)
     await db.Credential.all().update(disabled=True)
-    await request("GET", "/v1/publisher", 401, private=True)
+    await request("GET", "/v2/publisher", 401, private=True)
 
 
 def check_runtime_permissions(url: str) -> None:
@@ -419,6 +270,119 @@ def check_runtime_permissions(url: str) -> None:
                 pass
 
 
+async def check_native_upgrade(executor: MigrationExecutor) -> None:
+    """Replay a populated pre-v2 schema through the admitted migration boundary."""
+    from datetime import UTC, datetime
+
+    from tortoise.migrations.schema_generator.state import State
+    from tortoise.migrations.schema_generator.state_apps import StateApps
+
+    target = MigrationKey("models", "0004_documentation_ownership")
+    await executor.migrate([MigrationTarget(target.app_label, target.name)], direction="forward")
+    state = State(models={}, apps=StateApps(default_connections={"models": "default"}))
+    for key in executor.loader.graph.forwards_plan(target):
+        await executor.loader.graph.nodes[key].apply(state, dry_run=True, schema_editor=None)
+    old = {
+        name: state.apps.get_model("models." + name)
+        for name in (
+            "Namespace",
+            "Extension",
+            "Release",
+            "PythonDistribution",
+            "ModuleFederationDistribution",
+            "PythonFile",
+            "DocumentationSnapshot",
+            "DocumentationSet",
+        )
+    }
+    namespace = await old["Namespace"].create(name="upgrade")
+    extension = await old["Extension"].create(
+        name="upgrade/mail", namespace=namespace, nickname="Upgrade"
+    )
+    legacy = await old["Release"].create(
+        extension=extension, version="1.0.0", state="published", published_at=datetime.now(UTC)
+    )
+    python = await old["PythonDistribution"].create(
+        release=legacy,
+        normalized_project="upgrade-mail",
+        project_version="1.0.0",
+        host_sdk="core-py",
+        host_sdk_range="^1.0.0",
+        entry_group="inkcre.core.extensions",
+        entry_name="upgrade",
+        entry_object="upgrade:Extension",
+        source_repository="https://example.invalid",
+        source_revision="old-source",
+    )
+    await old["ModuleFederationDistribution"].create(
+        release=legacy,
+        host_sdk="@inkcre/core",
+        host_sdk_range="^1.0.0",
+        source_repository="https://example.invalid",
+        source_revision="old-source",
+    )
+    await old["PythonFile"].create(
+        distribution=python,
+        filename="upgrade_mail-1.0.0-py3-none-any.whl",
+        sha256="a" * 64,
+        size=4,
+        filetype="bdist_wheel",
+        core_metadata_sha256="b" * 64,
+        r2_key="preserved/wheel",
+        metadata_r2_key="preserved/metadata",
+    )
+    snapshot = await old["DocumentationSnapshot"].create(
+        id="c" * 32,
+        release=legacy,
+        scope="global",
+        content_sha256="d" * 64,
+        entry="index.html",
+        source_repository="https://example.invalid",
+        source_revision="old-source",
+        files={"index.html": {"media_type": "text/html", "size": 4}},
+        etag="e" * 64,
+    )
+    await old["DocumentationSet"].create(release=legacy, scope="global", snapshot=snapshot)
+    files_before = await old["PythonFile"].all().values()
+    docs_before = await old["DocumentationSnapshot"].all().values()
+    await executor.migrate(direction="forward")
+    # Historical and current model classes share table names; discard old SQL shapes.
+    EXECUTOR_CACHE.clear()
+    assert await db.PythonFile.all().values() == files_before
+    native = await db.NativeRelease.get(
+        extension_id=extension.name, distribution="python", version="1.0.0"
+    )
+    assert native.state == "published"
+    mf = await db.NativeRelease.get(
+        extension_id=extension.name, distribution="module_federation", version="1.0.0"
+    )
+    assert mf.state == "preparing", "unuploaded legacy MF must not become published"
+    migrated = await db.Release.get(id=legacy.id)
+    assert migrated.visible_distributions == ["python"]
+    docs_after = await db.DocumentationSnapshot.all().values()
+    for row in docs_after:
+        assert row.pop("native_release_id") is None
+    assert docs_after == docs_before, "historical snapshot identity, receipt and owner changed"
+    pointer = await db.DocumentationSet.get(snapshot_id=snapshot.id)
+    assert pointer.release_id == legacy.id and pointer.native_release_id is None
+    for model in (
+        db.DocumentationSet,
+        db.DocumentationSnapshot,
+        db.PythonFile,
+        db.PythonDistribution,
+        db.ModuleFederationDistribution,
+        db.NativeRelease,
+        db.Release,
+        db.Extension,
+        db.Namespace,
+    ):
+        await model.all().delete()
+    print(
+        "Populated pre-v2 migration preserved native bytes references "
+        "and historical document receipts."
+    )
+
+
 async def main() -> None:
     owner_url = os.environ["REGISTRY_TEST_DATABASE_URL"]
     config = database_config(owner_url)
@@ -429,7 +393,11 @@ async def main() -> None:
             "Models changed without a checked-in migration"
         )
         executor = MigrationExecutor(Tortoise.get_connection("default"), config["apps"])
-        await executor.migrate(direction="forward")
+        await executor.loader.build_graph()
+        if not await executor.recorder.applied_migrations():
+            await check_native_upgrade(executor)
+        else:
+            await executor.migrate(direction="forward")
         assert not await executor.plan(), "Migration head was not reached"
         assert not await db.Namespace.exists(), "Checks require an empty disposable database"
     url = await asyncio.to_thread(configure_runtime_login, owner_url, secrets.token_urlsafe(32))
@@ -472,6 +440,7 @@ async def main() -> None:
                         db.Credential,
                         db.Extension,
                         db.Release,
+                        db.NativeRelease,
                         db.ModuleFederationDistribution,
                         db.PythonDistribution,
                         db.PythonFile,
@@ -489,6 +458,7 @@ async def main() -> None:
                     db.PythonFile,
                     db.PythonDistribution,
                     db.ModuleFederationDistribution,
+                    db.NativeRelease,
                     db.Release,
                     db.Extension,
                     db.Credential,

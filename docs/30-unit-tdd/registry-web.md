@@ -13,22 +13,21 @@ filtering. Search is a case-insensitive substring of the canonical name or
 nickname; filtering combines with search. An empty Registry and empty search
 results have different recovery actions. The page remains useful without JavaScript.
 
-`/explore/{namespace}/{name}` displays published releases and their admitted
-native distribution descriptors. Versions are sorted by SemVer; the default
+`/explore/{namespace}/{name}?distribution=python|module_federation` displays independently published native releases. Web is the default distribution; switching distribution selects its own version list. Versions are sorted by SemVer; the default
 selection is the highest stable version, or the highest pre-release if there
 is no stable release. The optional `version` query selects an exact published
 version. Missing or withdrawn versions return a human-readable 404. Existing
 `/v1`, `/simple`, `/packages`, and Module Federation asset paths retain their
 machine-facing semantics.
 
-The detail page links to client-web's `/extensions?install=<name>&version=<exact>`.
+The detail page links to client-web's `/extensions?install=<name>&distribution=<kind>&version=<exact>`.
 The Registry neither reads deployment state nor installs the Release. When a
 client-web page opens the Registry, it passes only its Web origin as
 `client_origin`; the catalog preserves it through search, filters, and version
 links. The Registry accepts HTTPS origins (and local HTTP for development),
 then constructs a fixed client-web path and displays the destination host. A
 direct Registry visit defaults to `https://app.inkcre.dev`. The return query
-contains only the Extension name and exact version; client-web reads the
+contains the Extension name, distribution and exact version; client-web reads the
 Release anew from its own configured Registry and requires confirmation.
 
 The UI does not invent descriptions, popularity, trust badges, compatibility
@@ -45,16 +44,15 @@ HTML, or logs. Only the theme preference is persisted in local storage.
 
 Connect、复制 ID 和主题按钮在各自的事件处理器绑定后才启用，避免脚本加载期间丢失用户操作。凭据输入框没有原生表单字段名，因此脚本加载延迟或失败时，浏览器不能把凭据作为 URL 查询参数提交；认证仅由脚本通过 Authorization 发出。
 
-`GET /v1/publisher?offset=0` authenticates through the existing namespace
+`GET /v2/publisher?offset=0` authenticates through the existing namespace
 credential dependency and returns only that namespace's releases, including
 preparing, withdrawn, and operator-blocked releases. Pages contain at most ten
 records. Related distribution and file data is prefetched in bounded queries.
 `next_offset` indicates another page; concurrent publication can shift this
 non-snapshot listing, and Refresh reloads current state. Private responses,
-including rejected credentials, are not cached. Per-distribution uploaded flags
-come from the admitted files/manifest association, not a browser assumption.
+including rejected credentials, are not cached. Each native release has its own uploaded flag, which comes from the admitted files/manifest association, not a browser assumption.
 
-The Web release form calls the existing prepare endpoint, uploads a Module
+The Web release form calls the v2 module_federation prepare endpoint, uploads a Module
 Federation ZIP through the existing multipart endpoint, and asks for a separate
 publication decision. Failed preparation or upload keeps the form available
 for correction; published bytes and metadata remain immutable. The workspace

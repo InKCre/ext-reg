@@ -63,6 +63,7 @@ class Release(Model):
         related_name="releases",
         on_delete=fields.RESTRICT,
     )
+    visible_distributions = fields.JSONField(default=list)
     version = fields.CharField(max_length=128)
     state = fields.CharField(max_length=16, default="preparing")
     yank_reason: str | None = fields.TextField(null=True)
@@ -83,10 +84,48 @@ class Release(Model):
         ]
 
 
+class NativeRelease(Model):
+    id = fields.BigIntField(primary_key=True)
+    extension_id: str
+    extension: fields.ForeignKeyRelation[Extension] = fields.ForeignKeyField(
+        "models.Extension", related_name="native_releases", on_delete=fields.RESTRICT
+    )
+    distribution = fields.CharField(max_length=32)
+    version = fields.CharField(max_length=128)
+    state = fields.CharField(max_length=16, default="preparing")
+    yank_reason: str | None = fields.TextField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    published_at = fields.DatetimeField(null=True)
+    updated_at = fields.DatetimeField(auto_now_add=True)
+    python: fields.BackwardOneToOneRelation["PythonDistribution"] | None
+    module_federation: fields.BackwardOneToOneRelation["ModuleFederationDistribution"] | None
+
+    class Meta(Model.Meta):
+        table = "native_releases"
+        unique_together = (("extension_id", "distribution", "version"),)
+        indexes = (("extension_id", "distribution", "state", "created_at"),)
+        constraints: ClassVar = [
+            CheckConstraint(
+                "distribution IN ('python', 'module_federation')", "native_distribution"
+            ),
+            CheckConstraint(
+                "state IN ('preparing', 'published', 'yanked', 'blocked')", "native_release_state"
+            ),
+        ]
+
+
 class PythonDistribution(Model):
     id = fields.BigIntField(primary_key=True)
-    release: fields.OneToOneRelation[Release] = fields.OneToOneField(
-        "models.Release", related_name="python", on_delete=fields.RESTRICT
+    legacy_release: fields.OneToOneRelation[Release] | None = fields.OneToOneField(
+        "models.Release",
+        related_name="python",
+        null=True,
+        on_delete=fields.RESTRICT,
+    )
+    release: fields.OneToOneRelation[NativeRelease] = fields.OneToOneField(
+        "models.NativeRelease",
+        related_name="python",
+        on_delete=fields.RESTRICT,
     )
     normalized_project = fields.CharField(max_length=256)
     project_version = fields.CharField(max_length=256)
@@ -139,8 +178,14 @@ class PythonFile(Model):
 
 class ModuleFederationDistribution(Model):
     id = fields.BigIntField(primary_key=True)
-    release: fields.OneToOneRelation[Release] = fields.OneToOneField(
+    legacy_release: fields.OneToOneRelation[Release] | None = fields.OneToOneField(
         "models.Release",
+        related_name="module_federation",
+        null=True,
+        on_delete=fields.RESTRICT,
+    )
+    release: fields.OneToOneRelation[NativeRelease] = fields.OneToOneField(
+        "models.NativeRelease",
         related_name="module_federation",
         on_delete=fields.RESTRICT,
     )
@@ -178,8 +223,11 @@ class ModuleFederationDistribution(Model):
 
 class DocumentationSnapshot(Model):
     id = fields.CharField(max_length=32, primary_key=True)
-    release: fields.ForeignKeyRelation[Release] = fields.ForeignKeyField(
-        "models.Release", on_delete=fields.RESTRICT
+    release: fields.ForeignKeyRelation[Release] | None = fields.ForeignKeyField(
+        "models.Release", null=True, on_delete=fields.RESTRICT
+    )
+    native_release: fields.ForeignKeyRelation[NativeRelease] | None = fields.ForeignKeyField(
+        "models.NativeRelease", null=True, on_delete=fields.RESTRICT
     )
     scope = fields.CharField(max_length=32)
     content_sha256 = fields.CharField(max_length=64)
@@ -195,6 +243,10 @@ class DocumentationSnapshot(Model):
         table = "documentation_snapshots"
         constraints: ClassVar = [
             UniqueConstraint(("id", "release_id", "scope"), "docs_snapshot_owner"),
+            UniqueConstraint(("id", "native_release_id", "scope"), "native_docs_snapshot_owner"),
+            CheckConstraint(
+                "(release_id IS NULL) <> (native_release_id IS NULL)", "docs_snapshot_one_owner"
+            ),
             CheckConstraint("id ~ '^[0-9a-f]{32}$'", "docs_snapshot_id"),
             CheckConstraint(
                 "scope IN ('global', 'python', 'module-federation')", "docs_snapshot_scope"
@@ -209,8 +261,11 @@ class DocumentationSnapshot(Model):
 
 class DocumentationSet(Model):
     id = fields.BigIntField(primary_key=True)
-    release: fields.ForeignKeyRelation[Release] = fields.ForeignKeyField(
-        "models.Release", on_delete=fields.RESTRICT
+    release: fields.ForeignKeyRelation[Release] | None = fields.ForeignKeyField(
+        "models.Release", null=True, on_delete=fields.RESTRICT
+    )
+    native_release: fields.ForeignKeyRelation[NativeRelease] | None = fields.ForeignKeyField(
+        "models.NativeRelease", null=True, on_delete=fields.RESTRICT
     )
     scope = fields.CharField(max_length=32)
     snapshot: fields.ForeignKeyRelation[DocumentationSnapshot] = fields.ForeignKeyField(
@@ -220,7 +275,10 @@ class DocumentationSet(Model):
 
     class Meta(Model.Meta):
         table = "documentation_sets"
-        unique_together = (("release_id", "scope"),)
+        unique_together = (("release_id", "scope"), ("native_release_id", "scope"))
         constraints: ClassVar = [
             CheckConstraint("scope IN ('global', 'python', 'module-federation')", "docs_set_scope"),
+            CheckConstraint(
+                "(release_id IS NULL) <> (native_release_id IS NULL)", "docs_set_one_owner"
+            ),
         ]
