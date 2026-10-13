@@ -25,11 +25,15 @@ from registry_database import configure_runtime_login
 from registry_preview_seed import seed
 
 
-def request(client: httpx.Client, method: str, path: str, *, missing=False, **kwargs):
+def request(
+    client: httpx.Client, method: str, path: str, *, missing=False, complete=False, **kwargs
+):
     response = client.request(method, path, **kwargs)
     if missing and response.status_code == 404:
         return None
     response.raise_for_status()
+    if complete and response.status_code != 200:
+        raise RuntimeError(f"Provider returned an incomplete result for {method} {path}")
     if not response.content:
         return None
     body = response.json()

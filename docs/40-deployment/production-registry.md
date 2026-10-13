@@ -8,6 +8,19 @@ production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET`、`D
 
 Heroku 交付为 Uvicorn 设置 `FORWARDED_ALLOW_IPS=*`，由平台 HTTP 入口提供外部请求协议，补斜杠跳转保持 HTTPS。转发头不参与 namespace 授权或身份判断；认证仍由 publisher credential 决定。部署 smoke 同时检查 `/simple` 跳转到该 origin 的 HTTPS `/simple/`。
 
+## 当前 PostgreSQL 原生发行切换
+
+PR58 的 0005/0006 向前迁移将分发关联改为原生发行坐标，保留历史文件、R2 key、URL 和文档 receipt。迁移后的关联不能由旧镜像解释，因此这次切换必须有维护窗口，不能只暂停发布写入而保持旧服务读取。合并 main 会触发独立 SDK 包资产发布；Registry 服务迁移与镜像发布仍由 `production.yml` 手动执行。
+
+1. 固定已验证的 current-main SHA，先运行 `operation=verify`。保存当前镜像 revision、数据库迁移位置、数据库可恢复快照及历史下载和文档身份摘要。
+2. 暂停所有 publisher 并等待在途请求结束。由获准的操作员将既有 app 的 web formation 缩至 0，等待旧 web dyno 停止；维护窗口内不允许其他操作员或自动化重新扩容。Heroku maintenance 页面或 Eco 休眠不能替代停止进程。
+3. 对同一 SHA 运行 `operation=deploy`。控制器在任何数据库、配置和发布变更之前读取 [Heroku Formation Info 和 Dyno List](https://devcenter.heroku.com/articles/platform-api-reference)。它要求 web quantity 为 0，且完整 dyno 列表中的 web 状态仅为 down/crashed；idle、starting、up、未知状态及不完整列表均拒绝。不自动停机，也不自动回滚。
+4. 控制器依次迁移、配置 runtime 登录和 app、推送目标镜像、发布镜像、恢复 `web=1:eco`，最后验证 exact `/livez`。再检查 v1 历史只读、旧写 410、v2 坐标、原 wheel/MF 字节与文档 receipt，确认后恢复已采用 v2 的 publisher。恢复 publisher 不包含新 Extension 正式发行授权。
+
+日志以 app、目标 revision 和 phase 标识失败位置。migration 或 release 失败时控制器不执行 scale-up，保持旧进程停止；调查迁移记录及实际 release 后，以兼容当前 schema 的镜像向前恢复。smoke 失败发生在新镜像已启动之后，不能当作部署未发生；保持 publisher 暂停，核验实际 revision 和服务状态后修复。迁移后直接启动旧镜像不是安全回滚。恢复旧数据库快照需要单独确认维护期间的写入及恢复范围，不能把 schema 不兼容视为自动回滚依据。
+
+以下 D1 导入、路由切换和恢复坐标记载的是 2026-09-13 的历史迁移。其旧入口只读可继续的做法，不适用于上述同库不兼容迁移。
+
 ## 生产资源与 TLS
 
 Registry 使用 Heroku app `inkcre-ext-reg-production`，其默认 origin 为 `https://inkcre-ext-reg-production-a6bbc8ada2d2.herokuapp.com`；web formation 为一个 Eco dyno。Neon 项目为 `wandering-base-13707928`，数据库 `registry` 位于根分支 `br-muddy-term-aw4iive7`。R2 使用原有私有桶 `inkcre-extension-registry-production-v2`。PR 分支从固定空 `preview-base` 创建，生产导入不改变这个基础分支。

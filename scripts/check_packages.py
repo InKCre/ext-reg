@@ -24,6 +24,109 @@ from packaging.requirements import Requirement
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def check_production_delivery_boundary() -> None:
+    from contextlib import redirect_stdout
+
+    import httpx
+    import registry_production
+
+    environment = {
+        "MIGRATION_DATABASE_URL": "postgres://owner:synthetic@localhost/registry",
+        "DATABASE_URL": "postgres://registry_app:synthetic@localhost/registry",
+        "HEROKU_API_KEY": "synthetic-token",
+        "S3_ENDPOINT_URL": "https://objects.invalid",
+        "S3_BUCKET": "synthetic-bucket",
+        "DOCUMENTATION_ORIGIN_TEMPLATE": "https://docs-{snapshot}.invalid",
+        "AWS_ACCESS_KEY_ID": "synthetic-key",
+        "AWS_SECRET_ACCESS_KEY": "synthetic-secret",
+    }
+    for quantity, state, partial, failure in [
+        (1, None, False, None),
+        (0, "up", False, None),
+        (0, "starting", False, None),
+        (0, "idle", False, None),
+        (0, "unknown", False, None),
+        (0, None, True, None),
+        (0, None, False, "migration"),
+        (0, None, False, "release"),
+        (0, None, False, "smoke"),
+        (0, "down", False, None),
+        (0, "crashed", False, None),
+    ]:
+        events = []
+        output = io.StringIO()
+
+        def provider(
+            request: httpx.Request, events=events, quantity=quantity, state=state, partial=partial
+        ) -> httpx.Response:
+            events.append((request.method, request.url.path))
+            if request.url.path.endswith("/formation/web"):
+                body = {"type": "web", "quantity": quantity}
+            elif request.url.path.endswith("/dynos"):
+                body = [] if state is None else [{"type": "web", "state": state}]
+                return httpx.Response(206 if partial else 200, json=body)
+            else:
+                body = {"stack": {"name": "container"}}
+            return httpx.Response(200, json=body)
+
+        def command(*args, events=events, failure=failure, **kwargs):
+            events.append(tuple(args))
+            if (failure == "migration" and args[:2] == ("docker", "run")) or (
+                failure == "release" and args[:2] == ("heroku", "container:release")
+            ):
+                raise RuntimeError("synthetic command failure")
+            return ""
+
+        def login(*args, events=events):
+            events.append(("database-login",))
+
+        def smoke(*args, events=events, failure=failure):
+            events.append(("smoke", *args))
+            if failure == "smoke":
+                raise RuntimeError("synthetic smoke failure")
+
+        refused = quantity != 0 or state in {"up", "starting", "idle", "unknown"} or partial
+        with (
+            httpx.Client(
+                base_url="https://api.heroku.com/", transport=httpx.MockTransport(provider)
+            ) as client,
+            patch.dict(os.environ, environment),
+            patch.object(registry_production, "run", command),
+            patch.object(registry_production, "configure_runtime_login", login),
+            patch.object(registry_production, "smoke", smoke),
+            redirect_stdout(output),
+        ):
+            try:
+                registry_production.deploy(client, "owned-fixture", "verified-image", "exact-sha")
+            except RuntimeError:
+                assert refused or failure
+            else:
+                assert not refused and not failure
+        if refused:
+            assert all(event[0] == "GET" for event in events), events
+            assert "phase=stopped_web_check status=failed" in output.getvalue()
+        if failure in {"migration", "release"}:
+            assert not any(event[:2] == ("heroku", "ps:scale") for event in events)
+            assert f"phase={failure} status=failed" in output.getvalue()
+        if not refused and failure not in {"migration", "release"}:
+            scale = ("heroku", "ps:scale", "web=1:eco", "--app", "owned-fixture")
+            release = ("heroku", "container:release", "web", "--app", "owned-fixture")
+            assert events.count(scale) == 1 and events.index(release) < events.index(scale)
+            assert (
+                "docker",
+                "tag",
+                "verified-image",
+                "registry.heroku.com/owned-fixture/web",
+            ) in events
+            assert ("smoke", "https://registry.inkcre.dev", "exact-sha") in events
+        if failure == "migration":
+            assert not any(event[0] in {"PATCH", "database-login"} for event in events)
+        if failure == "smoke":
+            assert "phase=smoke status=failed" in output.getvalue()
+        assert "synthetic-secret" not in output.getvalue()
+    print("Production stopped-web gate and ordered failure boundaries passed.")
+
+
 def check_native_runtime_boundary() -> None:
     import asyncio
 
@@ -360,6 +463,7 @@ def check_coordinated_version_preparation() -> None:
 
 
 def main() -> None:
+    check_production_delivery_boundary()
     check_coordinated_version_preparation()
     check_native_runtime_boundary()
     check_preview_catalog()
