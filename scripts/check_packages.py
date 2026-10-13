@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import email
+import io
 import json
 import os
+import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
 import tomllib
 import venv
@@ -195,7 +199,113 @@ def check_preview_catalog() -> None:
         )
 
 
+def check_coordinated_version_preparation() -> None:
+    """Exercise the real CLI on a disposable Git history, without editing this checkout."""
+    from release import projects
+
+    with tempfile.TemporaryDirectory() as directory:
+        fixture = Path(directory)
+        base = "HEAD"
+        archive = subprocess.check_output(["git", "archive", base], cwd=ROOT)
+        with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
+            bundle.extractall(fixture, filter="data")
+
+        def git(*arguments):
+            return subprocess.check_output(
+                ["git", *arguments], cwd=fixture, stderr=subprocess.DEVNULL
+            )
+
+        git("init", "--quiet")
+        git("config", "user.name", "Registry qualification")
+        git("config", "user.email", "qualification@example.invalid")
+        for project in projects():
+            path = fixture / project.pyproject.relative_to(ROOT)
+            version = ".".join(map(str, project.version))
+            major, minor, patch = project.version
+            previous = (
+                (major, minor, patch - 1)
+                if patch
+                else (major, minor - 1, 0)
+                if minor
+                else (major - 1, 0, 0)
+            )
+            baseline_version = ".".join(map(str, previous))
+            path.write_text(
+                path.read_text().replace(
+                    f'version = "{version}"', f'version = "{baseline_version}"', 1
+                )
+            )
+            (fixture / project.changelog.relative_to(ROOT)).write_text("# Changelog\n\n## 0.0.0\n")
+        git("add", ".")
+        git("commit", "--quiet", "-m", "baseline")
+        baseline = git("rev-parse", "HEAD").decode().strip()
+        for project in projects():
+            for path in (project.pyproject, project.changelog):
+                shutil.copyfile(path, fixture / path.relative_to(ROOT))
+            target = fixture / project.fragments.relative_to(ROOT)
+            shutil.rmtree(target, ignore_errors=True)
+            target.mkdir()
+        shutil.copyfile(ROOT / "scripts/release.py", fixture / "scripts/release.py")
+        (fixture / "src/qualification.py").write_text("# Observable behavior-path candidate.\n")
+        git("add", ".")
+        git("commit", "--quiet", "-m", "coordinated candidate")
+
+        def check(*arguments):
+            return subprocess.run(
+                [sys.executable, "scripts/release.py", "check", "--base", baseline, *arguments],
+                cwd=fixture,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        strict = check()
+        assert strict.returncode and "release PR contains behavior changes" in strict.stderr
+        flag = "--allow-feature-version-preparation"
+        admitted = check(flag)
+        assert admitted.returncode == 0, admitted.stderr
+        assert "This does not authorize publication" in admitted.stdout
+        residual = fixture / ".changes/+residual.fixed.md"
+        residual.write_text("An unconsumed release intent.\n")
+        rejected = check(flag)
+        assert rejected.returncode and "unconsumed fragments" in rejected.stderr
+        residual.unlink()
+        changelog = fixture / "CHANGELOG.md"
+        original = changelog.read_text()
+        root_version = ".".join(map(str, projects()[0].version))
+        changelog.write_text(original.replace(f"## {root_version}", "## 99.0.0", 1))
+        rejected = check(flag)
+        assert rejected.returncode and "prepared changelog must begin" in rejected.stderr
+        changelog.write_text(original)
+        project_file = fixture / "pyproject.toml"
+        original = project_file.read_text()
+        project_file.write_text(
+            original.replace(f'version = "{root_version}"', 'version = "0.0.0"', 1)
+        )
+        rejected = check(flag)
+        assert rejected.returncode and "prepared version must increase" in rejected.stderr
+        root_project = projects()[0]
+        major, minor, patch = root_project.version
+        previous = (
+            (major, minor, patch - 1)
+            if patch
+            else (major, minor - 1, 0)
+            if minor
+            else (major - 1, 0, 0)
+        )
+        unchanged = ".".join(map(str, previous))
+        project_file.write_text(
+            original.replace(f'version = "{root_version}"', f'version = "{unchanged}"', 1)
+        )
+        rejected = check(flag)
+        assert (
+            rejected.returncode and "version and changelog must change together" in rejected.stderr
+        )
+    print("Coordinated version CLI admission and strict residual boundaries passed.")
+
+
 def main() -> None:
+    check_coordinated_version_preparation()
     check_native_runtime_boundary()
     check_preview_catalog()
     wheels = []

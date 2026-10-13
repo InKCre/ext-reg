@@ -17,7 +17,7 @@
     "format:check": "pdm run ruff format --check . && prettier --check .",
     "lint": "pdm run ruff check .",
     "registry:check": "pdm run python scripts/check_registry.py",
-    "release:check": "pdm run check:releases && node scripts/check_changesets.mjs",
+    "release:check": "pdm run check:releases ${RELEASE_CHECK_ARGS:-} && node scripts/check_changesets.mjs",
     "release:version": "changeset version",
     "type-check": "pdm run pyright && pnpm --filter @inkcre/extension-runtime-client-web type-check",
     "web:build": "sass --pkg-importer=node --no-source-map --style=compressed web/registry.scss src/inkcre_extension_registry/service/static/registry.css",

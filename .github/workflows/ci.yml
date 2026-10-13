@@ -2,6 +2,7 @@ name: Registry checks
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       base_revision:
@@ -51,6 +52,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       REGISTRY_TEST_DATABASE_URL: postgres://registry:registry-check@localhost:5432/registry_check
+      RELEASE_CHECK_ARGS: ${{ contains(github.event.pull_request.labels.*.name, 'coordinated-sdk-version-preparation') && '--allow-feature-version-preparation' || '' }}
       BASE_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base_revision || '' }}
     steps:
       - name: Checkout

@@ -175,7 +175,7 @@ def affected_projects(paths: set[str], items: tuple[Project, ...]) -> set[str]:
     return affected
 
 
-def check(base: str | None) -> None:
+def check(base: str | None, *, allow_feature_version_preparation: bool = False) -> None:
     items = projects()
     problems = [problem for project in items for problem in validate_fragments(project)]
     if base is None:
@@ -202,12 +202,22 @@ def check(base: str | None) -> None:
         unexpected = sorted(
             path for path in paths if path not in allowed and not path.startswith(tuple(prefixes))
         )
-        if unexpected:
+        if unexpected and not allow_feature_version_preparation:
             problems.append("release PR contains behavior changes: " + ", ".join(unexpected))
         for project in items:
             changelog_changed = relative(project, project.changelog) in paths
             if (project.key in version_changed) != changelog_changed:
                 problems.append(f"{project.key}: version and changelog must change together")
+            if allow_feature_version_preparation and project.key in version_changed:
+                previous = show_version(project, base)
+                if previous is not None and project.version <= previous:
+                    problems.append(f"{project.key}: prepared version must increase")
+                if fragments(project):
+                    problems.append(f"{project.key}: prepared release has unconsumed fragments")
+                version = ".".join(map(str, project.version))
+                first_heading = re.search(r"^## (\S+)", project.changelog.read_text(), re.MULTILINE)
+                if first_heading is None or first_heading.group(1) != version:
+                    problems.append(f"{project.key}: prepared changelog must begin with {version}")
     else:
         affected = affected_projects(paths, items)
         for project in items:
@@ -228,6 +238,12 @@ def check(base: str | None) -> None:
                     problems.append(f"{project.key}: feature PR cannot edit its changelog")
     if problems:
         raise ReleaseError("\n".join(problems))
+    if allow_feature_version_preparation:
+        print(
+            "Coordinated SDK version preparation: behavior paths admitted; "
+            "version/changelog and consumed-fragment checks remain required. "
+            "This does not authorize publication."
+        )
 
 
 def bump(project: Project) -> tuple[int, int, int]:
@@ -295,10 +311,16 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     check_parser = commands.add_parser("check")
     check_parser.add_argument("--base", default=os.environ.get("BASE_REVISION"))
+    check_parser.add_argument("--allow-feature-version-preparation", action="store_true")
     commands.add_parser("prepare")
     args = parser.parse_args()
     try:
-        check(args.base) if args.command == "check" else prepare()
+        if args.command == "check":
+            check(
+                args.base, allow_feature_version_preparation=args.allow_feature_version_preparation
+            )
+        else:
+            prepare()
     except ReleaseError as error:
         print(error, file=sys.stderr)
         return 1
