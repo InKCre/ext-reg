@@ -93,7 +93,6 @@ async def check_documentation(
         json={
             "nickname": "Documentation acceptance",
             "version": "1.0.0",
-            "required_native_formats": ["module_federation"],
             "module_federation": {
                 "source_repository": "https://example.invalid/repo",
                 "source_revision": "revision",

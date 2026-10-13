@@ -11,11 +11,7 @@ from packaging.utils import canonicalize_name
 from semantic_version import NpmSpec, Version
 
 from .contracts import ExtensionReleaseDescriptor, PythonReleaseDescriptor
-from .errors import (
-    ExtensionCompatibilityError,
-    ExtensionRegistryError,
-    ExtensionReleaseUnavailableError,
-)
+from .errors import ExtensionCompatibilityError, ExtensionRegistryError
 
 CORE_HOST_SDK = "core-py"
 ENTRY_POINT_GROUP = "inkcre.core.extensions"
@@ -47,10 +43,6 @@ class RegistryReleaseClient:
         url = urljoin(self.origin, f"v1/extensions/{namespace}/{extension}/releases/{version}")
         try:
             response = requests.get(url, timeout=self.timeout)
-            if response.status_code == 404:
-                raise ExtensionReleaseUnavailableError(404)
-            if response.status_code == 451:
-                raise ExtensionReleaseUnavailableError(451)
             response.raise_for_status()
             release = ExtensionReleaseDescriptor.model_validate(response.json())
         except (requests.RequestException, ValueError, pydantic.ValidationError) as error:

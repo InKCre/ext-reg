@@ -14,19 +14,9 @@ one Python association and one Module Federation association; either is
 optional. Association metadata, filenames, and bytes are immutable. Identical
 retries are idempotent; conflicts require a new Release.
 
-`preparing` 是私有状态。新 Release 必须在准备请求中声明非空、无重复的
-`required_native_formats`，只能包含 `python` 与 `module_federation`；它是精确版本的
-不可变最小交付集合，并不禁止随后追加另一种原生关联。发布要求承诺的关联全部存在，
-以及每个已有关联的产物齐备。对象检查在事务外进行，提交时重新核对关联、文件和快照身份；
-检查期间新增分发会导致冲突，发布者须重试，不能把未经检查的新关联一起发布。
-
-承诺存于 Release 的可空 JSON 列，只在准备与发布者工作台接口暴露，公开
-`ReleaseRecord` 保持原有字段。历史已发布记录保留空值，不推断或回填；它们仍可读取并
-首次追加缺少的分发。历史准备记录需要发布者声明后才能发布。旧发布工具未提供声明时，
-新建 Release 返回 409 并明确要求升级，而不是默认推断当前上传的格式。生产启用此边界前，
-各发布者必须采用新版 Toolkit 或直接发送合法声明。
-
-`published` 与 `yanked` 保留描述和产物；`blocked` 是独立的操作员读拒绝状态。
+`preparing` is private and publication requires at least one admitted native
+Distribution. `published` and `yanked` preserve descriptors and bytes;
+`blocked` is a separate operator read-denial state.
 
 ## Native Admission and Reads
 
@@ -95,3 +85,18 @@ R2 的网络访问不持有数据库事务锁。boto3 的同步调用在线程�
 Publisher 持有 namespace 范围内的发布能力；原始 token 只用于请求认证和运维命令的标准输入，数据库保存 SHA-256。匿名读取只能看到公开或撤回的 release，blocked 状态拒绝描述和原始文件访问。预览服务只获得所属数据库分支和 R2 桶的凭据；云平台控制凭据只属于可信交付控制器。
 
 Registry 验证文件结构与完整性，不证明发布者可信。Python 扩展在受信任 Core 进程中运行，Module Federation Remote 获得宿主页面权限；Host 继续拥有兼容性判断和运行时协商。
+
+## Publishing a Complete Release
+
+Preparing a Release declares its native associations. Publication requires every declared association
+and its stored objects to be complete: a Python association needs at least one wheel and its metadata;
+a Module Federation association needs its manifest and all stored assets. A complete Python wheel
+cannot compensate for a declared but missing Module Federation snapshot, or vice versa. A Release
+with only one declared format remains valid. A producer intending both formats must prepare both
+associations before attempting publication; Registry cannot infer an omitted producer's intent.
+
+Object checks run outside database transactions. Before committing publication, Registry locks the
+Release and rereads association and immutable artifact identities. A concurrent association append
+or artifact upload changes that checked set and rejects publication with a conflict; the publisher
+can retry against the new set. Public Release models, native metadata, and prepare fields remain
+unchanged. Existing published Releases retain the existing first-append rule for missing associations.

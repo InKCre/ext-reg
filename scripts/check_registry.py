@@ -22,7 +22,6 @@ import httpx
 import psycopg
 from check_d1_import import check_import
 from check_documentation import check_documentation
-from check_native_support import check_native_support
 from moto.server import ThreadedMotoServer
 from registry_database import configure_runtime_login
 from tortoise import Tortoise
@@ -62,7 +61,6 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     association = {
         "nickname": "Publisher's extension",
         "version": "1.0.0",
-        "required_native_formats": ["python", "module_federation"],
         "python": {
             **source,
             "project": "check-extension",
@@ -84,33 +82,8 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     await request(
         "POST", "/v1/extensions/other/extension/releases", 403, private=True, json=association
     )
-    old_publisher = {
-        key: value for key, value in association.items() if key != "required_native_formats"
-    }
-    await request("POST", release_path, 409, private=True, json=old_publisher)
-    assert not await db.Release.exists(), "Undeclared preparation must roll back"
-    for formats in ([], ["python", "python"], ["unknown"]):
-        await request(
-            "POST",
-            release_path,
-            422,
-            private=True,
-            json={**association, "required_native_formats": formats},
-        )
     await request("POST", release_path, private=True, json=association)
-    await request(
-        "POST",
-        release_path,
-        private=True,
-        json={**association, "required_native_formats": ["module_federation", "python"]},
-    )
-    await request(
-        "POST",
-        release_path,
-        409,
-        private=True,
-        json={**association, "required_native_formats": ["python"]},
-    )
+    await request("POST", release_path, private=True, json=association)
     await request(
         "POST", release_path, 409, private=True, json={**association, "nickname": "Changed"}
     )
@@ -118,7 +91,6 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     await request("POST", version_path + "/publish", 409, private=True)
     workspace = (await request("GET", "/v1/publisher", private=True)).json()
     assert len(workspace["releases"]) == 1
-    assert workspace["releases"][0]["required_native_formats"] == ["module_federation", "python"]
     assert not workspace["releases"][0]["python_uploaded"]
     assert not workspace["releases"][0]["web_uploaded"]
     row = await db.PythonDistribution.get()
@@ -156,6 +128,7 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
             files={"content": (wheel_name, wheel)},
         )
     await request("POST", version_path + "/publish", 409, private=True)
+    await request("GET", version_path, 404)
     snapshot = archive(
         {
             "mf-manifest.json": json.dumps(
@@ -252,7 +225,6 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
             json={
                 "nickname": association["nickname"],
                 "version": f"1.{minor}.0",
-                "required_native_formats": ["module_federation"],
                 "module_federation": association["module_federation"],
             },
         )
@@ -310,12 +282,7 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
         "POST",
         release_path,
         private=True,
-        json={
-            **association,
-            "version": "4.0.0",
-            "python": None,
-            "required_native_formats": ["module_federation"],
-        },
+        json={**association, "version": "4.0.0", "python": None},
     )
     inspected = inspect_module_federation_snapshot(
         staged_zip,
@@ -395,89 +362,9 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
         files={"content": ("staging.zip", changed_zip)},
     )
 
-    await db.Release.filter(version="1.0.0").update(state="blocked")
-    await request("GET", version_path, 451)
-    await request("GET", package_path, 451)
-    await request("GET", web_path, 451)
-    for path in (package_path, package_path + ".metadata", web_path):
-        for method in ("GET", "HEAD"):
-            denied = await request(method, path, 451, headers={"If-None-Match": "*"})
-            assert denied.headers["cache-control"] == "no-store"
-    assert "check-extension" not in (await request("GET", "/simple/")).text
-    await check_documentation(client, token, other_token, artifacts)
-    # A legacy published release remains readable and accepts its first missing
-    # association without retroactively inventing a publication commitment.
-    legacy_version = "6.0.0"
-    legacy_path = release_path + "/" + legacy_version
-    mf_only = {
-        **association,
-        "version": legacy_version,
-        "python": None,
-        "required_native_formats": ["module_federation"],
-    }
-    await request("POST", release_path, private=True, json=mf_only)
-    await request(
-        "POST",
-        legacy_path + "/module-federation",
-        private=True,
-        files={"content": ("legacy.zip", snapshot)},
-    )
-    await request("POST", legacy_path + "/publish", private=True)
-    await db.Release.filter(version=legacy_version).update(required_native_formats=None)
-    record = (await request("GET", legacy_path)).json()
-    assert record["module_federation"] is not None and record["python"] is None
-    assert "required_native_formats" not in record
-    await request(
-        "POST",
-        release_path,
-        private=True,
-        json={**association, "version": legacy_version, "module_federation": None},
-    )
-    legacy = await db.Release.get(version=legacy_version)
-    assert legacy.required_native_formats is None
-    assert await db.PythonDistribution.filter(release=legacy).exists()
-    await request(
-        "POST",
-        release_path,
-        409,
-        private=True,
-        json={
-            **association,
-            "version": legacy_version,
-            "python": {**association["python"], "source_revision": "changed"},
-        },
-    )
-    # A historical preparing release needs a declaration before publication.
-    waiting_path = release_path + "/7.0.0"
-    waiting = {**mf_only, "version": "7.0.0"}
-    await request("POST", release_path, private=True, json=waiting)
-    await db.Release.filter(version="7.0.0").update(required_native_formats=None)
-    await request(
-        "POST",
-        waiting_path + "/module-federation",
-        private=True,
-        files={"content": ("waiting.zip", snapshot)},
-    )
-    await request("POST", waiting_path + "/publish", 409, private=True)
-    await request("POST", release_path, private=True, json=waiting)
-    await request("POST", waiting_path + "/publish", private=True)
-    assert (await request("GET", waiting_path)).json()["python"] is None
-    # A second association may be appended beyond a singleton minimum, but its
-    # missing bytes must still prevent publication.
-    extra = {**association, "version": "8.0.0", "required_native_formats": ["module_federation"]}
-    await request("POST", release_path, private=True, json=extra)
-    extra_path = release_path + "/8.0.0"
-    await request(
-        "POST",
-        extra_path + "/module-federation",
-        private=True,
-        files={"content": ("extra.zip", snapshot)},
-    )
-    await request("POST", extra_path + "/publish", 409, private=True)
-    # Checking objects outside the lock must not publish an association appended
-    # during those checks, because its bytes were never examined.
+    # An association appended during object checks must not become public unchecked.
     racing_path = release_path + "/9.0.0"
-    racing = {**mf_only, "version": "9.0.0"}
+    racing = {**association, "version": "9.0.0", "python": None}
     await request("POST", release_path, private=True, json=racing)
     await request(
         "POST",
@@ -493,75 +380,25 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
         if not appended:
             appended = True
             await request(
-                "POST",
-                release_path,
-                private=True,
-                json={
-                    **association,
-                    "version": "9.0.0",
-                    "required_native_formats": ["module_federation"],
-                },
+                "POST", release_path, private=True, json={**association, "version": "9.0.0"}
             )
         return await original_artifact_head(key)
 
     with patch.object(artifacts, "head", append_during_object_check):
-        await request("POST", racing_path + "/publish", 409, private=True)
+        conflict = await request("POST", racing_path + "/publish", 409, private=True)
+        assert "changed during publication" in conflict.json()["detail"]
     await request("GET", racing_path, 404)
-    missing = {
-        **mf_only,
-        "version": "10.0.0",
-        "required_native_formats": ["python", "module_federation"],
-    }
-    missing_path = release_path + "/10.0.0"
-    await request("POST", release_path, private=True, json=missing)
-    await request(
-        "POST",
-        missing_path + "/module-federation",
-        private=True,
-        files={"content": ("missing.zip", snapshot)},
-    )
-    await request("POST", missing_path + "/publish", 409, private=True)
-    # A later version can deliberately publish only Python.
-    python_version = "11.0.0"
-    python_path = release_path + "/" + python_version
-    await request(
-        "POST",
-        release_path,
-        private=True,
-        json={
-            **association,
-            "version": python_version,
-            "module_federation": None,
-            "required_native_formats": ["python"],
-        },
-    )
-    with zipfile.ZipFile(io.BytesIO(wheel)) as bundle:
-        python_wheel = archive(
-            {
-                name.replace("1.0.0", python_version): bundle.read(name)
-                .decode()
-                .replace("1.0.0", python_version)
-                for name in bundle.namelist()
-            }
-        )
-    await request(
-        "POST",
-        "/legacy/",
-        private=True,
-        data={
-            ":action": "file_upload",
-            "protocol_version": "1",
-            "name": "check-extension",
-            "version": python_version,
-            "filetype": "bdist_wheel",
-            "metadata_version": "2.3",
-            "sha256_digest": hashlib.sha256(python_wheel).hexdigest(),
-        },
-        files={"content": (f"check_extension-{python_version}-py3-none-any.whl", python_wheel)},
-    )
-    await request("POST", python_path + "/publish", private=True)
-    python_record = (await request("GET", python_path)).json()
-    assert python_record["python"] is not None and python_record["module_federation"] is None
+
+    await db.Release.filter(version="1.0.0").update(state="blocked")
+    await request("GET", version_path, 451)
+    await request("GET", package_path, 451)
+    await request("GET", web_path, 451)
+    for path in (package_path, package_path + ".metadata", web_path):
+        for method in ("GET", "HEAD"):
+            denied = await request(method, path, 451, headers={"If-None-Match": "*"})
+            assert denied.headers["cache-control"] == "no-store"
+    assert "check-extension" not in (await request("GET", "/simple/")).text
+    await check_documentation(client, token, other_token, artifacts)
     await db.Credential.all().update(disabled=True)
     await request("GET", "/v1/publisher", 401, private=True)
 
@@ -583,7 +420,6 @@ def check_runtime_permissions(url: str) -> None:
 
 
 async def main() -> None:
-    check_native_support()
     owner_url = os.environ["REGISTRY_TEST_DATABASE_URL"]
     config = database_config(owner_url)
     async with TortoiseContext() as context:

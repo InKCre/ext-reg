@@ -1,15 +1,7 @@
 import type { ModuleFederation } from '@module-federation/runtime'
 import { ExtensionModel } from '@inkcre/core'
 import type { ReleaseRecord } from './generated/types.gen'
-import {
-  asError,
-  combinedError,
-  ExtensionEnabledError,
-  WebExtensionRuntimeError,
-  NativeDistributionSupportChangeError,
-  RegistryReleaseUnavailableError,
-  type NativeDistributionFormat,
-} from './errors'
+import { asError, combinedError, ExtensionEnabledError, WebExtensionRuntimeError } from './errors'
 import { loadExtensionModule, type WebExtensionModule, WebExtensionModuleHandle } from './module'
 import { RegistryReleaseReader } from './registry'
 
@@ -22,11 +14,6 @@ export interface ExtensionManagerOptions {
 export interface InstallExtensionInput {
   readonly name: string
   readonly version: string
-}
-
-export interface ChangeExtensionVersionOptions {
-  readonly expectedInstalledVersion?: string
-  readonly allowSupportChange?: boolean
 }
 
 export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule> {
@@ -59,52 +46,11 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     })
   }
 
-  async changeVersion(
-    name: string,
-    version: string,
-    options: ChangeExtensionVersionOptions = {},
-  ): Promise<ExtensionModel> {
+  async changeVersion(name: string, version: string): Promise<ExtensionModel> {
     const extension = await this.#requireInstalled(name)
     this.#assertStoppedAndDisabled(extension)
-    if (options.allowSupportChange && options.expectedInstalledVersion === undefined) {
-      throw new TypeError('Support change confirmation requires expectedInstalledVersion.')
-    }
-    if (
-      options.expectedInstalledVersion !== undefined &&
-      extension.version !== options.expectedInstalledVersion
-    ) {
-      throw new WebExtensionRuntimeError(`${name} changed version after confirmation.`)
-    }
     if (extension.version === version) return extension
     const release = await this.#releases.getRelease(name, version, true)
-    let oldRelease: ReleaseRecord | null = null
-    try {
-      oldRelease = await this.#releases.getRelease(name, extension.version, false)
-    } catch (error) {
-      if (!(error instanceof RegistryReleaseUnavailableError)) throw error
-      if (!options.allowSupportChange) {
-        throw new NativeDistributionSupportChangeError(
-          name,
-          extension.version,
-          version,
-          [],
-          'unavailable',
-        )
-      }
-    }
-    if (oldRelease !== null) {
-      const formats: NativeDistributionFormat[] = ['python', 'module_federation']
-      const removed = formats.filter((format) => oldRelease[format] && !release[format])
-      if (removed.length && !options.allowSupportChange) {
-        throw new NativeDistributionSupportChangeError(
-          name,
-          extension.version,
-          version,
-          removed,
-          'reduced',
-        )
-      }
-    }
     return extension.changeVersion(release.version, release.nickname)
   }
 

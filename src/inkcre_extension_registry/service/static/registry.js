@@ -211,14 +211,6 @@ if ($('#connect-form')) {
         .filter(Boolean)
         .join(' · ')
       info.append(element('p', uploaded || `${distributions} declared · awaiting upload`))
-      const required = release.required_native_formats
-      if (required)
-        info.append(
-          element(
-            'p',
-            `Required: ${required.map((format) => (format === 'python' ? 'Python' : 'Web')).join(' + ')}`,
-          ),
-        )
       const actions = element('div', null, 'release-actions')
       const button = (label, kind) => {
         const node = element('button', label, 'button')
@@ -230,19 +222,8 @@ if ($('#connect-form')) {
       if (release.state === 'preparing') {
         if (release.module_federation) button('Upload Web ZIP', 'module-federation')
         const publish = button('Publish', 'publish')
-        const uploadedFormats = {
-          python: release.python_uploaded,
-          module_federation: release.web_uploaded,
-        }
-        publish.disabled =
-          !required?.length ||
-          required.some((format) => !uploadedFormats[format]) ||
-          Boolean(release.python && !release.python_uploaded) ||
-          Boolean(release.module_federation && !release.web_uploaded)
-        if (publish.disabled)
-          publish.title = required?.length
-            ? 'Upload every declared distribution before publishing'
-            : 'Declare required formats with the publisher toolkit'
+        publish.disabled = !release.python_uploaded && !release.web_uploaded
+        if (publish.disabled) publish.title = 'Upload a distribution before publishing'
       }
       if (release.state === 'published') {
         const link = element('a', 'View release ↗', 'button')

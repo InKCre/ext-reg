@@ -97,11 +97,6 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: str = Field(..., title="Manifest Url")
 
 
-class RequiredNativeFormat(Enum):
-    python = "python"
-    module_federation = "module_federation"
-
-
 class State(Enum):
     preparing = "preparing"
     published = "published"
@@ -246,9 +241,6 @@ class PrepareReleaseRequest(BaseModel):
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
     python: PythonAssociationInput | None = None
-    required_native_formats: list[RequiredNativeFormat] | None = Field(
-        None, title="Required Native Formats"
-    )
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
         min_length=5,
@@ -269,9 +261,6 @@ class PublisherRelease(BaseModel):
     nickname: str = Field(..., title="Nickname")
     python: PythonDistribution | None = None
     python_uploaded: bool = Field(..., title="Python Uploaded")
-    required_native_formats: list[RequiredNativeFormat] | None = Field(
-        None, title="Required Native Formats"
-    )
     state: State = Field(..., title="State")
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",

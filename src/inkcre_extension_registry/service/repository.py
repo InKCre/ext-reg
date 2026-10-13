@@ -117,7 +117,6 @@ def _release_query():
 
 def _publication_snapshot(row: db.Release) -> tuple:
     return (
-        tuple(row.required_native_formats or []),
         (row.python.pk, tuple(sorted(file.pk for file in row.python.files)))
         if row.python is not None
         else None,
@@ -222,22 +221,6 @@ class RegistryRepository:
                     extension=extension, version=request.version
                 )
                 release = await db.Release.filter(pk=release.pk).select_for_update().get()
-                required: list[Literal["python", "module_federation"]] | None = (
-                    sorted(request.required_native_formats)
-                    if request.required_native_formats is not None
-                    else None
-                )
-                if _created and required is None:
-                    raise RegistryStateError(
-                        "new Releases require explicit required_native_formats; "
-                        "upgrade the publisher"
-                    )
-                if release.required_native_formats is not None:
-                    if required is not None and required != release.required_native_formats:
-                        raise RegistryConflictError("Release native format commitment is immutable")
-                elif release.state == "preparing" and required is not None:
-                    release.required_native_formats = required
-                    await release.save(update_fields=["required_native_formats"])
                 for model, association, values, label in (
                     (
                         db.PythonDistribution,
@@ -295,11 +278,6 @@ class RegistryRepository:
         records = [
             PublisherRelease(
                 **_descriptor(row, public=False).model_dump(),
-                required_native_formats=(
-                    tuple(row.required_native_formats)
-                    if row.required_native_formats is not None
-                    else None
-                ),
                 python_uploaded=row.python is not None and bool(list(row.python.files)),
                 web_uploaded=(
                     row.module_federation is not None
@@ -350,10 +328,6 @@ class RegistryRepository:
         if row.state in {"yanked", "blocked"}:
             raise RegistryStateError(f"cannot publish a {row.state} Release")
         # Network checks never hold a database transaction/connection lock.
-        if row.state == "preparing" and row.required_native_formats is None:
-            raise RegistryStateError(
-                "declare required_native_formats before publishing this Release"
-            )
         if row.state == "preparing" and not await self._release_objects_available(row):
             raise RegistryStateError(
                 "Release native Distribution objects are not completely available"
@@ -380,11 +354,8 @@ class RegistryRepository:
         return result
 
     async def _release_objects_available(self, row: db.Release) -> bool:
-        required = set(row.required_native_formats or [])
         files = list(row.python.files) if row.python is not None else []
-        if ("python" in required and row.python is None) or (row.python is not None and not files):
-            return False
-        if "module_federation" in required and row.module_federation is None:
+        if row.python is not None and not files:
             return False
         for file in files:
             archive = await self.artifacts.head(file.r2_key)

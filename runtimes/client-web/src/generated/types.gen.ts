@@ -215,10 +215,6 @@ export type PrepareReleaseRequest = {
   nickname: string
   python?: PythonAssociationInput | null
   /**
-   * Required Native Formats
-   */
-  required_native_formats?: Array<'python' | 'module_federation'> | null
-  /**
    * Version
    */
   version: string
@@ -242,10 +238,6 @@ export type PublisherRelease = {
    * Python Uploaded
    */
   python_uploaded: boolean
-  /**
-   * Required Native Formats
-   */
-  required_native_formats?: Array<'python' | 'module_federation'> | null
   /**
    * State
    */

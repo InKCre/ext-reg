@@ -176,27 +176,6 @@
       ],
       "default": null
     },
-    "required_native_formats": {
-      "anyOf": [
-        {
-          "items": {
-            "enum": [
-              "python",
-              "module_federation"
-            ],
-            "type": "string"
-          },
-          "maxItems": 2,
-          "minItems": 1,
-          "type": "array"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Required Native Formats"
-    },
     "version": {
       "maxLength": 128,
       "minLength": 5,

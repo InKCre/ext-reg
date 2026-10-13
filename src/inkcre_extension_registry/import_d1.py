@@ -88,10 +88,6 @@ async def target_snapshot() -> dict[str, list[dict]]:
             if "namespace_id" in row:
                 row["namespace"] = row.pop("namespace_id")
             if table == "releases":
-                if row.pop("required_native_formats") is not None:
-                    raise ValueError(
-                        "Legacy D1 verification cannot omit a declared Release commitment"
-                    )
                 row.pop("id")
                 row["extension_name"] = row.pop("extension_id")
             if "release_id" in row:

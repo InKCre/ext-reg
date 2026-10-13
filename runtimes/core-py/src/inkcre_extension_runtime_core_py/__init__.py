@@ -8,15 +8,12 @@ from .errors import (
     ExtensionCompatibilityError,
     ExtensionEntryPointError,
     ExtensionLifecycleError,
-    ExtensionNativeSupportChangeError,
     ExtensionNotInstalledError,
     ExtensionRegistryError,
-    ExtensionReleaseUnavailableError,
     ExtensionRuntimeError,
     ExtensionStateConflictError,
 )
 from .manager import ExtensionManager, RunningExtension
-from .support import NativeDistributionFormat, require_native_support_preserved
 
 if typing.TYPE_CHECKING:
     from .publication import PublicHTTPRoute
@@ -30,16 +27,12 @@ __all__ = [
     "ExtensionEntryPointError",
     "ExtensionLifecycleError",
     "ExtensionManager",
-    "ExtensionNativeSupportChangeError",
     "ExtensionNotInstalledError",
     "ExtensionRegistryError",
-    "ExtensionReleaseUnavailableError",
     "ExtensionRuntimeError",
     "ExtensionStateConflictError",
-    "NativeDistributionFormat",
     "PublicHTTPRoute",
     "RunningExtension",
-    "require_native_support_preserved",
 ]
 
 

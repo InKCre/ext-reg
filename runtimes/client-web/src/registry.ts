@@ -10,11 +10,7 @@ import {
   zListExtensionsV1ExtensionsGetResponse,
   zReleaseRecord,
 } from './generated/zod.gen'
-import {
-  HostSdkCompatibilityError,
-  RegistryReleaseError,
-  RegistryReleaseUnavailableError,
-} from './errors'
+import { HostSdkCompatibilityError, RegistryReleaseError } from './errors'
 
 const EXTENSION_NAME =
   /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
@@ -133,9 +129,6 @@ export class RegistryReleaseReader {
   async #getJson(url: URL): Promise<unknown> {
     const response = await this.#fetch(url, { headers: { Accept: 'application/json' } })
     if (!response.ok) {
-      if (response.status === 404 || response.status === 451) {
-        throw new RegistryReleaseUnavailableError(response.status)
-      }
       throw new RegistryReleaseError(
         `Extension Registry request failed with HTTP ${response.status}.`,
       )

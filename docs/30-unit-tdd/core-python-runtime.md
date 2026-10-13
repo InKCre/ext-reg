@@ -57,15 +57,3 @@ Extension 启动期间再次启动会失败。任何失败或取消都会撤销�
 Core async-only API。采用方必须分别声明 Runtime 包版本与 Core Host SDK 版本窗口，并验证真实
 Host 的事务实现。Runtime 层的 scripted 验证可证明 await、typed round trip 和 publication 清理，
 不能替代 Core 对 PostgreSQL 提交、回滚及行锁的验证。
-
-精确版本变更的支持保留规则由公开的 `require_native_support_preserved` 拥有。
-它接收旧、新版本的实际原生格式集合；旧集合为空值只表示发行明确不存在或被封禁，
-不能用于表示网络故障。默认减少支持或无法核对旧支持会抛出
-`ExtensionNativeSupportChangeError`，其 `reason` 为 `reduced` 或 `unavailable`。
-调用者明确确认时必须提供原版本 `expected_installed_version` 和
-`allow_support_change=True`；临时 Registry 错误仍应传递给调用者。
-
-`ExtensionManager.install` 使用同一规则，版本变更要求全部 Peer 停用并保留当前进程
-已加载版本的重启约束。最终 Host 模型写入收到 `expected_version`，Host 必须在自身事务
-中核对旧版本与空启用集合，而不是清除启用意图或只依赖预检查。独立 Core 应用可以在其
-安装服务中消费 helper，并自行拥有 Registry 读取和原子写入，不必调用此 Manager。
