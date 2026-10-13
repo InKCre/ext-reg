@@ -28,6 +28,10 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
   readonly #warn: (message: string) => void
   readonly #running = new Map<string, WebExtensionModuleHandle<T>>()
   readonly #errors = new Map<string, Error>()
+  readonly #intents = new Map<string, Promise<unknown>>()
+  readonly #operations = new Map<string, Promise<unknown>>()
+  readonly #startups = new Set<Promise<void>>()
+  #closing = false
 
   constructor(options: ExtensionManagerOptions) {
     if (!options.peerId) throw new TypeError('An exact runtime Peer ID is required.')
@@ -50,19 +54,22 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     peerId: string,
   ): Promise<ExtensionParticipationModel> {
     this.#assertPeer(peerId)
-    const current = await ExtensionParticipationModel.get(peerId, input.name)
-    if (current) {
-      if (current.distribution === 'module_federation' && current.version === input.version)
-        return current
-      return this.changeVersion(input.name, input.version, peerId)
-    }
-    const release = await this.#releases.get(input.name, input.version, true)
-    await ExtensionModel.install({ name: release.name, nickname: release.nickname })
-    return ExtensionParticipationModel.select({
-      peerId,
-      name: release.name,
-      distribution: 'module_federation',
-      version: release.version,
+    this.#assertOpen()
+    return this.#ordered(this.#operations, input.name, async () => {
+      const current = await ExtensionParticipationModel.get(peerId, input.name)
+      if (current) {
+        if (current.distribution === 'module_federation' && current.version === input.version)
+          return current
+        return this.#changeVersion(input.name, input.version, peerId)
+      }
+      const release = await this.#releases.get(input.name, input.version, true)
+      await ExtensionModel.install({ name: release.name, nickname: release.nickname })
+      return ExtensionParticipationModel.select({
+        peerId,
+        name: release.name,
+        distribution: 'module_federation',
+        version: release.version,
+      })
     })
   }
 
@@ -72,6 +79,15 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     peerId: string,
   ): Promise<ExtensionParticipationModel> {
     this.#assertPeer(peerId)
+    this.#assertOpen()
+    return this.#ordered(this.#operations, name, () => this.#changeVersion(name, version, peerId))
+  }
+
+  async #changeVersion(
+    name: string,
+    version: string,
+    peerId: string,
+  ): Promise<ExtensionParticipationModel> {
     const current = await this.#requireParticipation(name, peerId)
     if (this.#running.has(name)) throw new ExtensionEnabledError(name)
     const release = await this.#releases.get(name, version, true)
@@ -90,9 +106,12 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
 
   async uninstall(name: string, peerId: string): Promise<void> {
     this.#assertPeer(peerId)
-    if (this.#running.has(name)) throw new ExtensionEnabledError(name)
-    await (await this.#requireParticipation(name, peerId)).remove()
-    this.#errors.delete(name)
+    this.#assertOpen()
+    await this.#ordered(this.#operations, name, async () => {
+      if (this.#running.has(name)) throw new ExtensionEnabledError(name)
+      await (await this.#requireParticipation(name, peerId)).remove()
+      this.#errors.delete(name)
+    })
   }
 
   async getStatus(name: string, peerId: string = this.#peerId): Promise<ExtensionRuntimeStatus> {
@@ -138,69 +157,63 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
 
   async enable(name: string, peerId: string): Promise<ExtensionParticipationModel> {
     this.#assertPeer(peerId)
-    let participation = await this.#requireParticipation(name, peerId)
-    if (participation.distribution === null) {
-      await this.#releases.get(name, participation.version, false)
-      participation = await ExtensionParticipationModel.select({
-        peerId,
-        name,
-        distribution: 'module_federation',
-        version: participation.version,
-        expectedVersion: participation.version,
-      })
-    }
-    const handle = await this.#start(participation)
-    try {
-      return await participation.setEnabled(true)
-    } catch (error) {
+    this.#assertOpen()
+    await this.#ordered(this.#intents, name, async () => {
+      const participation = await this.#resolveLegacy(
+        await this.#requireParticipation(name, peerId),
+      )
+      await participation.setEnabled(true)
+    })
+    return this.#ordered(this.#operations, name, async () => {
       try {
-        await handle.dispose()
-        this.#running.delete(name)
-      } catch (cleanupError) {
-        throw combinedError('Enable persistence and runtime compensation failed.', [
-          asError(error),
-          asError(cleanupError),
-        ])
+        const current = await this.#restore(name, peerId)
+        if (!current) throw new WebExtensionRuntimeError('The Peer selection was removed.')
+        return current
+      } catch (error) {
+        this.#errors.set(name, asError(error))
+        throw error
       }
-      throw error
-    }
+    })
   }
 
   async disable(name: string, peerId: string): Promise<ExtensionParticipationModel> {
     this.#assertPeer(peerId)
-    const participation = await this.#requireParticipation(name, peerId)
-    const handle = this.#running.get(name)
-    if (handle) {
-      await handle.dispose()
-      this.#running.delete(name)
-    }
-    try {
-      return await participation.setEnabled(false)
-    } catch (error) {
-      if (handle) {
-        try {
-          await this.#start(participation)
-        } catch (restartError) {
-          throw combinedError('Disable persistence and runtime restoration failed.', [
-            asError(error),
-            asError(restartError),
-          ])
-        }
+    this.#assertOpen()
+    // Commit the command before waiting for an in-flight restore to finish.
+    await this.#ordered(this.#intents, name, async () => {
+      await (await this.#requireParticipation(name, peerId)).setEnabled(false)
+    })
+    return this.#ordered(this.#operations, name, async () => {
+      try {
+        await this.#stop(name)
+        this.#errors.delete(name)
+        return await this.#requireParticipation(name, peerId)
+      } catch (error) {
+        this.#errors.set(name, asError(error))
+        throw error
       }
-      throw error
-    }
+    })
   }
 
   async startup(peerId: string): Promise<void> {
     this.#assertPeer(peerId)
+    this.#assertOpen()
+    const task = this.#restoreAll(peerId)
+    this.#startups.add(task)
+    void task.finally(() => this.#startups.delete(task)).catch(() => {})
+    return task
+  }
+
+  async #restoreAll(peerId: string): Promise<void> {
     const failures: Error[] = []
-    for (const participation of await ExtensionParticipationModel.list(peerId)) {
-      if (!participation.enabled) continue
+    const rows = await ExtensionParticipationModel.list(peerId)
+    const names = new Set([...rows.map((row) => row.name), ...this.#running.keys()])
+    for (const name of names) {
       try {
-        await this.enable(participation.name, peerId)
+        await this.#ordered(this.#operations, name, () => this.#restore(name, peerId))
       } catch (error) {
         const failure = asError(error)
-        this.#errors.set(participation.name, failure)
+        this.#errors.set(name, failure)
         failures.push(failure)
       }
     }
@@ -208,40 +221,138 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
   }
 
   async shutdown(): Promise<void> {
-    const failures: Error[] = []
-    for (const [name, handle] of this.#running) {
-      try {
-        await handle.dispose()
-        this.#running.delete(name)
-      } catch (error) {
-        failures.push(asError(error))
+    this.#closing = true
+    try {
+      // Pending list/intent work must not activate after shutdown has returned.
+      while (this.#startups.size || this.#intents.size || this.#operations.size) {
+        await Promise.allSettled([
+          ...this.#startups,
+          ...this.#intents.values(),
+          ...this.#operations.values(),
+        ])
       }
+      const failures: Error[] = []
+      for (const name of this.#running.keys()) {
+        try {
+          await this.#stop(name)
+        } catch (error) {
+          failures.push(asError(error))
+        }
+      }
+      if (failures.length) throw combinedError('Web Extension shutdown failed.', failures)
+    } finally {
+      this.#closing = false
     }
-    if (failures.length) throw combinedError('Web Extension shutdown failed.', failures)
   }
 
-  async #start(extension: ExtensionParticipationModel): Promise<WebExtensionModuleHandle<T>> {
-    const running = this.#running.get(extension.name)
-    if (running) {
-      if (running.version !== extension.version)
-        throw new WebExtensionRuntimeError('A different exact version is running.')
-      return running
-    }
-    if (extension.distribution !== 'module_federation')
+  async #stop(name: string): Promise<void> {
+    const handle = this.#running.get(name)
+    if (!handle) return
+    await handle.dispose()
+    this.#running.delete(name)
+  }
+
+  async #resolveLegacy(row: ExtensionParticipationModel): Promise<ExtensionParticipationModel> {
+    if (row.distribution === 'module_federation') return row
+    if (row.distribution !== null)
       throw new WebExtensionRuntimeError('The selected distribution cannot run in this Peer.')
-    const release = await this.#releases.get(extension.name, extension.version, false)
+    await this.#releases.get(row.name, row.version, false)
+    return ExtensionParticipationModel.select({
+      peerId: row.peer_id,
+      name: row.name,
+      distribution: 'module_federation',
+      version: row.version,
+      expectedVersion: row.version,
+    })
+  }
+
+  #matches(
+    current: ExtensionParticipationModel | null,
+    selected: ExtensionParticipationModel,
+  ): boolean {
+    return (
+      !this.#closing &&
+      current !== null &&
+      current.enabled &&
+      current.distribution === 'module_federation' &&
+      current.version === selected.version &&
+      current.distribution === selected.distribution
+    )
+  }
+
+  async #restore(name: string, peerId: string): Promise<ExtensionParticipationModel | null> {
+    let selected = await ExtensionParticipationModel.get(peerId, name)
+    const running = this.#running.get(name)
+    if (running) {
+      if (
+        !this.#closing &&
+        selected?.enabled &&
+        selected.distribution === 'module_federation' &&
+        selected.version === running.version
+      )
+        return selected
+      await this.#stop(name)
+    }
+    if (this.#closing || !selected?.enabled) return selected
+    selected = await this.#resolveLegacy(selected)
+    let current = await ExtensionParticipationModel.get(peerId, name)
+    if (!this.#matches(current, selected)) return current
+    const release = await this.#releases.get(name, selected.version, false)
     this.#warnIfYanked(release)
-    const distribution = release.module_federation!
     const handle = await loadExtensionModule<T>(
       this.#moduleFederation,
-      extension.name,
-      extension.version,
-      distribution.manifest_url,
+      name,
+      selected.version,
+      release.module_federation!.manifest_url,
     )
-    await handle.activate()
-    this.#running.set(extension.name, handle)
-    this.#errors.delete(extension.name)
-    return handle
+    try {
+      current = await ExtensionParticipationModel.get(peerId, name)
+      if (!this.#matches(current, selected)) {
+        await handle.dispose()
+        return current
+      }
+      await handle.activate()
+      // Other admitted clients may change a sleeping Peer directly in the shared store.
+      // A local queue does not claim ownership of their durable intent.
+      current = await ExtensionParticipationModel.get(peerId, name)
+      if (!this.#matches(current, selected)) {
+        await handle.dispose()
+        return current
+      }
+    } catch (startError) {
+      try {
+        await handle.dispose()
+      } catch (cleanupError) {
+        throw combinedError('Extension restore and compensation failed.', [
+          asError(startError),
+          asError(cleanupError),
+        ])
+      }
+      throw startError
+    }
+    this.#running.set(name, handle)
+    this.#errors.delete(name)
+    return current
+  }
+
+  #ordered<R>(
+    queue: Map<string, Promise<unknown>>,
+    name: string,
+    work: () => Promise<R>,
+  ): Promise<R> {
+    const previous = queue.get(name) ?? Promise.resolve()
+    const task = previous.catch(() => {}).then(work)
+    queue.set(name, task)
+    void task
+      .finally(() => {
+        if (queue.get(name) === task) queue.delete(name)
+      })
+      .catch(() => {})
+    return task
+  }
+
+  #assertOpen(): void {
+    if (this.#closing) throw new WebExtensionRuntimeError('The runtime is shutting down.')
   }
 
   async #requireInstalled(name: string): Promise<ExtensionModel> {

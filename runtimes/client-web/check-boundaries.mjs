@@ -241,6 +241,115 @@ try {
     await manager.shutdown()
     ExtensionParticipationModel.get = originalGet
   }
+  // Restore consumes durable intent; delayed modules cannot resurrect revoked selections.
+  const originalList = ExtensionParticipationModel.list
+  const deferred = () => {
+    let resolve
+    const promise = new Promise((done) => {
+      resolve = done
+    })
+    return { promise, resolve }
+  }
+  try {
+    for (const scenario of [
+      'pending-load-disable',
+      'disable-command',
+      'external-disable',
+      'external-pin',
+      'shutdown',
+    ]) {
+      const entered = deferred()
+      const releaseActivation = deferred()
+      const falseSaved = deferred()
+      const events = []
+      const writes = []
+      const rows = new Map([
+        [current, { ...selection }],
+        [target, { ...selection, peer_id: target }],
+      ])
+      ExtensionParticipationModel.get = async (peerId) => {
+        const snapshot = { ...rows.get(peerId) }
+        snapshot.setEnabled = async (enabled) => {
+          writes.push(enabled)
+          rows.get(peerId).enabled = enabled
+          if (!enabled) falseSaved.resolve()
+          return { ...rows.get(peerId) }
+        }
+        return snapshot
+      }
+      ExtensionParticipationModel.list = async (peerId) => [
+        await ExtensionParticipationModel.get(peerId),
+      ]
+      const runtime = new ExtensionManager({
+        peerId: current,
+        releases,
+        moduleFederation: {
+          registerRemotes() {},
+          async loadRemote() {
+            if (scenario === 'pending-load-disable') {
+              entered.resolve()
+              await releaseActivation.promise
+            }
+            return {
+              async initialize() {
+                events.push('initialize')
+                entered.resolve()
+                await releaseActivation.promise
+              },
+              activate() {
+                events.push('activate')
+              },
+              deactivate() {
+                events.push('deactivate')
+              },
+              dispose() {
+                events.push('dispose')
+              },
+            }
+          },
+        },
+      })
+      const restore = runtime.startup(current)
+      await entered.promise
+      assert.deepEqual(writes, [], 'startup must not rewrite intent')
+      let command
+      if (scenario === 'disable-command' || scenario === 'pending-load-disable') {
+        command = runtime.disable(selection.name, current)
+        await falseSaved.promise
+        assert.equal(runtime.isRunning(selection.name), false)
+      } else if (scenario === 'external-disable') {
+        rows.get(current).enabled = false
+      } else if (scenario === 'external-pin') {
+        rows.get(current).version = '1.2.0'
+      } else {
+        command = runtime.shutdown()
+      }
+      releaseActivation.resolve()
+      await restore
+      await command
+      assert.equal(runtime.isRunning(selection.name), false, scenario)
+      assert.deepEqual(
+        events,
+        scenario === 'pending-load-disable'
+          ? ['dispose']
+          : ['initialize', 'activate', 'deactivate', 'dispose'],
+        scenario,
+      )
+      assert.deepEqual(
+        writes,
+        scenario === 'disable-command' || scenario === 'pending-load-disable' ? [false] : [],
+        scenario,
+      )
+      assert.equal(rows.get(current).enabled, !scenario.includes('disable'), scenario)
+      assert.equal(rows.get(current).version, scenario === 'external-pin' ? '1.2.0' : '1.10.0')
+      assert.equal(rows.get(target).enabled, true)
+      assert.equal(rows.get(target).version, '1.10.0')
+      await runtime.shutdown()
+    }
+  } finally {
+    ExtensionParticipationModel.get = originalGet
+    ExtensionParticipationModel.list = originalList
+  }
   assert.deepEqual(
     (await listAdvertisedExtensionManagementPeers()).map(({ id }) => id),
     [target, current],

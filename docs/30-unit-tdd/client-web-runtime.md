@@ -15,3 +15,7 @@ Core SDK 尚未提供独立发布产物，因此开发依赖固定 client-web �
 Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选择 distribution；返回坐标和唯一原生关联均须匹配。安装将共享 Extension 身份与当前 Peer 的精确参与选择分别保存，enable/startup 读取当前 Peer 选择，不追随 latest，不修改其他 Peer 或清理业务 state。旧未知分发仅用当前浏览器支持的 MF 查询同一精确版本，缺失时失败而不替换版本。
 
 管理能力为 `core.extension.management.v2`。`select` 明确指定分发与版本，`status` 返回目标 Peer 的能力和实际运行事实；所有响应采用 `{peer_id,supported_distributions,extensions}`，逐行包含精确选择和实际 loaded_version/running。Runtime SDK 校验目标身份与每行身份，保留原 PeerManager 的传输失败分类，不能由持久化 enabled 推断正在运行。删除参与记录保留部署配置和业务 state。
+
+显式 enable/disable 先按同一 Host、同一 Extension 的命令顺序保存 enabled 意图，再串行执行模块生命周期。disable 在等待在途启动之前保存 false，并在资源清理完成后返回。startup 只恢复已有意图，成功或失败都不反写 enabled；初始化失败保留意图及错误，允许后续恢复重试。
+
+恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回、分发或版本改变，迟到的模块会执行 dispose，不能登记为 running。shutdown 等待在途恢复与命令完成并清理模块。同 Host 的串行队列不锁住其他已准入客户端对共享数据库的写入，因此离线意图更新不等于瞬时、原子的进程切换；这些客户端的修改通过重新读取被识别。
