@@ -189,6 +189,55 @@ class ExtensionRecord(BaseModel):
     releases: Annotated[list[ReleaseRecord], Field(title="Releases")] = []
 
 
+class NativePrepareReleaseRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    module_federation: ModuleFederationAssociationInput | None = None
+    nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
+    python: PythonAssociationInput | None = None
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
+class NativeReleaseRecord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    module_federation: ModuleFederationDistribution | None = None
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    nickname: Annotated[str, Field(title="Nickname")]
+    python: PythonDistribution | None = None
+    state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
 class PrepareReleaseRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -208,6 +257,24 @@ class PrepareReleaseRequest(BaseModel):
     ]
 
 
+class NativeExtensionRecord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    nickname: Annotated[str, Field(title="Nickname")]
+    releases: Annotated[list[NativeReleaseRecord], Field(title="Releases")] = []
+
+
 class PythonConsumerContracts(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -215,6 +282,9 @@ class PythonConsumerContracts(BaseModel):
     )
     extension: ExtensionRecord
     extension_summary: ExtensionSummary
+    native_extension: NativeExtensionRecord
+    native_prepare: NativePrepareReleaseRequest
+    native_release: NativeReleaseRecord
     prepare_release: PrepareReleaseRequest
     release: ReleaseRecord
     yank: YankRequest

@@ -27,11 +27,16 @@ from .. import __version__
 from ..contracts.models import (
     DocumentationHosting,
     DocumentationPublication,
-    DocumentationReceipt,
     DocumentationScope,
     ExtensionRecord,
     ExtensionSummary,
-    PrepareReleaseRequest,
+    NativeDistribution,
+    NativeDocumentationReceipt,
+    NativeExtensionRecord,
+    NativePrepareReleaseRequest,
+    NativePublisherWorkspace,
+    NativeReleaseDocumentation,
+    NativeReleaseRecord,
     PublisherWorkspace,
     PythonEntryPoint,
     RegistryError,
@@ -90,7 +95,7 @@ logger = logging.getLogger(__name__)
 
 BEARER_PATTERN = re.compile(r"^Bearer ([A-Za-z0-9._~-]{24,512})$")
 UPLOAD_PATH_PATTERN = re.compile(
-    r"^/legacy/$|^/v1/extensions/[^/]+/[^/]+/releases/[^/]+/(module-federation|documentation/[^/]+)$"
+    r"^/legacy/$|^/v2/extensions/[^/]+/[^/]+/distributions/[^/]+/releases/[^/]+/(module-federation|documentation/[^/]+)$"
 )
 
 
@@ -305,6 +310,16 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
+    async def reject_legacy_writes(request: Request, call_next):
+        if request.url.path.startswith("/v1/") and request.method not in {"GET", "HEAD", "OPTIONS"}:
+            return JSONResponse(
+                status_code=410,
+                content={"detail": "v1 publishing is retired; use the v2 native Distribution API"},
+                headers={"Cache-Control": "no-store"},
+            )
+        return await call_next(request)
+
+    @app.middleware("http")
     async def bound_uploads(request: Request, call_next: Any) -> Response:
         if request.method in {"POST", "PUT"} and UPLOAD_PATH_PATTERN.fullmatch(request.url.path):
             content_length = request.headers.get("content-length")
@@ -426,13 +441,14 @@ def create_app() -> FastAPI:
         response: Response,
         *,
         public: bool,
-    ) -> ReleaseDocumentation:
+        distribution: NativeDistribution | None = None,
+    ) -> ReleaseDocumentation | NativeReleaseDocumentation:
         extension = _validate_identity(namespace, name, version)
         settings = documentation_settings(request)
         response.headers["Cache-Control"] = "no-store"
         try:
             return await _documentation(request).discover(
-                extension, version, settings, public=public
+                extension, version, settings, public=public, distribution=distribution
             )
         except (RegistryBlockedError, RegistryNotFoundError) as error:
             raise _map_repository_error(error) from error
@@ -466,9 +482,48 @@ def create_app() -> FastAPI:
     ) -> ReleaseDocumentation:
         return await read_documentation(namespace, name, version, request, response, public=False)
 
+    @app.get(
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation",
+        response_model=NativeReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (404, 451, 503)},
+    )
+    async def get_native_documentation(
+        distribution: NativeDistribution,
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        request: Request,
+        response: Response,
+    ) -> NativeReleaseDocumentation:
+        result = await read_documentation(
+            namespace, name, version, request, response, public=True, distribution=distribution
+        )
+        assert isinstance(result, NativeReleaseDocumentation)
+        return result
+
+    @app.get(
+        "/v2/publisher/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation",
+        response_model=NativeReleaseDocumentation,
+        responses={code: DOCUMENTATION_ERRORS[code] for code in (401, 403, 404, 451, 503)},
+    )
+    async def publisher_native_documentation(
+        distribution: NativeDistribution,
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        request: Request,
+        response: Response,
+        _publisher: Annotated[str, Depends(_publisher_namespace)],
+    ) -> NativeReleaseDocumentation:
+        result = await read_documentation(
+            namespace, name, version, request, response, public=False, distribution=distribution
+        )
+        assert isinstance(result, NativeReleaseDocumentation)
+        return result
+
     @app.post(
-        "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}",
-        response_model=DocumentationReceipt,
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation/{scope}",
+        response_model=NativeDocumentationReceipt,
         responses={
             **DOCUMENTATION_ERRORS,
             200: {
@@ -501,7 +556,8 @@ def create_app() -> FastAPI:
             }
         },
     )
-    async def upload_documentation(
+    async def upload_native_documentation(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
         version: StrictSemVer,
@@ -509,7 +565,7 @@ def create_app() -> FastAPI:
         request: Request,
         response: Response,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-    ) -> DocumentationReceipt:
+    ) -> NativeDocumentationReceipt:
         extension = _validate_identity(namespace, name, version)
         settings = documentation_settings(request)
         form = await _form(request)
@@ -534,6 +590,7 @@ def create_app() -> FastAPI:
                     payload,
                     bundle,
                     settings,
+                    distribution=distribution,
                 )
             except documentation.DocumentationPreconditionError as error:
                 raise HTTPException(409, str(error)) from error
@@ -542,6 +599,7 @@ def create_app() -> FastAPI:
         finally:
             await form.close()
         response.headers["Cache-Control"] = "no-store"
+        assert isinstance(result, NativeDocumentationReceipt)
         return result
 
     @app.api_route(
@@ -590,6 +648,84 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
 
+    @app.api_route(
+        "/v2/documentation/{namespace}/{name}/{distribution}/{version}/{scope}/{path:path}",
+        methods=["GET", "HEAD"],
+        include_in_schema=False,
+    )
+    async def native_documentation_entry(
+        distribution: NativeDistribution,
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        scope: DocumentationScope,
+        path: str,
+        request: Request,
+    ) -> Response:
+        settings = documentation_settings(request)
+        extension = _validate_identity(namespace, name, version)
+        try:
+            found = await _documentation(request).discover(
+                extension, version, settings, distribution=distribution
+            )
+            selected = next((item for item in found.sets if item.scope == scope), None)
+            if selected is None:
+                raise RegistryNotFoundError("documentation scope does not exist")
+            if path:
+                document_path(path.removesuffix("/"))
+            snapshot = await _documentation(request).public_snapshot(selected.snapshot_id)
+            documentation.static_path(snapshot, path)
+        except ValueError as error:
+            raise HTTPException(404, "invalid documentation path") from error
+        except (RegistryBlockedError, RegistryNotFoundError) as error:
+            raise _map_repository_error(error) from error
+        target = documentation.snapshot_link(settings, selected.snapshot_id, path)
+        if found.state == "yanked":
+            return html_response(
+                page(
+                    "documentation-yanked.html",
+                    title="Withdrawn release documentation",
+                    version=version,
+                    name=extension,
+                    target=target,
+                    noindex=True,
+                )
+            )
+        return RedirectResponse(
+            target,
+            status_code=307,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
+
+    @app.get("/v2/extensions", response_model=list[ExtensionSummary])
+    async def native_extensions(request: Request) -> list[ExtensionSummary]:
+        return await _repository(request).list_native_extensions()
+
+    @app.get(
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}",
+        response_model=NativeExtensionRecord,
+    )
+    async def native_extension(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        distribution: NativeDistribution,
+        request: Request,
+    ) -> NativeExtensionRecord:
+        result = await _repository(request).get_native_extension(
+            f"{namespace}/{name}", distribution
+        )
+        if result is None:
+            raise HTTPException(404, "public native Distribution does not exist")
+        return result
+
+    @app.get("/v2/publisher", response_model=NativePublisherWorkspace)
+    async def native_publisher(
+        request: Request,
+        offset: int = Query(default=0, ge=0),
+        publisher: Annotated[str, Depends(_publisher_namespace)] = "",
+    ) -> NativePublisherWorkspace:
+        return await _repository(request).native_publisher_workspace(publisher, offset)
+
     @app.get("/livez")
     async def livez() -> dict[str, str]:
         return {
@@ -605,7 +741,7 @@ def create_app() -> FastAPI:
         client_origin: Annotated[str | None, Query(max_length=512)] = None,
     ) -> HTMLResponse:
         web_origin = _client_web_origin(client_origin)
-        extensions = await _repository(request).list_extensions()
+        extensions = await _repository(request).list_native_extensions()
         return html_response(
             extension_catalog_html(
                 extensions,
@@ -631,21 +767,39 @@ def create_app() -> FastAPI:
         namespace: RegistrySegment,
         name: RegistrySegment,
         request: Request,
+        distribution: NativeDistribution | None = None,
         version: Annotated[str | None, Query(max_length=128)] = None,
         client_origin: Annotated[str | None, Query(max_length=512)] = None,
     ) -> HTMLResponse:
         web_origin = _client_web_origin(client_origin)
         extension_name = _validate_identity(namespace, name)
-        extension = await _repository(request).get_extension(extension_name)
+        selected_distribution = distribution or "module_federation"
+        extension = await _repository(request).get_native_extension(
+            extension_name, selected_distribution
+        )
+        if extension is None and distribution is None:
+            selected_distribution = "python"
+            extension = await _repository(request).get_native_extension(
+                extension_name, selected_distribution
+            )
         selected = select_release(extension, version) if extension else None
         hosted = None
         if selected is not None and request.app.state.settings.documentation_origin_template:
             with suppress(RegistryBlockedError, RegistryNotFoundError):
                 hosted = await _documentation(request).discover(
-                    extension_name, selected.version, request.app.state.settings
+                    extension_name,
+                    selected.version,
+                    request.app.state.settings,
+                    distribution=selected_distribution,
                 )
         document = (
-            extension_detail_html(extension, version, hosted, client_origin=web_origin)
+            extension_detail_html(
+                extension,
+                version,
+                hosted,
+                client_origin=web_origin,
+                distribution=selected_distribution,
+            )
             if extension
             else None
         )
@@ -714,76 +868,111 @@ def create_app() -> FastAPI:
         response.headers["Cache-Control"] = "no-store"
         return release
 
-    @app.post(
-        "/v1/extensions/{namespace}/{name}/releases",
-        response_model=ReleaseRecord,
+    @app.get(
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}",
+        response_model=NativeReleaseRecord,
     )
-    async def prepare_release(
+    async def get_native_release(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
-        payload: PrepareReleaseRequest,
+        version: StrictSemVer,
+        request: Request,
+        response: Response,
+    ) -> NativeReleaseRecord:
+        extension_name = _validate_identity(namespace, name, version)
+        try:
+            release = await _repository(request).get_native_release(
+                extension_name, version, distribution=distribution
+            )
+        except Exception as error:
+            raise _map_repository_error(error) from error
+        if release is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "public Release does not exist")
+        response.headers["Cache-Control"] = "no-store"
+        return release
+
+    @app.post(
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases",
+        response_model=NativeReleaseRecord,
+    )
+    async def prepare_native_release(
+        distribution: NativeDistribution,
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        payload: NativePrepareReleaseRequest,
         request: Request,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
         _validate_identity(namespace, name, payload.version)
         try:
-            return await _repository(request).prepare_release(namespace, name, payload)
+            return await _repository(request).prepare_release(
+                namespace, name, payload, distribution=distribution
+            )
         except Exception as error:
             raise _map_repository_error(error) from error
 
     @app.post(
-        "/v1/extensions/{namespace}/{name}/releases/{version}/publish",
-        response_model=ReleaseRecord,
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/publish",
+        response_model=NativeReleaseRecord,
     )
-    async def publish_release(
+    async def publish_native_release(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
         version: StrictSemVer,
         request: Request,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
         try:
-            return await _repository(request).publish(extension_name, version)
+            return await _repository(request).publish(
+                extension_name, version, distribution=distribution
+            )
         except Exception as error:
             raise _map_repository_error(error) from error
 
     @app.post(
-        "/v1/extensions/{namespace}/{name}/releases/{version}/yank",
-        response_model=ReleaseRecord,
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/yank",
+        response_model=NativeReleaseRecord,
     )
-    async def yank_release(
+    async def yank_native_release(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
         version: StrictSemVer,
         request: Request,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
         payload: YankRequest | None = None,
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
         try:
             return await _repository(request).yank(
                 extension_name,
                 version,
                 (payload or YankRequest()).reason,
+                distribution=distribution,
             )
         except Exception as error:
             raise _map_repository_error(error) from error
 
     @app.post(
-        "/v1/extensions/{namespace}/{name}/releases/{version}/unyank",
-        response_model=ReleaseRecord,
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/unyank",
+        response_model=NativeReleaseRecord,
     )
-    async def unyank_release(
+    async def unyank_native_release(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
         version: StrictSemVer,
         request: Request,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
         try:
-            return await _repository(request).unyank(extension_name, version)
+            return await _repository(request).unyank(
+                extension_name, version, distribution=distribution
+            )
         except Exception as error:
             raise _map_repository_error(error) from error
 
@@ -894,16 +1083,19 @@ def create_app() -> FastAPI:
         return Response(status_code=status.HTTP_200_OK)
 
     @app.post(
-        "/v1/extensions/{namespace}/{name}/releases/{version}/module-federation",
-        response_model=ReleaseRecord,
+        "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation",
+        response_model=NativeReleaseRecord,
     )
-    async def upload_module_federation(
+    async def upload_native_module_federation(
+        distribution: NativeDistribution,
         namespace: RegistrySegment,
         name: RegistrySegment,
         version: StrictSemVer,
         request: Request,
         _publisher: Annotated[str, Depends(_publisher_namespace)],
-    ) -> ReleaseRecord:
+    ) -> NativeReleaseRecord:
+        if distribution != "module_federation":
+            raise HTTPException(404, "Module Federation upload requires its native distribution")
         extension_name = _validate_identity(namespace, name, version)
         started = perf_counter()
         form = await _form(request)

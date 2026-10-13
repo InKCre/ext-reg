@@ -34,4 +34,8 @@ Registry 通过不可变 Git commit 安装 `InKCre/ui` 的 `@inkcre/ui-web` 公�
 
 Toolkit、Core Runtime 与 Web Runtime 保持各自的版本和发布机制。`pnpm build` 构建这些独立产物；Registry 的容器部署不会发布它们，也不会引入单独的前端部署流程。
 
-`pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.3,<0.5`。Python 改动在所属 project 的 `.changes/` 记录 Towncrier fragment；Web Runtime 使用 `.changeset/`。合并普通改动后，Version PR 才准备版本与 changelog，正式产物只从准备完成的 `main` 发布。
+`pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.5,<0.6`。Python 改动在所属 project 的 `.changes/` 记录 Towncrier fragment；Web Runtime 使用 `.changeset/`。合并普通改动后，Version PR 才准备版本与 changelog，正式产物只从准备完成的 `main` 发布。
+
+本次独立原生发行与 Peer 参与模型需要先生成候选 SDK 版本才能跨仓验证：Registry 0.3、Toolkit 0.5、Python Runtime 0.2 由既有 `scripts/release.py prepare` 生成，Web Runtime 0.4 由 Changesets 生成，相关 intents 已消费，后续不能再次升版。PR 58 使用维护者授予的 `coordinated-sdk-version-preparation` label 声明同一 PR 内包含功能与机械版本准备。CI 监听 label 添加/移除并从 PR metadata 决定是否传递 `--allow-feature-version-preparation`；日志显示该用途。这个开关只解除行为文件分类限制，仍要求版本/changelog 一致、版本前进、对应 fragments 已消费及全部质量检查。无 label 默认保持原有严格规则。本地完整验收使用 `BASE_REVISION=<base SHA> RELEASE_CHECK_ARGS=--allow-feature-version-preparation pnpm check`。
+
+该候选例外不改变 canonical package 发布触发器、production environment 或 protected-main 权威；Git exact package 与真实 pack 只用于此次有界资格验证。正式包与生产数据库仍按既有发布边界交付。

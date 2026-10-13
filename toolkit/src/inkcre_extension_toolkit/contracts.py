@@ -7,10 +7,15 @@ from inkcre_extension_toolkit.generated.contracts import (
     ExtensionSummary,
     ModuleFederationAssociationInput,
     ModuleFederationDistribution,
+    NativeExtensionRecord,
+    NativeReleaseRecord,
     PythonAssociationInput,
     PythonDistribution,
     ReleaseRecord,
     YankRequest,
+)
+from inkcre_extension_toolkit.generated.contracts import (
+    NativePrepareReleaseRequest as GeneratedNativePrepareReleaseRequest,
 )
 from inkcre_extension_toolkit.generated.contracts import (
     PrepareReleaseRequest as GeneratedPrepareReleaseRequest,
@@ -63,6 +68,15 @@ class PrepareReleaseRequest(GeneratedPrepareReleaseRequest):
         return self
 
 
+class NativePrepareReleaseRequest(GeneratedNativePrepareReleaseRequest):
+    @model_validator(mode="after")
+    def native_association_is_valid(self) -> "NativePrepareReleaseRequest":
+        PrepareReleaseRequest.model_validate(self.model_dump(mode="json"))
+        if (self.python is None) == (self.module_federation is None):
+            raise ValueError("prepare exactly one native Distribution")
+        return self
+
+
 __all__ = [
     "CanonicalExtensionName",
     "ContractModel",
@@ -73,6 +87,9 @@ __all__ = [
     "InstalledPythonDistribution",
     "ModuleFederationAssociationInput",
     "ModuleFederationDistribution",
+    "NativeExtensionRecord",
+    "NativePrepareReleaseRequest",
+    "NativeReleaseRecord",
     "PrepareReleaseRequest",
     "PythonAssociationInput",
     "PythonDistribution",

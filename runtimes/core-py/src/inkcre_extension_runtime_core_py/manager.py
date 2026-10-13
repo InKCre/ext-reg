@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import logging
 import typing
 from dataclasses import dataclass
 
 from .base import ExtensionBase
 from .contracts import PythonReleaseDescriptor, ReleaseState
-from .distribution import AcquiredDistribution, PipDistributionConsumer
+from .distribution import AcquiredDistribution
 from .errors import (
     ExtensionCompatibilityError,
+    ExtensionEnvironmentApplicationRequiredError,
     ExtensionNotInstalledError,
     ExtensionStateConflictError,
-    translate_host_model_error,
 )
 from .modules import DistributionModules
 from .release import RegistryReleaseClient, require_python_association, validate_coordinate
@@ -32,68 +31,56 @@ class RunningExtension:
     claim: typing.Any
 
 
-def _host_model() -> type[typing.Any]:
-    return importlib.import_module("app.schemas.extension").ExtensionModel
-
-
-def _host_version() -> str:
-    return typing.cast(str, importlib.import_module("app.version").CORE_VERSION)
-
-
-def _registry_origin() -> str:
-    config = importlib.import_module("app.business.extension.config")
-    return typing.cast(str, config.resolve_extension_registry_origin())
+class ParticipationStore(typing.Protocol):
+    def list_participations(self, peer_id: str) -> typing.Iterable[typing.Any]: ...
+    def get_participation(self, peer_id: str, name: str) -> typing.Any: ...
+    def select_participation(
+        self, peer_id: str, name: str, distribution: str, version: str
+    ) -> typing.Any: ...
+    def set_participation_enabled(self, peer_id: str, name: str, enabled: bool) -> typing.Any: ...
+    def remove_participation(self, peer_id: str, name: str) -> None: ...
 
 
 class ExtensionManager:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        store: ParticipationStore,
+        models: typing.Any,
+        *,
+        peer_id: str,
+        registry_origin: str,
+        host_version: str,
+    ) -> None:
+        self.store = store
+        self.models = models
+        self.peer_id = peer_id
+        self.registry_origin = registry_origin
+        self.host_version = host_version
         self.running: dict[str, RunningExtension] = {}
         self.fastapi_app: typing.Any = None
-        self._loaded_versions: dict[str, str] = {}
 
     def list(self) -> tuple[typing.Any, ...]:
-        return tuple(_host_model().list())
+        return tuple(self.models.list())
 
     def get(self, name: str) -> typing.Any:
         validate_coordinate(name)
-        try:
-            model = _host_model().get(name)
-        except Exception as error:
-            translate_host_model_error(error)
+        model = self.models.get(name)
         if model is None:
             raise ExtensionNotInstalledError(f"{name} is not installed")
         return model
 
     def install(self, name: str, version: str) -> typing.Any:
         validate_coordinate(name, version)
-        try:
-            current = _host_model().get(name)
-        except Exception as error:
-            translate_host_model_error(error)
-        if current is not None and current.version == version:
-            return current
-        loaded = self._loaded_versions.get(name)
-        if loaded is not None and loaded != version:
-            raise ExtensionStateConflictError(
-                "Changing a loaded Extension version requires a process restart"
-            )
-        origin = _registry_origin()
-        release = RegistryReleaseClient(origin).get(name, version)
+        release = RegistryReleaseClient(self.registry_origin).get(name, version)
         if release.state is not ReleaseState.published:
             raise ExtensionCompatibilityError("Release is not published")
-        require_python_association(release, _host_version())
-        try:
-            return _host_model().install(name, version, release.nickname)
-        except Exception as error:
-            translate_host_model_error(error)
+        require_python_association(release, self.host_version)
+        return self.store.select_participation(self.peer_id, name, "python", version)
 
     def uninstall(self, name: str) -> None:
         if name in self.running:
-            raise ExtensionStateConflictError("Cannot uninstall a running Extension")
-        try:
-            self.get(name).uninstall()
-        except Exception as error:
-            translate_host_model_error(error)
+            raise ExtensionStateConflictError("Cannot remove a running participation")
+        self.store.remove_participation(self.peer_id, name)
 
     def update_config(self, name: str, config: dict[str, typing.Any]) -> typing.Any:
         running = self.running.get(name)
@@ -104,33 +91,35 @@ class ExtensionManager:
 
     async def enable(self, name: str, peer: typing.Any = None) -> typing.Any:
         model = self.get(name)
+        selection = self.store.get_participation(self.peer_id, name)
+        if selection is None:
+            raise ExtensionNotInstalledError(f"{name} is not selected for this Peer")
+        if selection.distribution is None:
+            release = RegistryReleaseClient(self.registry_origin).get(name, selection.version)
+            require_python_association(release, self.host_version)
+            selection = self.store.select_participation(
+                self.peer_id, name, "python", selection.version
+            )
+        if selection.distribution != "python":
+            raise ExtensionCompatibilityError("Selected distribution cannot run in this Peer")
         current = self.running.get(name)
         if current is not None:
-            if current.model.version != model.version:
+            if current.acquired.record.version != selection.version:
                 raise ExtensionStateConflictError("A different Extension version is running")
-            return current.model
-        host_version = _host_version()
+            return selection
         acquired = await asyncio.to_thread(
-            AcquiredDistribution.discover, name, model.version, host_version
+            AcquiredDistribution.discover, name, selection.version, self.host_version
         )
-        association = None
         if acquired is None:
-            origin = _registry_origin()
-            release = RegistryReleaseClient(origin).get(name, model.version)
-            association = require_python_association(release, host_version)
-            acquired = await asyncio.to_thread(
-                PipDistributionConsumer(origin).acquire,
-                release,
-                association,
-                host_version,
+            raise ExtensionEnvironmentApplicationRequiredError(
+                "Applying this Python distribution requires a stopped Peer and a new process"
             )
-        running = await self._start(model, association, acquired)
+        running = await self._start(model, None, acquired)
         try:
-            running.model = running.model.enable_peer(peer)
-        except Exception as error:
+            return self.store.set_participation_enabled(self.peer_id, name, True)
+        except Exception:
             await self._force_stop(running)
-            translate_host_model_error(error)
-        return running.model
+            raise
 
     async def _start(
         self,
@@ -181,7 +170,6 @@ class ExtensionManager:
             raise
         running = RunningExtension(model, association, acquired, extension_class, claim)
         self.running[model.name] = running
-        self._loaded_versions[model.name] = model.version
         return running
 
     async def disable(self, name: str, peer: typing.Any = None) -> typing.Any:
@@ -190,11 +178,11 @@ class ExtensionManager:
         if running is not None:
             await self._stop(running)
         try:
-            return model.disable_peer(peer)
-        except Exception as error:
+            return self.store.set_participation_enabled(self.peer_id, name, False)
+        except Exception:
             if running is not None:
                 await self._start(model, running.association, running.acquired)
-            translate_host_model_error(error)
+            raise
 
     async def _stop(self, running: RunningExtension) -> None:
         await running.extension_class.on_close()
@@ -226,12 +214,12 @@ class ExtensionManager:
 
     async def startup(self, app: typing.Any, peer: typing.Any = None) -> None:
         self.fastapi_app = app
-        for model in self.list():
-            if peer in model.enabled:
+        for selection in self.store.list_participations(self.peer_id):
+            if selection.enabled:
                 try:
-                    await self.enable(model.name, peer)
+                    await self.enable(selection.name, peer)
                 except Exception:
-                    logger.exception("Extension %s failed to start", model.name)
+                    logger.exception("Extension %s failed to start", selection.name)
 
     async def shutdown(self) -> None:
         for running in tuple(self.running.values())[::-1]:

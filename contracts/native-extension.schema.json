@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "ModuleFederationDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "host_sdk": {
+          "const": "@inkcre/core",
+          "title": "Host Sdk",
+          "type": "string"
+        },
+        "host_sdk_version": {
+          "title": "Host Sdk Version",
+          "type": "string"
+        },
+        "manifest_url": {
+          "title": "Manifest Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifest_url",
+        "host_sdk",
+        "host_sdk_version"
+      ],
+      "title": "ModuleFederationDistribution",
+      "type": "object"
+    },
+    "NativeReleaseRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "distribution": {
+          "enum": [
+            "python",
+            "module_federation"
+          ],
+          "title": "Distribution",
+          "type": "string"
+        },
+        "module_federation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModuleFederationDistribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        },
+        "python": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PythonDistribution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "published",
+            "yanked",
+            "blocked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "nickname",
+        "version",
+        "state",
+        "distribution"
+      ],
+      "title": "NativeReleaseRecord",
+      "type": "object"
+    },
+    "PythonDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_point": {
+          "$ref": "#/$defs/PythonEntryPoint"
+        },
+        "host_sdk": {
+          "const": "core-py",
+          "title": "Host Sdk",
+          "type": "string"
+        },
+        "host_sdk_version": {
+          "title": "Host Sdk Version",
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,198}[A-Za-z0-9])?$",
+          "title": "Project",
+          "type": "string"
+        },
+        "simple_url": {
+          "title": "Simple Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "simple_url",
+        "host_sdk",
+        "host_sdk_version",
+        "entry_point"
+      ],
+      "title": "PythonDistribution",
+      "type": "object"
+    },
+    "PythonEntryPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$",
+          "title": "Group",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "object": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_.]*(?::[A-Za-z_][A-Za-z0-9_.]*)?$",
+          "title": "Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group",
+        "name",
+        "object"
+      ],
+      "title": "PythonEntryPoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 129,
+      "minLength": 3,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+      "title": "Name",
+      "type": "string"
+    },
+    "nickname": {
+      "title": "Nickname",
+      "type": "string"
+    },
+    "releases": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/NativeReleaseRecord"
+      },
+      "title": "Releases",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "nickname"
+  ],
+  "title": "NativeExtensionRecord",
+  "type": "object"
+}

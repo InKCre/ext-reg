@@ -6,8 +6,8 @@ export * from './peer-management'
 export { preferredPublishedRelease, RegistryReleaseReader, sortPublishedReleases } from './registry'
 export type { HostSdkIdentity, RegistryReleaseReaderOptions, WebReleaseRecord } from './registry'
 export type {
-  ExtensionRecord,
+  NativeExtensionRecord as ExtensionRecord,
   ExtensionSummary,
-  ReleaseRecord,
+  NativeReleaseRecord as ReleaseRecord,
   ModuleFederationDistribution,
 } from './generated/types.gen'

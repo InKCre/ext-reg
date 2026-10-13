@@ -4,6 +4,13 @@ export class WebExtensionRuntimeError extends Error {
 
 export class RegistryReleaseError extends WebExtensionRuntimeError {
   override name = 'RegistryReleaseError'
+
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message)
+  }
 }
 
 export class RegistryDocumentationError extends WebExtensionRuntimeError {
@@ -22,7 +29,7 @@ export class ExtensionEnabledError extends WebExtensionRuntimeError {
   override name = 'ExtensionEnabledError'
 
   constructor(name: string) {
-    super(`Cannot change or uninstall ${name} while one or more Peers remain enabled.`)
+    super(`Cannot change or uninstall ${name} while it is running in this Peer.`)
   }
 }
 

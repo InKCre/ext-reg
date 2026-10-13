@@ -218,56 +218,76 @@ class PipDistributionConsumer:
         except (OSError, zipfile.BadZipFile, pydantic.ValidationError) as error:
             raise ExtensionAcquisitionError("Extension wheel is invalid") from error
 
+    def download(
+        self,
+        release: ExtensionReleaseDescriptor,
+        association: PythonReleaseDescriptor,
+        host_version: str,
+        wheel_dir: Path,
+    ) -> Path:
+        """Download and validate without modifying the interpreter environment."""
+        _, index_url = simple_project_and_index_urls(self.origin, association)
+        download = self._runner(
+            [
+                "download",
+                "--no-deps",
+                "--only-binary=:all:",
+                "--dest",
+                str(wheel_dir),
+                "--index-url",
+                index_url,
+                f"{association.project}=={_python_project_version(release.version)}",
+            ]
+        )
+        self._require_success(download, "wheel acquisition")
+        wheels = list(wheel_dir.glob("*.whl"))
+        extension_wheels: list[Path] = []
+        for wheel in wheels:
+            try:
+                with zipfile.ZipFile(wheel) as archive:
+                    if any(
+                        name.endswith(".dist-info/inkcre-extension.json")
+                        for name in archive.namelist()
+                    ):
+                        extension_wheels.append(wheel)
+            except zipfile.BadZipFile as error:
+                raise ExtensionAcquisitionError("Downloaded wheel is invalid") from error
+        if len(extension_wheels) != 1:
+            raise ExtensionAcquisitionError("Registry did not yield exactly one Extension wheel")
+        extension_wheel = extension_wheels[0]
+        self._validate_wheel(extension_wheel, release, association, host_version)
+        return extension_wheel
+
+    def apply(
+        self,
+        extension_wheel: Path,
+        release: ExtensionReleaseDescriptor,
+        association: PythonReleaseDescriptor,
+        host_version: str,
+    ) -> AcquiredDistribution:
+        """Modify the shared environment; the Host must stop the Peer and restart it."""
+        self._validate_wheel(extension_wheel, release, association, host_version)
+        install = self._runner(
+            [
+                "install",
+                "--no-compile",
+                str(extension_wheel),
+            ]
+        )
+        self._require_success(install, "installation")
+        importlib.invalidate_caches()
+        acquired = AcquiredDistribution.discover(release.name, release.version, host_version)
+        if acquired is None:
+            raise ExtensionAcquisitionError("Acquired Distribution has no exact installed record")
+        return acquired
+
     def acquire(
         self,
         release: ExtensionReleaseDescriptor,
         association: PythonReleaseDescriptor,
         host_version: str,
     ) -> AcquiredDistribution:
-        _, index_url = simple_project_and_index_urls(self.origin, association)
+        """Acquire and apply for a Host that has already stopped the entire Peer."""
         with tempfile.TemporaryDirectory(prefix="inkcre-extension-") as temporary:
-            wheel_dir = Path(temporary)
-            download = self._runner(
-                [
-                    "download",
-                    "--no-deps",
-                    "--only-binary=:all:",
-                    "--dest",
-                    str(wheel_dir),
-                    "--index-url",
-                    index_url,
-                    f"{association.project}=={_python_project_version(release.version)}",
-                ]
-            )
-            self._require_success(download, "wheel acquisition")
-            wheels = list(wheel_dir.glob("*.whl"))
-            extension_wheels: list[Path] = []
-            for wheel in wheels:
-                try:
-                    with zipfile.ZipFile(wheel) as archive:
-                        if any(
-                            name.endswith(".dist-info/inkcre-extension.json")
-                            for name in archive.namelist()
-                        ):
-                            extension_wheels.append(wheel)
-                except zipfile.BadZipFile as error:
-                    raise ExtensionAcquisitionError("Downloaded wheel is invalid") from error
-            if len(extension_wheels) != 1:
-                raise ExtensionAcquisitionError(
-                    "Registry did not yield exactly one Extension wheel"
-                )
-            extension_wheel = extension_wheels[0]
-            self._validate_wheel(extension_wheel, release, association, host_version)
-            install = self._runner(
-                [
-                    "install",
-                    "--no-compile",
-                    str(extension_wheel),
-                ]
-            )
-            self._require_success(install, "installation")
-        importlib.invalidate_caches()
-        acquired = AcquiredDistribution.discover(release.name, release.version, host_version)
-        if acquired is None:
-            raise ExtensionAcquisitionError("Acquired Distribution has no exact installed record")
-        return acquired
+            wheel = self.download(release, association, host_version, Path(temporary))
+            return self.apply(wheel, release, association, host_version)

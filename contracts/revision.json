@@ -1,5 +1,5 @@
 {
-  "contract_revision": 3,
+  "contract_revision": 4,
   "distribution_kinds": [
     "module_federation",
     "python"

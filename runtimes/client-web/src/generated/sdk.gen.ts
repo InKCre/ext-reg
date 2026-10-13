@@ -19,6 +19,12 @@ import type {
   GetExtensionV1ExtensionsNamespaceNameGetData,
   GetExtensionV1ExtensionsNamespaceNameGetErrors,
   GetExtensionV1ExtensionsNamespaceNameGetResponses,
+  GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData,
+  GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+  GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
+  GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetData,
+  GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors,
+  GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses,
   GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetData,
   GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetErrors,
   GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetResponses,
@@ -32,18 +38,29 @@ import type {
   ModuleFederationFileExtensionsNamespaceNameVersionModuleFederationRelativePathGetData,
   ModuleFederationFileExtensionsNamespaceNameVersionModuleFederationRelativePathGetErrors,
   ModuleFederationFileExtensionsNamespaceNameVersionModuleFederationRelativePathGetResponses,
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostData,
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors,
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses,
+  NativeExtensionsV2ExtensionsGetData,
+  NativeExtensionsV2ExtensionsGetResponses,
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetData,
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors,
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses,
+  NativePublisherV2PublisherGetData,
+  NativePublisherV2PublisherGetErrors,
+  NativePublisherV2PublisherGetResponses,
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostData,
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors,
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses,
   PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetData,
   PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetErrors,
   PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses,
+  PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData,
+  PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+  PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
   PublisherWorkspaceV1PublisherGetData,
   PublisherWorkspaceV1PublisherGetErrors,
   PublisherWorkspaceV1PublisherGetResponses,
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostData,
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors,
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses,
+  PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostData,
+  PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors,
+  PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses,
   PythonFilePackagesProjectProjectVersionFilenameGetData,
   PythonFilePackagesProjectProjectVersionFilenameGetErrors,
   PythonFilePackagesProjectProjectVersionFilenameGetResponses,
@@ -52,18 +69,18 @@ import type {
   SimpleProjectSimpleProjectGetResponses,
   SimpleRootSimpleGetData,
   SimpleRootSimpleGetResponses,
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostData,
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors,
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData,
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors,
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses,
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostData,
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors,
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses,
+  UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostData,
+  UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors,
+  UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses,
+  UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostData,
+  UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors,
+  UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses,
+  UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostData,
+  UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors,
+  UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses,
+  YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostData,
+  YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors,
+  YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses,
 } from './types.gen'
 
 export type Options<
@@ -220,31 +237,6 @@ export const getExtensionV1ExtensionsNamespaceNameGet = <ThrowOnError extends bo
   >({ url: '/v1/extensions/{namespace}/{name}', ...options })
 
 /**
- * Prepare Release
- */
-export const prepareReleaseV1ExtensionsNamespaceNameReleasesPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<PrepareReleaseV1ExtensionsNamespaceNameReleasesPostData, ThrowOnError>,
-): RequestResult<
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses,
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses,
-    PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors,
-    ThrowOnError
-  >({
-    url: '/v1/extensions/{namespace}/{name}/releases',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
-
-/**
  * Get Release
  */
 export const getReleaseV1ExtensionsNamespaceNameReleasesVersionGet = <
@@ -284,123 +276,6 @@ export const getDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentati
   >({ url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation', ...options })
 
 /**
- * Upload Documentation
- */
-export const uploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData,
-    ThrowOnError
-  >,
-): RequestResult<
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses,
-    UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors,
-    ThrowOnError
-  >({
-    ...formDataBodySerializer,
-    url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}',
-    ...options,
-    headers: {
-      'Content-Type': null,
-      ...options.headers,
-    },
-  })
-
-/**
- * Upload Module Federation
- */
-export const uploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData,
-    ThrowOnError
-  >,
-): RequestResult<
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses,
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses,
-    UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors,
-    ThrowOnError
-  >({ url: '/v1/extensions/{namespace}/{name}/releases/{version}/module-federation', ...options })
-
-/**
- * Publish Release
- */
-export const publishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostData,
-    ThrowOnError
-  >,
-): RequestResult<
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses,
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses,
-    PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors,
-    ThrowOnError
-  >({ url: '/v1/extensions/{namespace}/{name}/releases/{version}/publish', ...options })
-
-/**
- * Unyank Release
- */
-export const unyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<
-    UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostData,
-    ThrowOnError
-  >,
-): RequestResult<
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses,
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses,
-    UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors,
-    ThrowOnError
-  >({ url: '/v1/extensions/{namespace}/{name}/releases/{version}/unyank', ...options })
-
-/**
- * Yank Release
- */
-export const yankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPost = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostData, ThrowOnError>,
-): RequestResult<
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses,
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses,
-    YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors,
-    ThrowOnError
-  >({
-    url: '/v1/extensions/{namespace}/{name}/releases/{version}/yank',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
-
-/**
  * Publisher Workspace
  */
 export const publisherWorkspaceV1PublisherGet = <ThrowOnError extends boolean = false>(
@@ -436,5 +311,274 @@ export const publisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVer
       ThrowOnError
     >({
       url: '/v1/publisher/extensions/{namespace}/{name}/releases/{version}/documentation',
+      ...options,
+    })
+
+/**
+ * Native Extensions
+ */
+export const nativeExtensionsV2ExtensionsGet = <ThrowOnError extends boolean = false>(
+  options?: Options<NativeExtensionsV2ExtensionsGetData, ThrowOnError>,
+): RequestResult<NativeExtensionsV2ExtensionsGetResponses, unknown, ThrowOnError> =>
+  (options?.client ?? client).get<NativeExtensionsV2ExtensionsGetResponses, unknown, ThrowOnError>({
+    url: '/v2/extensions',
+    ...options,
+  })
+
+/**
+ * Native Extension
+ */
+export const nativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetData,
+    ThrowOnError
+  >,
+): RequestResult<
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses,
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses,
+    NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors,
+    ThrowOnError
+  >({ url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}', ...options })
+
+/**
+ * Prepare Native Release
+ */
+export const prepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPost = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostData,
+    ThrowOnError
+  >,
+): RequestResult<
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses,
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses,
+    PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors,
+    ThrowOnError
+  >({
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases',
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  })
+
+/**
+ * Get Native Release
+ */
+export const getNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGet =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses,
+    GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).get<
+      GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses,
+      GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}',
+      ...options,
+    })
+
+/**
+ * Get Native Documentation
+ */
+export const getNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGet =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
+    GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).get<
+      GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
+      GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation',
+      ...options,
+    })
+
+/**
+ * Upload Native Documentation
+ */
+export const uploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses,
+    UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses,
+      UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors,
+      ThrowOnError
+    >({
+      ...formDataBodySerializer,
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation/{scope}',
+      ...options,
+      headers: {
+        'Content-Type': null,
+        ...options.headers,
+      },
+    })
+
+/**
+ * Upload Native Module Federation
+ */
+export const uploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses,
+    UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses,
+      UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation',
+      ...options,
+    })
+
+/**
+ * Publish Native Release
+ */
+export const publishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses,
+    PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses,
+      PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/publish',
+      ...options,
+    })
+
+/**
+ * Unyank Native Release
+ */
+export const unyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses,
+    UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses,
+      UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/unyank',
+      ...options,
+    })
+
+/**
+ * Yank Native Release
+ */
+export const yankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses,
+    YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses,
+      YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors,
+      ThrowOnError
+    >({
+      url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/yank',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+
+/**
+ * Native Publisher
+ */
+export const nativePublisherV2PublisherGet = <ThrowOnError extends boolean = false>(
+  options?: Options<NativePublisherV2PublisherGetData, ThrowOnError>,
+): RequestResult<
+  NativePublisherV2PublisherGetResponses,
+  NativePublisherV2PublisherGetErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    NativePublisherV2PublisherGetResponses,
+    NativePublisherV2PublisherGetErrors,
+    ThrowOnError
+  >({ url: '/v2/publisher', ...options })
+
+/**
+ * Publisher Native Documentation
+ */
+export const publisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGet =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
+    PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).get<
+      PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses,
+      PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors,
+      ThrowOnError
+    >({
+      url: '/v2/publisher/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation',
       ...options,
     })

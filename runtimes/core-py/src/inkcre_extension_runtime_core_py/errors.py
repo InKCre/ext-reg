@@ -23,6 +23,10 @@ class ExtensionCompatibilityError(ExtensionRuntimeError): ...
 class ExtensionAcquisitionError(ExtensionRuntimeError): ...
 
 
+class ExtensionEnvironmentApplicationRequiredError(ExtensionRuntimeError):
+    """The selected wheel must be applied while the entire Peer is stopped."""
+
+
 class ExtensionEntryPointError(ExtensionRuntimeError): ...
 
 

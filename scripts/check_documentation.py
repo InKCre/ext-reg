@@ -71,10 +71,10 @@ async def check_documentation(
 ) -> None:
     check_content_sites()
     authorization = {"Authorization": f"Bearer {token}"}
-    base = "/v1/extensions/check/documentation/releases/1.0.0"
+    base = "/v2/extensions/check/documentation/distributions/module_federation/releases/1.0.0"
     docs = base + "/documentation"
-    entry_url = "/documentation/check/documentation/1.0.0/global/"
-    private = docs.replace("/v1/", "/v1/publisher/", 1)
+    entry_url = "/v2/documentation/check/documentation/module_federation/1.0.0/global/"
+    private = docs.replace("/v2/", "/v2/publisher/", 1)
 
     async def request(method, path, expected=200, **kwargs):
         response = await client.request(method, path, **kwargs)
@@ -268,26 +268,30 @@ async def check_documentation(
     assert await db.DocumentationSnapshot.filter(id=repeated["snapshot_id"]).count() == 1
     await request("GET", root)
 
-    row = await db.Release.get(extension_id="check/documentation", version="1.0.0")
+    row = await db.NativeRelease.get(
+        extension_id="check/documentation", distribution="module_federation", version="1.0.0"
+    )
     try:
         async with in_transaction():
-            await db.DocumentationSet.filter(release=row).update(scope="invalid")
+            await db.DocumentationSet.filter(native_release=row).update(scope="invalid")
     except IntegrityError:
         pass
     else:
         raise AssertionError("database admitted an invalid documentation scope")
     # Bypass publish to prove the database protects pointer ownership itself.
-    other_release = await db.Release.create(extension_id=row.extension_id, version="2.0.0")
-    for values in ({"scope": "python"}, {"release_id": other_release.id}):
+    other_release = await db.NativeRelease.create(
+        extension_id=row.extension_id, distribution="module_federation", version="2.0.0"
+    )
+    for values in ({"scope": "python"}, {"native_release_id": other_release.id}):
         try:
             async with in_transaction():
-                await db.DocumentationSet.filter(release=row).update(**values)
+                await db.DocumentationSet.filter(native_release=row).update(**values)
         except IntegrityError:
             pass
         else:
             raise AssertionError(f"database admitted a cross-owner documentation pointer: {values}")
     # The reverse direction must also be protected while the pointer exists.
-    current_set = await db.DocumentationSet.get(release=row, scope="global").select_related(
+    current_set = await db.DocumentationSet.get(native_release=row, scope="global").select_related(
         "snapshot"
     )
     try:
@@ -297,7 +301,7 @@ async def check_documentation(
         pass
     else:
         raise AssertionError("database allowed a referenced snapshot to change ownership")
-    await db.Release.filter(id=row.id).update(state="blocked")
+    await db.NativeRelease.filter(id=row.id).update(state="blocked")
     for path in (
         docs,
         private,
@@ -359,7 +363,13 @@ async def check_documentation(
         "http://localhost", token=token, transport=httpx.MockTransport(recover)
     ) as toolkit:
         recovered = toolkit.upload_documentation(
-            "check", "documentation", "1.0.0", "global", payload, zipped
+            "check",
+            "documentation",
+            "1.0.0",
+            "global",
+            payload,
+            zipped,
+            distribution="module_federation",
         )
         assert recovered.snapshot_id == first["snapshot_id"]
     assert [item.method for item in requests] == ["POST", "POST"]
@@ -375,7 +385,13 @@ async def check_documentation(
         with RegistryClient("http://localhost", transport=httpx.MockTransport(fail)) as toolkit:
             try:
                 toolkit.upload_documentation(
-                    "check", "documentation", "1.0.0", "global", payload, zipped
+                    "check",
+                    "documentation",
+                    "1.0.0",
+                    "global",
+                    payload,
+                    zipped,
+                    distribution="module_federation",
                 )
             except DocumentationOutcomeUnknown:
                 assert unavailable in {503, 200} and attempts == 2

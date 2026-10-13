@@ -10,13 +10,17 @@
       <button type="button" class="button copy-button" data-copy="{{ extension.name }}" disabled>
         Copy ID
       </button>
-      <a class="button button-primary" href="{{ install_url }}">Install in {{ client_host }}</a>
+      {% if distribution == "module_federation" %}<a class="button button-primary" href="{{ install_url }}">Install in {{ client_host }}</a>{% endif %}
     </div>
   </header>
   <div class="detail-layout">
     <article class="detail-content">
+      <nav aria-label="Distribution">
+        <a href="/explore/{{ extension.name }}?distribution=python">Python</a>
+        <a href="/explore/{{ extension.name }}?distribution=module_federation">Web</a>
+      </nav>
       <div class="section-heading">
-        <h2>Distributions</h2>
+        <h2>{{ "Python" if distribution == "python" else "Web" }} distribution</h2>
         <code>{{ release.version }}</code>
       </div>
       {% if release.python %}
@@ -80,7 +84,7 @@
           {% for item in releases %}
           <li>
             <a
-              href="/explore/{{ extension.name }}?version={{ item.version | urlencode }}&amp;client_origin={{ client_origin | urlencode }}"
+              href="/explore/{{ extension.name }}?distribution={{ distribution }}&amp;version={{ item.version | urlencode }}&amp;client_origin={{ client_origin | urlencode }}"
               {% if item.version == release.version %}
               aria-current="true"
               {% endif %}
@@ -102,7 +106,7 @@
           </dd>
         </div>
       </dl>
-      <a href="/v1/extensions/{{ extension.name }}/releases/{{ release.version }}">
+      <a href="/v2/extensions/{{ extension.name }}/distributions/{{ distribution }}/releases/{{ release.version }}">
         Release metadata ↗
       </a>
     </aside>

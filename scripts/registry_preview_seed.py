@@ -12,7 +12,7 @@ VERSION = "0.2.1"
 WHEEL_NAME = "inkcre_ext_rss-0.2.1-py3-none-any.whl"
 WHEEL_SHA256 = "190ff7d15b11a341c2367b87b2348832e7fe7d8042da512f2996926645a6d275"
 WHEEL_URL = f"https://registry.inkcre.dev/packages/inkcre-ext-rss/{VERSION}/{WHEEL_NAME}"
-RELEASE_PATH = f"/v1/extensions/inkcre/rss/releases/{VERSION}"
+RELEASE_PATH = f"/v2/extensions/inkcre/rss/distributions/python/releases/{VERSION}"
 PACKAGE_PATH = f"/packages/inkcre-ext-rss/{VERSION}/{WHEEL_NAME}"
 
 
@@ -29,7 +29,7 @@ def seed(origin: str, token: str) -> None:
                 raise RuntimeError("Pinned RSS preview wheel digest changed")
 
             prepared = registry.post(
-                "/v1/extensions/inkcre/rss/releases",
+                "/v2/extensions/inkcre/rss/distributions/python/releases",
                 json={
                     "nickname": "RSS/Atom Feeds",
                     "version": VERSION,
@@ -73,6 +73,7 @@ def seed(origin: str, token: str) -> None:
         record = release.json()
         if (
             record["name"] != "inkcre/rss"
+            or record["distribution"] != "python"
             or record["version"] != VERSION
             or record["state"] != "published"
             or record["nickname"] != "RSS/Atom Feeds"
@@ -92,11 +93,13 @@ def seed(origin: str, token: str) -> None:
         package.raise_for_status()
         if package.headers.get("etag") != f'"{WHEEL_SHA256}"':
             raise RuntimeError("Preview RSS wheel does not match the pinned fixture")
-        catalog = registry.get("/v1/extensions")
+        catalog = registry.get("/v2/extensions")
         catalog.raise_for_status()
         if not any(item["name"] == "inkcre/rss" for item in catalog.json()):
             raise RuntimeError("Preview RSS Release is missing from the catalog")
-        registry.get(f"/explore/inkcre/rss?version={VERSION}").raise_for_status()
+        registry.get(
+            f"/explore/inkcre/rss?distribution=python&version={VERSION}"
+        ).raise_for_status()
     print(f"Preview fixture ready: inkcre/rss {VERSION}")
 
 

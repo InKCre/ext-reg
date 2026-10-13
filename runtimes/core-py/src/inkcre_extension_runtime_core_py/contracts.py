@@ -13,13 +13,13 @@ from .generated.installed import (
     PythonEntryPoint as InstalledEntryPointDescriptor,
 )
 from .generated.registry import (
+    NativeReleaseRecord as ExtensionReleaseDescriptor,
+)
+from .generated.registry import (
     PythonDistribution as PythonReleaseDescriptor,
 )
 from .generated.registry import (
     PythonEntryPoint as EntryPointDescriptor,
-)
-from .generated.registry import (
-    ReleaseRecord as ExtensionReleaseDescriptor,
 )
 from .generated.registry import (
     State as ReleaseState,

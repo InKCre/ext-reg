@@ -17,6 +17,9 @@ from ..contracts.models import (
     DocumentationReceipt,
     DocumentationRecord,
     DocumentationScope,
+    NativeDistribution,
+    NativeDocumentationReceipt,
+    NativeReleaseDocumentation,
     ReleaseDocumentation,
     ReleaseState,
 )
@@ -26,6 +29,7 @@ from .repository import (
     RegistryConflictError,
     RegistryNotFoundError,
     RegistryStateError,
+    legacy_state,
 )
 from .settings import Settings
 from .storage import ArtifactStore
@@ -35,15 +39,16 @@ class DocumentationPreconditionError(RuntimeError):
     pass
 
 
-def readable(release: db.Release, *, public: bool = True) -> None:
-    if release.state == "blocked":
+def readable(release: db.Release | db.NativeRelease, *, public: bool = True) -> None:
+    effective_state = legacy_state(release) if isinstance(release, db.Release) else release.state
+    if effective_state == "blocked":
         raise RegistryBlockedError("documentation Release is operator-blocked")
     if public and release.state == "preparing":
         raise RegistryNotFoundError("public documentation does not exist")
 
 
 def record(
-    row: db.DocumentationSet, release: db.Release, settings: Settings
+    row: db.DocumentationSet, release: db.Release | db.NativeRelease, settings: Settings
 ) -> DocumentationRecord:
     snapshot = row.snapshot
     return DocumentationRecord(
@@ -55,7 +60,11 @@ def record(
         build_id=snapshot.build_id,
         scope=cast(DocumentationScope, row.scope),
         etag=f'"{snapshot.etag}"',
-        entry_url=f"{settings.public_origin}/documentation/{release.extension_id}/{release.version}/{row.scope}/",
+        entry_url=f"{settings.public_origin}/"
+        + ("v2/" if isinstance(release, db.NativeRelease) else "")
+        + f"documentation/{release.extension_id}/"
+        + (f"{release.distribution}/" if isinstance(release, db.NativeRelease) else "")
+        + f"{release.version}/{row.scope}/",
         snapshot_url=settings.documentation_origin(snapshot.id) + "/",
         updated_at=row.updated_at.isoformat(),
     )
@@ -84,21 +93,34 @@ def snapshot_link(settings: Settings, snapshot_id: str, path: str) -> str:
 
 
 def receipt(
-    snapshot: db.DocumentationSnapshot, release: db.Release, settings: Settings
-) -> DocumentationReceipt:
-    return DocumentationReceipt(
-        name=release.extension_id,
-        version=release.version,
-        scope=cast(DocumentationScope, snapshot.scope),
-        snapshot_id=snapshot.id,
-        content_sha256=snapshot.content_sha256,
-        entry=snapshot.entry,
-        source_repository=snapshot.source_repository,
-        source_revision=snapshot.source_revision,
-        build_id=snapshot.build_id,
-        snapshot_etag=f'"{snapshot.etag}"',
-        snapshot_url=settings.documentation_origin(snapshot.id) + "/",
-        committed_at=snapshot.created_at.isoformat(),
+    snapshot: db.DocumentationSnapshot, release: db.Release | db.NativeRelease, settings: Settings
+) -> DocumentationReceipt | NativeDocumentationReceipt:
+    model = (
+        NativeDocumentationReceipt
+        if isinstance(release, db.NativeRelease)
+        else DocumentationReceipt
+    )
+    extra = (
+        {"distribution": cast(NativeDistribution, release.distribution)}
+        if isinstance(release, db.NativeRelease)
+        else {}
+    )
+    return model.model_validate(
+        dict(
+            **extra,
+            name=release.extension_id,
+            version=release.version,
+            scope=cast(DocumentationScope, snapshot.scope),
+            snapshot_id=snapshot.id,
+            content_sha256=snapshot.content_sha256,
+            entry=snapshot.entry,
+            source_repository=snapshot.source_repository,
+            source_revision=snapshot.source_revision,
+            build_id=snapshot.build_id,
+            snapshot_etag=f'"{snapshot.etag}"',
+            snapshot_url=settings.documentation_origin(snapshot.id) + "/",
+            committed_at=snapshot.created_at.isoformat(),
+        )
     )
 
 
@@ -110,31 +132,64 @@ class DocumentationRepository:
         self._capacity = anyio.CapacityLimiter(4)
 
     async def discover(
-        self, extension: str, version: str, settings: Settings, *, public: bool = True
+        self,
+        extension: str,
+        version: str,
+        settings: Settings,
+        *,
+        public: bool = True,
+        distribution: NativeDistribution | None = None,
     ) -> ReleaseDocumentation:
-        release = await db.Release.filter(extension_id=extension, version=version).first()
+        model = db.NativeRelease if distribution is not None else db.Release
+        selector = {"distribution": distribution} if distribution is not None else {}
+        release = (
+            await model.filter(extension_id=extension, version=version, **selector)
+            .prefetch_related("python__release", "module_federation__release")
+            .first()
+        )
         if release is None:
             raise RegistryNotFoundError("Release does not exist")
         readable(release, public=public)
         rows = (
-            await db.DocumentationSet.filter(release=release)
+            await db.DocumentationSet.filter(
+                **(
+                    {"native_release": release}
+                    if distribution is not None
+                    else {"release": release}
+                )
+            )
             .select_related("snapshot")
             .order_by("scope")
         )
-        return ReleaseDocumentation(
-            name=extension,
-            version=version,
-            state=cast(ReleaseState, release.state),
-            sets=[record(row, release, settings) for row in rows],
+        response_model = (
+            NativeReleaseDocumentation if distribution is not None else ReleaseDocumentation
+        )
+        extra = {"distribution": distribution} if distribution is not None else {}
+        return response_model.model_validate(
+            dict(
+                **extra,
+                name=extension,
+                version=version,
+                state=cast(
+                    ReleaseState,
+                    legacy_state(release) if isinstance(release, db.Release) else release.state,
+                ),
+                sets=[record(row, release, settings) for row in rows],
+            )
         )
 
     async def public_snapshot(self, snapshot_id: str) -> db.DocumentationSnapshot:
         snapshot = (
-            await db.DocumentationSnapshot.filter(id=snapshot_id).select_related("release").first()
+            await db.DocumentationSnapshot.filter(id=snapshot_id)
+            .select_related("release", "native_release")
+            .prefetch_related("release__python__release", "release__module_federation__release")
+            .first()
         )
         if snapshot is None:
             raise RegistryNotFoundError("documentation snapshot does not exist")
-        readable(snapshot.release)
+        owner = snapshot.native_release or snapshot.release
+        assert owner is not None
+        readable(owner)
         return snapshot
 
     async def publish(
@@ -145,20 +200,28 @@ class DocumentationRepository:
         payload: DocumentationPublication,
         bundle: DocumentationBundle,
         settings: Settings,
-    ) -> DocumentationReceipt:
+        *,
+        distribution: NativeDistribution,
+    ) -> DocumentationReceipt | NativeDocumentationReceipt:
         if bundle.digest != payload.content_sha256:
             raise RegistryConflictError("documentation content digest does not match metadata")
         metadata = payload.model_dump(mode="json")
         etag = hashlib.sha256(
             json.dumps(
-                {**metadata, "name": extension, "version": version, "scope": scope},
+                {
+                    **metadata,
+                    "name": extension,
+                    "distribution": distribution,
+                    "version": version,
+                    "scope": scope,
+                },
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode()
         ).hexdigest()
 
         async def check(
-            release: db.Release,
+            release: db.NativeRelease,
         ) -> db.DocumentationSet | db.DocumentationSnapshot | None:
             readable(release, public=False)
             association = {
@@ -179,7 +242,7 @@ class DocumentationRepository:
                     )
                 return previous
             current = (
-                await db.DocumentationSet.filter(release=release, scope=scope)
+                await db.DocumentationSet.filter(native_release=release, scope=scope)
                 .select_related("snapshot")
                 .first()
             )
@@ -192,7 +255,9 @@ class DocumentationRepository:
                 )
             return current
 
-        release = await db.Release.filter(extension_id=extension, version=version).first()
+        release = await db.NativeRelease.filter(
+            extension_id=extension, distribution=distribution, version=version
+        ).first()
         if release is None:
             raise RegistryNotFoundError("Release does not exist")
         existing = await check(release)
@@ -229,13 +294,13 @@ class DocumentationRepository:
             raise failure
         try:
             async with in_transaction():
-                release = await db.Release.filter(id=release.id).select_for_update().get()
+                release = await db.NativeRelease.filter(id=release.id).select_for_update().get()
                 current = await check(release)
                 if isinstance(current, db.DocumentationSnapshot):
                     return receipt(current, release, settings)
                 snapshot = await db.DocumentationSnapshot.create(
                     id=payload.snapshot_id,
-                    release=release,
+                    native_release=release,
                     scope=scope,
                     **{
                         key: value
@@ -247,7 +312,7 @@ class DocumentationRepository:
                 )
                 if current is None:
                     current = await db.DocumentationSet.create(
-                        release=release, scope=scope, snapshot=snapshot
+                        native_release=release, scope=scope, snapshot=snapshot
                     )
                 else:
                     current.snapshot = snapshot

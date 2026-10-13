@@ -18,6 +18,7 @@ from .semantic import CanonicalExtensionName, ContractModel, StrictSemVer
 
 
 class DocumentationCandidate(ContractModel):
+    distribution: Literal["python", "module_federation"]
     name: CanonicalExtensionName
     version: StrictSemVer
     scope: Literal["global", "python", "module-federation"]

@@ -12,6 +12,7 @@ from semantic_version import NpmSpec, Version
 
 from .contracts import ExtensionReleaseDescriptor, PythonReleaseDescriptor
 from .errors import ExtensionCompatibilityError, ExtensionRegistryError
+from .generated.registry import Distribution
 
 CORE_HOST_SDK = "core-py"
 ENTRY_POINT_GROUP = "inkcre.core.extensions"
@@ -40,15 +41,24 @@ class RegistryReleaseClient:
 
     def get(self, name: str, version: str) -> ExtensionReleaseDescriptor:
         namespace, extension = validate_coordinate(name, version)
-        url = urljoin(self.origin, f"v1/extensions/{namespace}/{extension}/releases/{version}")
+        url = urljoin(
+            self.origin,
+            f"v2/extensions/{namespace}/{extension}/distributions/python/releases/{version}",
+        )
         try:
             response = requests.get(url, timeout=self.timeout)
             response.raise_for_status()
             release = ExtensionReleaseDescriptor.model_validate(response.json())
         except (requests.RequestException, ValueError, pydantic.ValidationError) as error:
             raise ExtensionRegistryError(f"Registry could not resolve {name}@{version}") from error
-        if (release.name, release.version) != (name, version):
+        if (release.name, release.version, release.distribution) != (
+            name,
+            version,
+            Distribution.python,
+        ):
             raise ExtensionRegistryError("Registry returned a different exact Release")
+        if release.python is None or release.module_federation is not None:
+            raise ExtensionRegistryError("Registry returned a different native association")
         return release
 
 

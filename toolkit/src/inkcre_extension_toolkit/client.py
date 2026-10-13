@@ -5,12 +5,17 @@ from urllib.parse import quote
 import httpx
 from pydantic import ValidationError
 
-from .contracts import PrepareReleaseRequest, ReleaseRecord
+from .contracts import (
+    NativePrepareReleaseRequest,
+    NativeReleaseRecord,
+    ReleaseRecord,
+)
 from .generated.documentation import (
     DocumentationHosting,
     DocumentationPublication,
-    DocumentationReceipt,
     DocumentationUpload,
+    NativeDocumentationReceipt,
+    NativeReleaseDocumentation,
     ReleaseDocumentation,
 )
 
@@ -68,50 +73,80 @@ class RegistryClient:
     def _release_path(namespace: str, name: str, version: str) -> str:
         return f"/v1/extensions/{namespace}/{name}/releases/{version}"
 
-    def get_release(self, namespace: str, name: str, version: str) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.get(self._release_path(namespace, name, version))
-        )
-        return ReleaseRecord.model_validate(response.json())
+    @staticmethod
+    def _native_path(
+        namespace: str, name: str, distribution: str, version: str | None = None
+    ) -> str:
+        if distribution not in {"python", "module_federation"}:
+            raise ValueError("unknown native Distribution")
+        root = f"/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases"
+        return root + (f"/{version}" if version else "")
 
-    def prepare(self, namespace: str, name: str, payload: PrepareReleaseRequest) -> ReleaseRecord:
+    def get_native_release(
+        self, namespace: str, name: str, distribution: str, version: str
+    ) -> NativeReleaseRecord:
+        response = self._require_success(
+            self._client.get(self._native_path(namespace, name, distribution, version))
+        )
+        return NativeReleaseRecord.model_validate(response.json())
+
+    def prepare_native(
+        self, namespace: str, name: str, distribution: str, payload: NativePrepareReleaseRequest
+    ) -> NativeReleaseRecord:
+        if (distribution == "python") != (payload.python is not None):
+            raise ValueError("prepare association must match the selected distribution")
         response = self._require_success(
             self._client.post(
-                f"/v1/extensions/{namespace}/{name}/releases",
+                self._native_path(namespace, name, distribution),
                 json=payload.model_dump(mode="json", exclude_none=True),
             )
         )
-        return ReleaseRecord.model_validate(response.json())
+        return NativeReleaseRecord.model_validate(response.json())
 
-    def upload_module_federation(
-        self, namespace: str, name: str, version: str, archive: bytes
-    ) -> ReleaseRecord:
+    def publish_native(
+        self, namespace: str, name: str, distribution: str, version: str
+    ) -> NativeReleaseRecord:
         response = self._require_success(
             self._client.post(
-                self._release_path(namespace, name, version) + "/module-federation",
-                files={"content": ("module-federation.zip", archive, "application/zip")},
+                self._native_path(namespace, name, distribution, version) + "/publish"
             )
         )
-        return ReleaseRecord.model_validate(response.json())
+        return NativeReleaseRecord.model_validate(response.json())
 
-    def publish(self, namespace: str, name: str, version: str) -> ReleaseRecord:
-        response = self._require_success(
-            self._client.post(self._release_path(namespace, name, version) + "/publish")
-        )
-        return ReleaseRecord.model_validate(response.json())
-
-    def yank(self, namespace: str, name: str, version: str, reason: str) -> ReleaseRecord:
+    def yank_native(
+        self, namespace: str, name: str, distribution: str, version: str, reason: str
+    ) -> NativeReleaseRecord:
         response = self._require_success(
             self._client.post(
-                self._release_path(namespace, name, version) + "/yank",
+                self._native_path(namespace, name, distribution, version) + "/yank",
                 json={"reason": reason},
             )
         )
-        return ReleaseRecord.model_validate(response.json())
+        return NativeReleaseRecord.model_validate(response.json())
 
-    def unyank(self, namespace: str, name: str, version: str) -> ReleaseRecord:
+    def unyank_native(
+        self, namespace: str, name: str, distribution: str, version: str
+    ) -> NativeReleaseRecord:
         response = self._require_success(
-            self._client.post(self._release_path(namespace, name, version) + "/unyank")
+            self._client.post(self._native_path(namespace, name, distribution, version) + "/unyank")
+        )
+        return NativeReleaseRecord.model_validate(response.json())
+
+    def upload_native_module_federation(
+        self, namespace: str, name: str, version: str, archive: bytes
+    ) -> NativeReleaseRecord:
+        response = self._require_success(
+            self._client.post(
+                self._native_path(namespace, name, "module_federation", version)
+                + "/module-federation",
+                files={"content": ("module-federation.zip", archive, "application/zip")},
+            )
+        )
+        return NativeReleaseRecord.model_validate(response.json())
+
+    def get_release(self, namespace: str, name: str, version: str) -> ReleaseRecord:
+        response = self._require_success(
+            self._client.get(self._release_path(namespace, name, version))
         )
         return ReleaseRecord.model_validate(response.json())
 
@@ -123,13 +158,27 @@ class RegistryClient:
         return DocumentationHosting.model_validate(response.json())
 
     def get_documentation(
-        self, namespace: str, name: str, version: str, *, private: bool = False
-    ) -> ReleaseDocumentation:
-        path = self._release_path(namespace, name, version) + "/documentation"
+        self,
+        namespace: str,
+        name: str,
+        version: str,
+        *,
+        private: bool = False,
+        distribution: str | None = None,
+    ) -> ReleaseDocumentation | NativeReleaseDocumentation:
+        path = (
+            self._native_path(namespace, name, distribution, version)
+            if distribution is not None
+            else self._release_path(namespace, name, version)
+        ) + "/documentation"
         if private:
-            path = path.replace("/v1/extensions/", "/v1/publisher/extensions/", 1)
+            path = path.replace("/v1/extensions/", "/v1/publisher/extensions/", 1).replace(
+                "/v2/extensions/", "/v2/publisher/extensions/", 1
+            )
         response = self._require_success(self._client.get(path))
-        return ReleaseDocumentation.model_validate(response.json())
+        return (
+            NativeReleaseDocumentation if distribution is not None else ReleaseDocumentation
+        ).model_validate(response.json())
 
     def upload_documentation(
         self,
@@ -141,7 +190,8 @@ class RegistryClient:
         archive: bytes,
         *,
         expected_etag: str | None = None,
-    ) -> DocumentationReceipt:
+        distribution: str,
+    ) -> NativeDocumentationReceipt:
         """Try the saved publication at most twice; never infer success from current."""
         from .documentation import inspect_documentation
 
@@ -156,12 +206,13 @@ class RegistryClient:
             try:
                 response = self._require_success(
                     self._client.post(
-                        self._release_path(namespace, name, version) + f"/documentation/{scope}",
+                        self._native_path(namespace, name, distribution, version)
+                        + f"/documentation/{scope}",
                         data={"metadata": publication.model_dump_json()},
                         files={"content": ("documentation.zip", archive, "application/zip")},
                     )
                 )
-                return DocumentationReceipt.model_validate_json(response.content)
+                return NativeDocumentationReceipt.model_validate_json(response.content)
             except (httpx.TransportError, RegistryHTTPError, ValidationError) as error:
                 if isinstance(error, RegistryHTTPError) and error.status_code not in {
                     500,

@@ -1,7 +1,5 @@
-import { createClient } from './generated/client'
-import { getDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGet } from './generated/sdk.gen'
 import type { DocumentationRecord } from './generated/types.gen'
-import { zReleaseDocumentation } from './generated/zod.gen'
+import { zReleaseDocumentation, zNativeReleaseDocumentation } from './generated/zod.gen'
 import { RegistryDocumentationError } from './errors'
 import { assertCoordinate, registryOrigin } from './registry'
 
@@ -14,28 +12,44 @@ export async function getExtensionDocumentation(
   origin: string,
   name: string,
   version: string,
+  distribution?: 'python' | 'module_federation',
 ): Promise<ExtensionDocumentationLink[] | null> {
   assertCoordinate(name, version)
   const [namespace, localName] = name.split('/') as [string, string]
-  const result = await getDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGet({
-    client: createClient({ baseUrl: registryOrigin(origin).origin }),
-    path: { namespace, name: localName, version },
-    credentials: 'omit',
-    headers: { Accept: 'application/json' },
-  })
-  if (result.response?.status === 404) return null
-  if (!result.response?.ok) {
+  const path = distribution
+    ? `/v2/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/distributions/${distribution}/releases/${encodeURIComponent(version)}/documentation`
+    : `/v1/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/releases/${encodeURIComponent(version)}/documentation`
+  let response: Response
+  try {
+    response = await fetch(new URL(path, registryOrigin(origin)), {
+      credentials: 'omit',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
     throw new RegistryDocumentationError(
-      result.response
-        ? `Extension documentation request failed with HTTP ${result.response.status}.`
-        : 'Extension documentation request could not reach the Registry.',
+      'Extension documentation request could not reach the Registry.',
     )
   }
-  const parsed = zReleaseDocumentation.safeParse(result.data)
+  if (response.status === 404) return null
+  if (!response.ok)
+    throw new RegistryDocumentationError(
+      `Extension documentation request failed with HTTP ${response.status}.`,
+    )
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch {
+    throw new RegistryDocumentationError('Registry returned invalid exact Release documentation.')
+  }
+  const parsed = distribution
+    ? zNativeReleaseDocumentation.safeParse(data)
+    : zReleaseDocumentation.safeParse(data)
   if (
     !parsed.success ||
     parsed.data.name !== name ||
     parsed.data.version !== version ||
+    (distribution !== undefined &&
+      (!('distribution' in parsed.data) || parsed.data.distribution !== distribution)) ||
     !['published', 'yanked'].includes(parsed.data.state)
   ) {
     throw new RegistryDocumentationError('Registry returned invalid exact Release documentation.')

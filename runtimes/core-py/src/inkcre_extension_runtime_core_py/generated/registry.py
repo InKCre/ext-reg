@@ -22,32 +22,6 @@ class Scope(Enum):
     module_federation = "module-federation"
 
 
-class DocumentationReceipt(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    build_id: constr(max_length=256) | None = Field(None, title="Build Id")
-    committed_at: str = Field(..., title="Committed At")
-    content_sha256: constr(pattern=r"^[0-9a-f]{64}$") = Field(..., title="Content Sha256")
-    entry: constr(min_length=1, max_length=768) | None = Field("index.html", title="Entry")
-    name: constr(
-        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-        min_length=3,
-        max_length=129,
-    ) = Field(..., title="Name")
-    scope: Scope = Field(..., title="Scope")
-    snapshot_etag: str = Field(..., title="Snapshot Etag")
-    snapshot_id: constr(pattern=r"^[0-9a-f]{32}$") = Field(..., title="Snapshot Id")
-    snapshot_url: str = Field(..., title="Snapshot Url")
-    source_repository: constr(min_length=1, max_length=2048) = Field(..., title="Source Repository")
-    source_revision: constr(min_length=1, max_length=256) = Field(..., title="Source Revision")
-    version: constr(
-        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-        min_length=5,
-        max_length=128,
-    ) = Field(..., title="Version")
-
-
 class DocumentationRecord(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -97,11 +71,62 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: str = Field(..., title="Manifest Url")
 
 
+class Distribution(Enum):
+    python = "python"
+    module_federation = "module_federation"
+
+
+class NativeDocumentationReceipt(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    build_id: constr(max_length=256) | None = Field(None, title="Build Id")
+    committed_at: str = Field(..., title="Committed At")
+    content_sha256: constr(pattern=r"^[0-9a-f]{64}$") = Field(..., title="Content Sha256")
+    distribution: Distribution = Field(..., title="Distribution")
+    entry: constr(min_length=1, max_length=768) | None = Field("index.html", title="Entry")
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    scope: Scope = Field(..., title="Scope")
+    snapshot_etag: str = Field(..., title="Snapshot Etag")
+    snapshot_id: constr(pattern=r"^[0-9a-f]{32}$") = Field(..., title="Snapshot Id")
+    snapshot_url: str = Field(..., title="Snapshot Url")
+    source_repository: constr(min_length=1, max_length=2048) = Field(..., title="Source Repository")
+    source_revision: constr(min_length=1, max_length=256) = Field(..., title="Source Revision")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
 class State(Enum):
     preparing = "preparing"
     published = "published"
     yanked = "yanked"
     blocked = "blocked"
+
+
+class NativeReleaseDocumentation(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Distribution = Field(..., title="Distribution")
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    sets: list[DocumentationRecord] = Field(..., title="Sets")
+    state: State = Field(..., title="State")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
 
 
 class PythonEntryPoint(BaseModel):
@@ -234,13 +259,68 @@ class ExtensionRecord(BaseModel):
     releases: list[ReleaseRecord] | None = Field([], title="Releases")
 
 
-class PrepareReleaseRequest(BaseModel):
+class NativePrepareReleaseRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
     python: PythonAssociationInput | None = None
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class NativePublisherRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Distribution = Field(..., title="Distribution")
+    module_federation: ModuleFederationDistribution | None = None
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: PythonDistribution | None = None
+    state: State = Field(..., title="State")
+    uploaded: bool = Field(..., title="Uploaded")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class NativePublisherWorkspace(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    namespace: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$", min_length=1, max_length=64
+    ) = Field(..., title="Namespace")
+    next_offset: conint(ge=0) | None = Field(..., title="Next Offset")
+    offset: conint(ge=0) = Field(..., title="Offset")
+    releases: list[NativePublisherRelease] = Field(..., title="Releases")
+
+
+class NativeReleaseRecord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Distribution = Field(..., title="Distribution")
+    module_federation: ModuleFederationDistribution | None = None
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: PythonDistribution | None = None
+    state: State = Field(..., title="State")
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
         min_length=5,
@@ -280,3 +360,16 @@ class PublisherWorkspace(BaseModel):
     next_offset: conint(ge=0) | None = Field(..., title="Next Offset")
     offset: conint(ge=0) = Field(..., title="Offset")
     releases: list[PublisherRelease] = Field(..., title="Releases")
+
+
+class NativeExtensionRecord(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    releases: list[NativeReleaseRecord] | None = Field([], title="Releases")

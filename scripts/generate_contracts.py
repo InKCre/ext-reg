@@ -14,6 +14,9 @@ from inkcre_extension_registry.contracts.models import (
     DocumentationContracts,
     ExtensionRecord,
     InstalledExtension,
+    NativeExtensionRecord,
+    NativePrepareReleaseRequest,
+    NativeReleaseRecord,
     PrepareReleaseRequest,
     PythonConsumerContracts,
     ReleaseRecord,
@@ -31,6 +34,13 @@ def _encoded(value: Any) -> bytes:
 
 def generated_contracts() -> dict[Path, bytes]:
     models = {
+        "native-extension.schema.json": NativeExtensionRecord.model_json_schema(
+            mode="serialization"
+        ),
+        "native-prepare-release.schema.json": NativePrepareReleaseRequest.model_json_schema(
+            mode="serialization"
+        ),
+        "native-release.schema.json": NativeReleaseRecord.model_json_schema(mode="serialization"),
         "documentation.schema.json": DocumentationContracts.model_json_schema(mode="serialization"),
         "extension.schema.json": ExtensionRecord.model_json_schema(mode="serialization"),
         "prepare-release.schema.json": PrepareReleaseRequest.model_json_schema(
@@ -46,7 +56,7 @@ def generated_contracts() -> dict[Path, bytes]:
     outputs[CONTRACTS / "openapi.json"] = _encoded(create_app().openapi())
     outputs[CONTRACTS / "revision.json"] = _encoded(
         {
-            "contract_revision": 3,
+            "contract_revision": 4,
             "documentation_scopes": ["global", "module-federation", "python"],
             "distribution_kinds": ["module_federation", "python"],
             "extension_version": "strict-semver-without-build-metadata",

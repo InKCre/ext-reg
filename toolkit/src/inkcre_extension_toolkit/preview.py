@@ -14,12 +14,12 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from .contracts import (
-    ExtensionRecord,
     ExtensionSummary,
     ModuleFederationDistribution,
+    NativeExtensionRecord,
+    NativeReleaseRecord,
     PythonDistribution,
     PythonEntryPoint,
-    ReleaseRecord,
     normalize_project_name,
 )
 from .module_federation import inspect_module_federation_snapshot
@@ -66,15 +66,24 @@ class PreviewBuildResult(_InventoryModel):
 
 
 class _ReleaseMaterial:
-    def __init__(self, *, name: str, nickname: str, version: str) -> None:
+    def __init__(
+        self,
+        *,
+        name: str,
+        nickname: str,
+        version: str,
+        distribution: Literal["python", "module_federation"],
+    ) -> None:
         self.name = name
         self.nickname = nickname
         self.version = version
+        self.distribution: Literal["python", "module_federation"] = distribution
         self.python: PythonDistribution | None = None
         self.module_federation: ModuleFederationDistribution | None = None
 
-    def record(self) -> ReleaseRecord:
-        return ReleaseRecord(
+    def record(self) -> NativeReleaseRecord:
+        return NativeReleaseRecord(
+            distribution=self.distribution,
             name=self.name,
             nickname=self.nickname,
             version=self.version,
@@ -136,16 +145,19 @@ def _string(value: object, label: str) -> str:
 
 
 def _release(
-    releases: dict[tuple[str, str], _ReleaseMaterial],
+    releases: dict[tuple[str, str, str], _ReleaseMaterial],
     *,
     name: str,
     nickname: str,
     version: str,
+    distribution: Literal["python", "module_federation"],
 ) -> _ReleaseMaterial:
-    key = (name, version)
+    key = (name, distribution, version)
     existing = releases.get(key)
     if existing is None:
-        existing = _ReleaseMaterial(name=name, nickname=nickname, version=version)
+        existing = _ReleaseMaterial(
+            name=name, nickname=nickname, version=version, distribution=distribution
+        )
         releases[key] = existing
     elif existing.nickname != nickname:
         raise PreviewBuildError(f"conflicting nickname for {name}@{version}")
@@ -188,7 +200,7 @@ def _build_module_federation(
     inventory_path: Path,
     origin: str,
     output: Path,
-    releases: dict[tuple[str, str], _ReleaseMaterial],
+    releases: dict[tuple[str, str, str], _ReleaseMaterial],
 ) -> None:
     producer = _read_json(_input_path(inventory_path, item.producer))
     inkcre = _object(producer.get("inkcre"), "package.json inkcre")
@@ -207,7 +219,9 @@ def _build_module_federation(
         _snapshot_archive(_input_path(inventory_path, item.artifact)),
         public_prefix=origin + prefix,
     )
-    material = _release(releases, name=name, nickname=nickname, version=version)
+    material = _release(
+        releases, name=name, nickname=nickname, version=version, distribution=item.kind
+    )
     distribution = ModuleFederationDistribution(
         manifest_url=prefix + "mf-manifest.json",
         host_sdk=host_sdk,
@@ -241,7 +255,7 @@ def _build_python(
     *,
     inventory_path: Path,
     output: Path,
-    releases: dict[tuple[str, str], _ReleaseMaterial],
+    releases: dict[tuple[str, str, str], _ReleaseMaterial],
     files_by_project: dict[str, list[PythonFileRecord]],
     python_owners: dict[tuple[str, str], tuple[str, str]],
 ) -> None:
@@ -281,7 +295,9 @@ def _build_python(
             f"Python Project/version {normalized_project}=={inspected.project_version} "
             "belongs to multiple Extension Releases"
         )
-    material = _release(releases, name=name, nickname=nickname, version=version)
+    material = _release(
+        releases, name=name, nickname=nickname, version=version, distribution=item.kind
+    )
     distribution = PythonDistribution(
         project=normalized_project,
         simple_url=f"/simple/{normalized_project}/",
@@ -317,7 +333,7 @@ def _build_python(
 
 def _headers() -> bytes:
     return (
-        b"/v1/extensions/*\n"
+        b"/v2/extensions/*\n"
         b"  Access-Control-Allow-Origin: *\n"
         b"  Cache-Control: no-store\n"
         b"  Content-Type: application/json; charset=utf-8\n"
@@ -353,7 +369,7 @@ def build_preview_registry(
         raise PreviewBuildError("output directory must not exist or must be empty")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".inkcre-preview-", dir=output_path.parent))
-    releases: dict[tuple[str, str], _ReleaseMaterial] = {}
+    releases: dict[tuple[str, str, str], _ReleaseMaterial] = {}
     files_by_project: dict[str, list[PythonFileRecord]] = {}
     python_owners: dict[tuple[str, str], tuple[str, str]] = {}
     try:
@@ -379,40 +395,44 @@ def build_preview_registry(
                     releases=releases,
                 )
         api_paths: list[str] = []
-        records_by_name: dict[str, list[ReleaseRecord]] = {}
-        for (name, version), material in sorted(releases.items()):
+        records_by_name: dict[tuple[str, str], list[NativeReleaseRecord]] = {}
+        for (name, distribution, version), material in sorted(releases.items()):
             namespace, local_name = name.split("/", 1)
-            release_path = f"/v1/extensions/{namespace}/{local_name}/releases/{version}"
+            release_path = (
+                f"/v2/extensions/{namespace}/{local_name}/distributions/{distribution}"
+                f"/releases/{version}"
+            )
             record = material.record()
             _write(
                 staging / (release_path.lstrip("/") + ".json"),
                 _json_bytes(record.model_dump(mode="json", exclude_none=True)),
             )
             api_paths.append(release_path)
-            records_by_name.setdefault(name, []).append(record)
+            records_by_name.setdefault((name, distribution), []).append(record)
         summaries: list[ExtensionSummary] = []
-        for name, records in sorted(records_by_name.items()):
+        for (name, distribution), records in sorted(records_by_name.items()):
             nicknames = {record.nickname for record in records}
             if len(nicknames) != 1:
                 raise PreviewBuildError(f"conflicting nickname across Releases for {name}")
             nickname = nicknames.pop()
             summary = ExtensionSummary(name=name, nickname=nickname)
-            detail = ExtensionRecord(name=name, nickname=nickname, releases=records)
+            detail = NativeExtensionRecord(name=name, nickname=nickname, releases=records)
             namespace, local_name = name.split("/", 1)
-            detail_path = f"/v1/extensions/{namespace}/{local_name}"
+            detail_path = f"/v2/extensions/{namespace}/{local_name}/distributions/{distribution}"
             _write(
                 staging / (detail_path.lstrip("/") + ".json"),
                 _json_bytes(detail.model_dump(mode="json", exclude_none=True)),
             )
             api_paths.append(detail_path)
-            summaries.append(summary)
+            if summary not in summaries:
+                summaries.append(summary)
         _write(
-            staging / "v1" / "extensions.json",
+            staging / "v2" / "extensions.json",
             _json_bytes(
                 [summary.model_dump(mode="json", exclude_none=True) for summary in summaries]
             ),
         )
-        api_paths.append("/v1/extensions")
+        api_paths.append("/v2/extensions")
         projects = sorted(files_by_project)
         if projects:
             _write(staging / "simple" / "index.html", root_html(projects).encode())
@@ -431,7 +451,7 @@ def build_preview_registry(
         shutil.rmtree(staging, ignore_errors=True)
         raise
     return PreviewBuildResult(
-        extension_count=len({name for name, _version in releases}),
+        extension_count=len({name for name, _distribution, _version in releases}),
         release_count=len(releases),
         distribution_count=len(inventory.distributions),
         output=str(output_path),

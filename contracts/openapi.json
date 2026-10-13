@@ -15,101 +15,6 @@
         "title": "DocumentationHosting",
         "type": "object"
       },
-      "DocumentationReceipt": {
-        "additionalProperties": false,
-        "properties": {
-          "build_id": {
-            "anyOf": [
-              {
-                "maxLength": 256,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Build Id"
-          },
-          "committed_at": {
-            "title": "Committed At",
-            "type": "string"
-          },
-          "content_sha256": {
-            "pattern": "^[0-9a-f]{64}$",
-            "title": "Content Sha256",
-            "type": "string"
-          },
-          "entry": {
-            "default": "index.html",
-            "maxLength": 768,
-            "minLength": 1,
-            "title": "Entry",
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 129,
-            "minLength": 3,
-            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-            "title": "Name",
-            "type": "string"
-          },
-          "scope": {
-            "enum": [
-              "global",
-              "python",
-              "module-federation"
-            ],
-            "title": "Scope",
-            "type": "string"
-          },
-          "snapshot_etag": {
-            "title": "Snapshot Etag",
-            "type": "string"
-          },
-          "snapshot_id": {
-            "pattern": "^[0-9a-f]{32}$",
-            "title": "Snapshot Id",
-            "type": "string"
-          },
-          "snapshot_url": {
-            "title": "Snapshot Url",
-            "type": "string"
-          },
-          "source_repository": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Source Repository",
-            "type": "string"
-          },
-          "source_revision": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Source Revision",
-            "type": "string"
-          },
-          "version": {
-            "maxLength": 128,
-            "minLength": 5,
-            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "snapshot_id",
-          "content_sha256",
-          "source_repository",
-          "source_revision",
-          "name",
-          "version",
-          "scope",
-          "snapshot_etag",
-          "snapshot_url",
-          "committed_at"
-        ],
-        "title": "DocumentationReceipt",
-        "type": "object"
-      },
       "DocumentationRecord": {
         "additionalProperties": false,
         "properties": {
@@ -333,7 +238,141 @@
         "title": "ModuleFederationDistribution",
         "type": "object"
       },
-      "PrepareReleaseRequest": {
+      "NativeDocumentationReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "build_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Id"
+          },
+          "committed_at": {
+            "title": "Committed At",
+            "type": "string"
+          },
+          "content_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Content Sha256",
+            "type": "string"
+          },
+          "distribution": {
+            "enum": [
+              "python",
+              "module_federation"
+            ],
+            "title": "Distribution",
+            "type": "string"
+          },
+          "entry": {
+            "default": "index.html",
+            "maxLength": 768,
+            "minLength": 1,
+            "title": "Entry",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "global",
+              "python",
+              "module-federation"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "snapshot_etag": {
+            "title": "Snapshot Etag",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "pattern": "^[0-9a-f]{32}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "snapshot_url": {
+            "title": "Snapshot Url",
+            "type": "string"
+          },
+          "source_repository": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Repository",
+            "type": "string"
+          },
+          "source_revision": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "content_sha256",
+          "source_repository",
+          "source_revision",
+          "name",
+          "version",
+          "scope",
+          "snapshot_etag",
+          "snapshot_url",
+          "committed_at",
+          "distribution"
+        ],
+        "title": "NativeDocumentationReceipt",
+        "type": "object"
+      },
+      "NativeExtensionRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "nickname": {
+            "title": "Nickname",
+            "type": "string"
+          },
+          "releases": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/NativeReleaseRecord"
+            },
+            "title": "Releases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "nickname"
+        ],
+        "title": "NativeExtensionRecord",
+        "type": "object"
+      },
+      "NativePrepareReleaseRequest": {
         "additionalProperties": false,
         "properties": {
           "module_federation": {
@@ -374,7 +413,249 @@
           "nickname",
           "version"
         ],
-        "title": "PrepareReleaseRequest",
+        "title": "NativePrepareReleaseRequest",
+        "type": "object"
+      },
+      "NativePublisherRelease": {
+        "additionalProperties": false,
+        "properties": {
+          "distribution": {
+            "enum": [
+              "python",
+              "module_federation"
+            ],
+            "title": "Distribution",
+            "type": "string"
+          },
+          "module_federation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModuleFederationDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "nickname": {
+            "title": "Nickname",
+            "type": "string"
+          },
+          "python": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PythonDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "published",
+              "yanked",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "uploaded": {
+            "title": "Uploaded",
+            "type": "boolean"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "nickname",
+          "version",
+          "state",
+          "distribution",
+          "uploaded"
+        ],
+        "title": "NativePublisherRelease",
+        "type": "object"
+      },
+      "NativePublisherWorkspace": {
+        "additionalProperties": false,
+        "properties": {
+          "namespace": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Namespace",
+            "type": "string"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          },
+          "offset": {
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "releases": {
+            "items": {
+              "$ref": "#/components/schemas/NativePublisherRelease"
+            },
+            "title": "Releases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "namespace",
+          "releases",
+          "offset",
+          "next_offset"
+        ],
+        "title": "NativePublisherWorkspace",
+        "type": "object"
+      },
+      "NativeReleaseDocumentation": {
+        "additionalProperties": false,
+        "properties": {
+          "distribution": {
+            "enum": [
+              "python",
+              "module_federation"
+            ],
+            "title": "Distribution",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "sets": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentationRecord"
+            },
+            "title": "Sets",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "published",
+              "yanked",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "state",
+          "sets",
+          "distribution"
+        ],
+        "title": "NativeReleaseDocumentation",
+        "type": "object"
+      },
+      "NativeReleaseRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "distribution": {
+            "enum": [
+              "python",
+              "module_federation"
+            ],
+            "title": "Distribution",
+            "type": "string"
+          },
+          "module_federation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModuleFederationDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 129,
+            "minLength": 3,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "nickname": {
+            "title": "Nickname",
+            "type": "string"
+          },
+          "python": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PythonDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "published",
+              "yanked",
+              "blocked"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 128,
+            "minLength": 5,
+            "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "nickname",
+          "version",
+          "state",
+          "distribution"
+        ],
+        "title": "NativeReleaseRecord",
         "type": "object"
       },
       "PublisherRelease": {
@@ -1154,86 +1435,6 @@
         "summary": "Get Extension"
       }
     },
-    "/v1/extensions/{namespace}/{name}/releases": {
-      "post": {
-        "operationId": "prepare_release_v1_extensions__namespace___name__releases_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PrepareReleaseRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseRecord"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Prepare Release"
-      }
-    },
     "/v1/extensions/{namespace}/{name}/releases/{version}": {
       "get": {
         "operationId": "get_release_v1_extensions__namespace___name__releases__version__get",
@@ -1394,639 +1595,6 @@
           }
         },
         "summary": "Get Documentation"
-      }
-    },
-    "/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}": {
-      "post": {
-        "operationId": "upload_documentation_v1_extensions__namespace___name__releases__version__documentation__scope__post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "version",
-            "required": true,
-            "schema": {
-              "maxLength": 128,
-              "minLength": 5,
-              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "scope",
-            "required": true,
-            "schema": {
-              "enum": [
-                "global",
-                "python",
-                "module-federation"
-              ],
-              "title": "Scope",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "properties": {
-                  "content": {
-                    "format": "binary",
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "contentMediaType": "application/json",
-                    "contentSchema": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "build_id": {
-                          "anyOf": [
-                            {
-                              "maxLength": 256,
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "title": "Build Id"
-                        },
-                        "content_sha256": {
-                          "pattern": "^[0-9a-f]{64}$",
-                          "title": "Content Sha256",
-                          "type": "string"
-                        },
-                        "entry": {
-                          "default": "index.html",
-                          "maxLength": 768,
-                          "minLength": 1,
-                          "title": "Entry",
-                          "type": "string"
-                        },
-                        "expected_etag": {
-                          "anyOf": [
-                            {
-                              "pattern": "^\"[0-9a-f]{64}\"$",
-                              "type": "string"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "title": "Expected Etag"
-                        },
-                        "snapshot_id": {
-                          "pattern": "^[0-9a-f]{32}$",
-                          "title": "Snapshot Id",
-                          "type": "string"
-                        },
-                        "source_repository": {
-                          "maxLength": 2048,
-                          "minLength": 1,
-                          "title": "Source Repository",
-                          "type": "string"
-                        },
-                        "source_revision": {
-                          "maxLength": 256,
-                          "minLength": 1,
-                          "title": "Source Revision",
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "snapshot_id",
-                        "content_sha256",
-                        "source_repository",
-                        "source_revision",
-                        "expected_etag"
-                      ],
-                      "title": "DocumentationPublication",
-                      "type": "object"
-                    },
-                    "description": "JSON-encoded DocumentationPublication; send as a text form field, not a file.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "metadata",
-                  "content"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentationReceipt"
-                }
-              }
-            },
-            "description": "Historical commit confirmed; current may differ."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Malformed conditional headers, multipart fields, metadata, or static ZIP."
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Publisher credential is missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Publisher does not own this namespace."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Release or publicly readable documentation does not exist."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Publication identity conflict, stale expected_etag, or missing association."
-          },
-          "411": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "A non-chunked Content-Length is required."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "The complete multipart request exceeds 20 MiB."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "The request must use multipart/form-data."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "451": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "The Release is operator-blocked, including for its publisher."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistryError"
-                }
-              }
-            },
-            "description": "Documentation content hosting is not configured."
-          }
-        },
-        "summary": "Upload Documentation"
-      }
-    },
-    "/v1/extensions/{namespace}/{name}/releases/{version}/module-federation": {
-      "post": {
-        "operationId": "upload_module_federation_v1_extensions__namespace___name__releases__version__module_federation_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "version",
-            "required": true,
-            "schema": {
-              "maxLength": 128,
-              "minLength": 5,
-              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseRecord"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Upload Module Federation"
-      }
-    },
-    "/v1/extensions/{namespace}/{name}/releases/{version}/publish": {
-      "post": {
-        "operationId": "publish_release_v1_extensions__namespace___name__releases__version__publish_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "version",
-            "required": true,
-            "schema": {
-              "maxLength": 128,
-              "minLength": 5,
-              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseRecord"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Publish Release"
-      }
-    },
-    "/v1/extensions/{namespace}/{name}/releases/{version}/unyank": {
-      "post": {
-        "operationId": "unyank_release_v1_extensions__namespace___name__releases__version__unyank_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "version",
-            "required": true,
-            "schema": {
-              "maxLength": 128,
-              "minLength": 5,
-              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseRecord"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Unyank Release"
-      }
-    },
-    "/v1/extensions/{namespace}/{name}/releases/{version}/yank": {
-      "post": {
-        "operationId": "yank_release_v1_extensions__namespace___name__releases__version__yank_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "namespace",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Namespace",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "version",
-            "required": true,
-            "schema": {
-              "maxLength": 128,
-              "minLength": 5,
-              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-              "title": "Version",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/YankRequest"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Payload"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseRecord"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Yank Release"
       }
     },
     "/v1/publisher": {
@@ -2217,6 +1785,1276 @@
           }
         },
         "summary": "Publisher Documentation"
+      }
+    },
+    "/v2/extensions": {
+      "get": {
+        "operationId": "native_extensions_v2_extensions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExtensionSummary"
+                  },
+                  "title": "Response Native Extensions V2 Extensions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Native Extensions"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}": {
+      "get": {
+        "operationId": "native_extension_v2_extensions__namespace___name__distributions__distribution__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeExtensionRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Native Extension"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases": {
+      "post": {
+        "operationId": "prepare_native_release_v2_extensions__namespace___name__distributions__distribution__releases_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NativePrepareReleaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prepare Native Release"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}": {
+      "get": {
+        "operationId": "get_native_release_v2_extensions__namespace___name__distributions__distribution__releases__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Native Release"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation": {
+      "get": {
+        "operationId": "get_native_documentation_v2_extensions__namespace___name__distributions__distribution__releases__version__documentation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseDocumentation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Get Native Documentation"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation/{scope}": {
+      "post": {
+        "operationId": "upload_native_documentation_v2_extensions__namespace___name__distributions__distribution__releases__version__documentation__scope__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "scope",
+            "required": true,
+            "schema": {
+              "enum": [
+                "global",
+                "python",
+                "module-federation"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "content": {
+                    "format": "binary",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "contentMediaType": "application/json",
+                    "contentSchema": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "build_id": {
+                          "anyOf": [
+                            {
+                              "maxLength": 256,
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Build Id"
+                        },
+                        "content_sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "title": "Content Sha256",
+                          "type": "string"
+                        },
+                        "entry": {
+                          "default": "index.html",
+                          "maxLength": 768,
+                          "minLength": 1,
+                          "title": "Entry",
+                          "type": "string"
+                        },
+                        "expected_etag": {
+                          "anyOf": [
+                            {
+                              "pattern": "^\"[0-9a-f]{64}\"$",
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Expected Etag"
+                        },
+                        "snapshot_id": {
+                          "pattern": "^[0-9a-f]{32}$",
+                          "title": "Snapshot Id",
+                          "type": "string"
+                        },
+                        "source_repository": {
+                          "maxLength": 2048,
+                          "minLength": 1,
+                          "title": "Source Repository",
+                          "type": "string"
+                        },
+                        "source_revision": {
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "title": "Source Revision",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "snapshot_id",
+                        "content_sha256",
+                        "source_repository",
+                        "source_revision",
+                        "expected_etag"
+                      ],
+                      "title": "DocumentationPublication",
+                      "type": "object"
+                    },
+                    "description": "JSON-encoded DocumentationPublication; send as a text form field, not a file.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "metadata",
+                  "content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeDocumentationReceipt"
+                }
+              }
+            },
+            "description": "Historical commit confirmed; current may differ."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Malformed conditional headers, multipart fields, metadata, or static ZIP."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publication identity conflict, stale expected_etag, or missing association."
+          },
+          "411": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "A non-chunked Content-Length is required."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The complete multipart request exceeds 20 MiB."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The request must use multipart/form-data."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Upload Native Documentation"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation": {
+      "post": {
+        "operationId": "upload_native_module_federation_v2_extensions__namespace___name__distributions__distribution__releases__version__module_federation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Native Module Federation"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/publish": {
+      "post": {
+        "operationId": "publish_native_release_v2_extensions__namespace___name__distributions__distribution__releases__version__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Native Release"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/unyank": {
+      "post": {
+        "operationId": "unyank_native_release_v2_extensions__namespace___name__distributions__distribution__releases__version__unyank_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unyank Native Release"
+      }
+    },
+    "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/yank": {
+      "post": {
+        "operationId": "yank_native_release_v2_extensions__namespace___name__distributions__distribution__releases__version__yank_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/YankRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Yank Native Release"
+      }
+    },
+    "/v2/publisher": {
+      "get": {
+        "operationId": "native_publisher_v2_publisher_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativePublisherWorkspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Native Publisher"
+      }
+    },
+    "/v2/publisher/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation": {
+      "get": {
+        "operationId": "publisher_native_documentation_v2_publisher_extensions__namespace___name__distributions__distribution__releases__version__documentation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "distribution",
+            "required": true,
+            "schema": {
+              "enum": [
+                "python",
+                "module_federation"
+              ],
+              "title": "Distribution",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseDocumentation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher credential is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Publisher does not own this namespace."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Release or publicly readable documentation does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "451": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "The Release is operator-blocked, including for its publisher."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryError"
+                }
+              }
+            },
+            "description": "Documentation content hosting is not configured."
+          }
+        },
+        "summary": "Publisher Native Documentation"
       }
     }
   }
