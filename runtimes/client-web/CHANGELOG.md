@@ -1,5 +1,11 @@
 # @inkcre/extension-runtime-client-web
 
+## 0.4.0
+
+### Minor Changes
+
+- 采用 Registry v2 原生发行与 Peer 精确参与模型。安装、启用及运行状态改为所选 Peer 的事实，管理能力升级到 v2；需要 @inkcre/core 0.4，旧全局版本 API 不再准入。
+
 ## 0.3.0
 
 ### Minor Changes

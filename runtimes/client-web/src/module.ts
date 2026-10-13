@@ -58,7 +58,7 @@ export async function loadExtensionModule<T extends WebExtensionModule>(
   version: string,
   manifestUrl: string,
 ): Promise<WebExtensionModuleHandle<T>> {
-  const remoteName = webExtensionRemoteName(name)
+  const remoteName = webExtensionRemoteName(name, version)
   moduleFederation.registerRemotes([{ name: remoteName, entry: manifestUrl }], { force: true })
   const loaded = await moduleFederation.loadRemote<T | { default: T }>(remoteName)
   if (!loaded) throw new Error(`${name}@${version} returned no Module Federation module.`)
@@ -66,6 +66,6 @@ export async function loadExtensionModule<T extends WebExtensionModule>(
   return new WebExtensionModuleHandle(name, version, extensionModule)
 }
 
-export function webExtensionRemoteName(name: string): string {
-  return `extension.${name.replace('/', '.')}`
+export function webExtensionRemoteName(name: string, version: string): string {
+  return `extension.${name.replace('/', '.')}.${version}`
 }

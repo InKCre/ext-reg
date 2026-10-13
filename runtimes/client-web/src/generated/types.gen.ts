@@ -15,60 +15,6 @@ export type DocumentationHosting = {
 }
 
 /**
- * DocumentationReceipt
- */
-export type DocumentationReceipt = {
-  /**
-   * Build Id
-   */
-  build_id?: string | null
-  /**
-   * Committed At
-   */
-  committed_at: string
-  /**
-   * Content Sha256
-   */
-  content_sha256: string
-  /**
-   * Entry
-   */
-  entry?: string
-  /**
-   * Name
-   */
-  name: string
-  /**
-   * Scope
-   */
-  scope: 'global' | 'python' | 'module-federation'
-  /**
-   * Snapshot Etag
-   */
-  snapshot_etag: string
-  /**
-   * Snapshot Id
-   */
-  snapshot_id: string
-  /**
-   * Snapshot Url
-   */
-  snapshot_url: string
-  /**
-   * Source Repository
-   */
-  source_repository: string
-  /**
-   * Source Revision
-   */
-  source_revision: string
-  /**
-   * Version
-   */
-  version: string
-}
-
-/**
  * DocumentationRecord
  */
 export type DocumentationRecord = {
@@ -205,15 +151,199 @@ export type ModuleFederationDistribution = {
 }
 
 /**
- * PrepareReleaseRequest
+ * NativeDocumentationReceipt
  */
-export type PrepareReleaseRequest = {
+export type NativeDocumentationReceipt = {
+  /**
+   * Build Id
+   */
+  build_id?: string | null
+  /**
+   * Committed At
+   */
+  committed_at: string
+  /**
+   * Content Sha256
+   */
+  content_sha256: string
+  /**
+   * Distribution
+   */
+  distribution: 'python' | 'module_federation'
+  /**
+   * Entry
+   */
+  entry?: string
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Scope
+   */
+  scope: 'global' | 'python' | 'module-federation'
+  /**
+   * Snapshot Etag
+   */
+  snapshot_etag: string
+  /**
+   * Snapshot Id
+   */
+  snapshot_id: string
+  /**
+   * Snapshot Url
+   */
+  snapshot_url: string
+  /**
+   * Source Repository
+   */
+  source_repository: string
+  /**
+   * Source Revision
+   */
+  source_revision: string
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * NativeExtensionRecord
+ */
+export type NativeExtensionRecord = {
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  /**
+   * Releases
+   */
+  releases?: Array<NativeReleaseRecord>
+}
+
+/**
+ * NativePrepareReleaseRequest
+ */
+export type NativePrepareReleaseRequest = {
   module_federation?: ModuleFederationAssociationInput | null
   /**
    * Nickname
    */
   nickname: string
   python?: PythonAssociationInput | null
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * NativePublisherRelease
+ */
+export type NativePublisherRelease = {
+  /**
+   * Distribution
+   */
+  distribution: 'python' | 'module_federation'
+  module_federation?: ModuleFederationDistribution | null
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  python?: PythonDistribution | null
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Uploaded
+   */
+  uploaded: boolean
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * NativePublisherWorkspace
+ */
+export type NativePublisherWorkspace = {
+  /**
+   * Namespace
+   */
+  namespace: string
+  /**
+   * Next Offset
+   */
+  next_offset: number | null
+  /**
+   * Offset
+   */
+  offset: number
+  /**
+   * Releases
+   */
+  releases: Array<NativePublisherRelease>
+}
+
+/**
+ * NativeReleaseDocumentation
+ */
+export type NativeReleaseDocumentation = {
+  /**
+   * Distribution
+   */
+  distribution: 'python' | 'module_federation'
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Sets
+   */
+  sets: Array<DocumentationRecord>
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * NativeReleaseRecord
+ */
+export type NativeReleaseRecord = {
+  /**
+   * Distribution
+   */
+  distribution: 'python' | 'module_federation'
+  module_federation?: ModuleFederationDistribution | null
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  python?: PythonDistribution | null
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
   /**
    * Version
    */
@@ -696,48 +826,6 @@ export type GetExtensionV1ExtensionsNamespaceNameGetResponses = {
 export type GetExtensionV1ExtensionsNamespaceNameGetResponse =
   GetExtensionV1ExtensionsNamespaceNameGetResponses[keyof GetExtensionV1ExtensionsNamespaceNameGetResponses]
 
-export type PrepareReleaseV1ExtensionsNamespaceNameReleasesPostData = {
-  body: PrepareReleaseRequest
-  headers?: {
-    /**
-     * Authorization
-     */
-    authorization?: string | null
-  }
-  path: {
-    /**
-     * Namespace
-     */
-    namespace: string
-    /**
-     * Name
-     */
-    name: string
-  }
-  query?: never
-  url: '/v1/extensions/{namespace}/{name}/releases'
-}
-
-export type PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type PrepareReleaseV1ExtensionsNamespaceNameReleasesPostError =
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors[keyof PrepareReleaseV1ExtensionsNamespaceNameReleasesPostErrors]
-
-export type PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses = {
-  /**
-   * Successful Response
-   */
-  200: ReleaseRecord
-}
-
-export type PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponse =
-  PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses[keyof PrepareReleaseV1ExtensionsNamespaceNameReleasesPostResponses]
-
 export type GetReleaseV1ExtensionsNamespaceNameReleasesVersionGetData = {
   body?: never
   path: {
@@ -829,295 +917,6 @@ export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentatio
 
 export type GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
   GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses[keyof GetDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationGetResponses]
-
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostData =
-  {
-    body: {
-      content: Blob | File
-      /**
-       * JSON-encoded DocumentationPublication; send as a text form field, not a file.
-       */
-      metadata: string
-    }
-    headers?: {
-      /**
-       * Authorization
-       */
-      authorization?: string | null
-    }
-    path: {
-      /**
-       * Namespace
-       */
-      namespace: string
-      /**
-       * Name
-       */
-      name: string
-      /**
-       * Version
-       */
-      version: string
-      /**
-       * Scope
-       */
-      scope: 'global' | 'python' | 'module-federation'
-    }
-    query?: never
-    url: '/v1/extensions/{namespace}/{name}/releases/{version}/documentation/{scope}'
-  }
-
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors =
-  {
-    /**
-     * Malformed conditional headers, multipart fields, metadata, or static ZIP.
-     */
-    400: RegistryError
-    /**
-     * Publisher credential is missing or invalid.
-     */
-    401: RegistryError
-    /**
-     * Publisher does not own this namespace.
-     */
-    403: RegistryError
-    /**
-     * Release or publicly readable documentation does not exist.
-     */
-    404: RegistryError
-    /**
-     * Publication identity conflict, stale expected_etag, or missing association.
-     */
-    409: RegistryError
-    /**
-     * A non-chunked Content-Length is required.
-     */
-    411: RegistryError
-    /**
-     * The complete multipart request exceeds 20 MiB.
-     */
-    413: RegistryError
-    /**
-     * The request must use multipart/form-data.
-     */
-    415: RegistryError
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError
-    /**
-     * The Release is operator-blocked, including for its publisher.
-     */
-    451: RegistryError
-    /**
-     * Documentation content hosting is not configured.
-     */
-    503: RegistryError
-  }
-
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostError =
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostErrors]
-
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses =
-  {
-    /**
-     * Historical commit confirmed; current may differ.
-     */
-    200: DocumentationReceipt
-  }
-
-export type UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponse =
-  UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses[keyof UploadDocumentationV1ExtensionsNamespaceNameReleasesVersionDocumentationScopePostResponses]
-
-export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostData =
-  {
-    body?: never
-    headers?: {
-      /**
-       * Authorization
-       */
-      authorization?: string | null
-    }
-    path: {
-      /**
-       * Namespace
-       */
-      namespace: string
-      /**
-       * Name
-       */
-      name: string
-      /**
-       * Version
-       */
-      version: string
-    }
-    query?: never
-    url: '/v1/extensions/{namespace}/{name}/releases/{version}/module-federation'
-  }
-
-export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors =
-  {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError
-  }
-
-export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostError =
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors[keyof UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostErrors]
-
-export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses =
-  {
-    /**
-     * Successful Response
-     */
-    200: ReleaseRecord
-  }
-
-export type UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponse =
-  UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses[keyof UploadModuleFederationV1ExtensionsNamespaceNameReleasesVersionModuleFederationPostResponses]
-
-export type PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostData = {
-  body?: never
-  headers?: {
-    /**
-     * Authorization
-     */
-    authorization?: string | null
-  }
-  path: {
-    /**
-     * Namespace
-     */
-    namespace: string
-    /**
-     * Name
-     */
-    name: string
-    /**
-     * Version
-     */
-    version: string
-  }
-  query?: never
-  url: '/v1/extensions/{namespace}/{name}/releases/{version}/publish'
-}
-
-export type PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostError =
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors[keyof PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostErrors]
-
-export type PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses = {
-  /**
-   * Successful Response
-   */
-  200: ReleaseRecord
-}
-
-export type PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponse =
-  PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses[keyof PublishReleaseV1ExtensionsNamespaceNameReleasesVersionPublishPostResponses]
-
-export type UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostData = {
-  body?: never
-  headers?: {
-    /**
-     * Authorization
-     */
-    authorization?: string | null
-  }
-  path: {
-    /**
-     * Namespace
-     */
-    namespace: string
-    /**
-     * Name
-     */
-    name: string
-    /**
-     * Version
-     */
-    version: string
-  }
-  query?: never
-  url: '/v1/extensions/{namespace}/{name}/releases/{version}/unyank'
-}
-
-export type UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostError =
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors[keyof UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostErrors]
-
-export type UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses = {
-  /**
-   * Successful Response
-   */
-  200: ReleaseRecord
-}
-
-export type UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponse =
-  UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses[keyof UnyankReleaseV1ExtensionsNamespaceNameReleasesVersionUnyankPostResponses]
-
-export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostData = {
-  /**
-   * Payload
-   */
-  body?: YankRequest | null
-  headers?: {
-    /**
-     * Authorization
-     */
-    authorization?: string | null
-  }
-  path: {
-    /**
-     * Namespace
-     */
-    namespace: string
-    /**
-     * Name
-     */
-    name: string
-    /**
-     * Version
-     */
-    version: string
-  }
-  query?: never
-  url: '/v1/extensions/{namespace}/{name}/releases/{version}/yank'
-}
-
-export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors = {
-  /**
-   * Validation Error
-   */
-  422: HttpValidationError
-}
-
-export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostError =
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors[keyof YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostErrors]
-
-export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses = {
-  /**
-   * Successful Response
-   */
-  200: ReleaseRecord
-}
-
-export type YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponse =
-  YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses[keyof YankReleaseV1ExtensionsNamespaceNameReleasesVersionYankPostResponses]
 
 export type PublisherWorkspaceV1PublisherGetData = {
   body?: never
@@ -1225,3 +1024,646 @@ export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVers
 
 export type PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponse =
   PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses[keyof PublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVersionDocumentationGetResponses]
+
+export type NativeExtensionsV2ExtensionsGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/v2/extensions'
+}
+
+export type NativeExtensionsV2ExtensionsGetResponses = {
+  /**
+   * Response Native Extensions V2 Extensions Get
+   *
+   * Successful Response
+   */
+  200: Array<ExtensionSummary>
+}
+
+export type NativeExtensionsV2ExtensionsGetResponse =
+  NativeExtensionsV2ExtensionsGetResponses[keyof NativeExtensionsV2ExtensionsGetResponses]
+
+export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetData = {
+  body?: never
+  path: {
+    /**
+     * Namespace
+     */
+    namespace: string
+    /**
+     * Name
+     */
+    name: string
+    /**
+     * Distribution
+     */
+    distribution: 'python' | 'module_federation'
+  }
+  query?: never
+  url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}'
+}
+
+export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetError =
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors[keyof NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetErrors]
+
+export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: NativeExtensionRecord
+}
+
+export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponse =
+  NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses[keyof NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetResponses]
+
+export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostData =
+  {
+    body: NativePrepareReleaseRequest
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases'
+  }
+
+export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostError =
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors[keyof PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostErrors]
+
+export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponse =
+  PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses[keyof PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostResponses]
+
+export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetData =
+  {
+    body?: never
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}'
+  }
+
+export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetError =
+  GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors[keyof GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetErrors]
+
+export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponse =
+  GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses[keyof GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetResponses]
+
+export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData =
+  {
+    body?: never
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation'
+  }
+
+export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors =
+  {
+    /**
+     * Release or publicly readable documentation does not exist.
+     */
+    404: RegistryError
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+    /**
+     * The Release is operator-blocked, including for its publisher.
+     */
+    451: RegistryError
+    /**
+     * Documentation content hosting is not configured.
+     */
+    503: RegistryError
+  }
+
+export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetError =
+  GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors[keyof GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors]
+
+export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseDocumentation
+  }
+
+export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponse =
+  GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses[keyof GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses]
+
+export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostData =
+  {
+    body: {
+      content: Blob | File
+      /**
+       * JSON-encoded DocumentationPublication; send as a text form field, not a file.
+       */
+      metadata: string
+    }
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+      /**
+       * Scope
+       */
+      scope: 'global' | 'python' | 'module-federation'
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation/{scope}'
+  }
+
+export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors =
+  {
+    /**
+     * Malformed conditional headers, multipart fields, metadata, or static ZIP.
+     */
+    400: RegistryError
+    /**
+     * Publisher credential is missing or invalid.
+     */
+    401: RegistryError
+    /**
+     * Publisher does not own this namespace.
+     */
+    403: RegistryError
+    /**
+     * Release or publicly readable documentation does not exist.
+     */
+    404: RegistryError
+    /**
+     * Publication identity conflict, stale expected_etag, or missing association.
+     */
+    409: RegistryError
+    /**
+     * A non-chunked Content-Length is required.
+     */
+    411: RegistryError
+    /**
+     * The complete multipart request exceeds 20 MiB.
+     */
+    413: RegistryError
+    /**
+     * The request must use multipart/form-data.
+     */
+    415: RegistryError
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+    /**
+     * The Release is operator-blocked, including for its publisher.
+     */
+    451: RegistryError
+    /**
+     * Documentation content hosting is not configured.
+     */
+    503: RegistryError
+  }
+
+export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostError =
+  UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors[keyof UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostErrors]
+
+export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses =
+  {
+    /**
+     * Historical commit confirmed; current may differ.
+     */
+    200: NativeDocumentationReceipt
+  }
+
+export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponse =
+  UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses[keyof UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostResponses]
+
+export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostData =
+  {
+    body?: never
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation'
+  }
+
+export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostError =
+  UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors[keyof UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors]
+
+export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponse =
+  UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses[keyof UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses]
+
+export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostData =
+  {
+    body?: never
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/publish'
+  }
+
+export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostError =
+  PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors[keyof PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostErrors]
+
+export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponse =
+  PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses[keyof PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostResponses]
+
+export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostData =
+  {
+    body?: never
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/unyank'
+  }
+
+export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostError =
+  UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors[keyof UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostErrors]
+
+export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponse =
+  UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses[keyof UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostResponses]
+
+export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostData =
+  {
+    /**
+     * Payload
+     */
+    body?: YankRequest | null
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/yank'
+  }
+
+export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostError =
+  YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors[keyof YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors]
+
+export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponse =
+  YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses[keyof YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses]
+
+export type NativePublisherV2PublisherGetData = {
+  body?: never
+  headers?: {
+    /**
+     * Authorization
+     */
+    authorization?: string | null
+  }
+  path?: never
+  query?: {
+    /**
+     * Offset
+     */
+    offset?: number
+  }
+  url: '/v2/publisher'
+}
+
+export type NativePublisherV2PublisherGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type NativePublisherV2PublisherGetError =
+  NativePublisherV2PublisherGetErrors[keyof NativePublisherV2PublisherGetErrors]
+
+export type NativePublisherV2PublisherGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: NativePublisherWorkspace
+}
+
+export type NativePublisherV2PublisherGetResponse =
+  NativePublisherV2PublisherGetResponses[keyof NativePublisherV2PublisherGetResponses]
+
+export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetData =
+  {
+    body?: never
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Distribution
+       */
+      distribution: 'python' | 'module_federation'
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+    }
+    query?: never
+    url: '/v2/publisher/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/documentation'
+  }
+
+export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors =
+  {
+    /**
+     * Publisher credential is missing or invalid.
+     */
+    401: RegistryError
+    /**
+     * Publisher does not own this namespace.
+     */
+    403: RegistryError
+    /**
+     * Release or publicly readable documentation does not exist.
+     */
+    404: RegistryError
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+    /**
+     * The Release is operator-blocked, including for its publisher.
+     */
+    451: RegistryError
+    /**
+     * Documentation content hosting is not configured.
+     */
+    503: RegistryError
+  }
+
+export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetError =
+  PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors[keyof PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetErrors]
+
+export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseDocumentation
+  }
+
+export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponse =
+  PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses[keyof PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetResponses]

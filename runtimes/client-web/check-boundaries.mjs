@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
-import { configStore, PeerManager, PeerOutcomeUnknown } from '@inkcre/core'
+import {
+  configStore,
+  PeerManager,
+  PeerOutcomeUnknown,
+  ExtensionParticipationModel,
+} from '@inkcre/core'
 import {
   EXTENSION_MANAGEMENT_CAPABILITY,
+  ExtensionManager,
+  ExtensionEnabledError,
   getExtensionDocumentation,
   listAdvertisedExtensionManagementPeers,
   manageExtensionOnPeer,
@@ -11,6 +18,7 @@ import {
   RegistryDocumentationError,
   RegistryReleaseReader,
   sortPublishedReleases,
+  webExtensionRemoteName,
 } from './dist/index.js'
 
 // Exercise the built package and real SDK over HTTP, without a deployment or real credentials.
@@ -19,15 +27,22 @@ const current = '22222222-2222-4222-8222-222222222222'
 const secret = 'boundary-check-secret'
 const installed = {
   name: 'inkcre/memos',
+  peer_id: target,
+  distribution: 'python',
   version: '0.2.0',
-  enabled: [target],
-  nickname: 'Memos',
-  config: {},
+  enabled: true,
   config_schema: null,
+  supported_distributions: ['python'],
+  loaded_version: null,
+  running: false,
+  restart_required: true,
+  operation: null,
+  error: null,
 }
+const envelope = { peer_id: target, supported_distributions: ['python'], extensions: [installed] }
 let origin
 let managementStatus = 200
-let managementBody = installed
+let managementBody = envelope
 let dropManagement = false
 let docStatus = 200
 let docBody
@@ -38,7 +53,12 @@ const catalogReleases = [
     nickname: 'Catalog check',
     version: '2.0.0-beta.1',
     state: 'published',
-    module_federation: null,
+    distribution: 'module_federation',
+    module_federation: {
+      host_sdk: '@inkcre/core',
+      host_sdk_version: '>=0.3.0 <0.4.0',
+      manifest_url: '/mf-manifest.json',
+    },
     python: null,
   },
   {
@@ -46,7 +66,12 @@ const catalogReleases = [
     nickname: 'Catalog check',
     version: '1.10.0',
     state: 'published',
-    module_federation: null,
+    distribution: 'module_federation',
+    module_federation: {
+      host_sdk: '@inkcre/core',
+      host_sdk_version: '>=0.3.0 <0.4.0',
+      manifest_url: '/mf-manifest.json',
+    },
     python: null,
   },
   {
@@ -54,7 +79,12 @@ const catalogReleases = [
     nickname: 'Catalog check',
     version: '1.2.0',
     state: 'published',
-    module_federation: null,
+    distribution: 'module_federation',
+    module_federation: {
+      host_sdk: '@inkcre/core',
+      host_sdk_version: '>=0.3.0 <0.4.0',
+      manifest_url: '/mf-manifest.json',
+    },
     python: null,
   },
 ]
@@ -96,9 +126,9 @@ const server = createServer(async (request, response) => {
     if (dropManagement) return request.socket.destroy()
     response.statusCode = managementStatus
     response.end(JSON.stringify(managementBody))
-  } else if (url.pathname === '/v1/extensions') {
+  } else if (url.pathname === '/v2/extensions') {
     response.end(JSON.stringify([{ name: 'inkcre/catalog', nickname: 'Catalog check' }]))
-  } else if (url.pathname === '/v1/extensions/inkcre/catalog') {
+  } else if (url.pathname === '/v2/extensions/inkcre/catalog/distributions/module_federation') {
     response.end(
       JSON.stringify({
         name: 'inkcre/catalog',
@@ -106,7 +136,11 @@ const server = createServer(async (request, response) => {
         releases: catalogReleases,
       }),
     )
-  } else if (url.pathname.startsWith('/v1/extensions/inkcre/catalog/releases/')) {
+  } else if (
+    url.pathname.startsWith(
+      '/v2/extensions/inkcre/catalog/distributions/module_federation/releases/',
+    )
+  ) {
     const version = url.pathname.split('/').at(-1)
     response.end(JSON.stringify(catalogReleases.find((release) => release.version === version)))
   } else {
@@ -120,6 +154,10 @@ await once(server, 'listening')
 origin = `http://127.0.0.1:${server.address().port}`
 
 try {
+  assert.notEqual(
+    webExtensionRemoteName('inkcre/memos', '0.2.0'),
+    webExtensionRemoteName('inkcre/memos', '0.2.1'),
+  )
   configStore.metaConfig = {
     INKCRE_PGREST_URL: origin,
     INKCRE_PEER_ID: current,
@@ -138,19 +176,65 @@ try {
   )
   assert.equal(preferredPublishedRelease(catalogReleases).version, '1.10.0')
   assert.equal((await releases.getRelease('inkcre/catalog', '1.10.0', true)).version, '1.10.0')
-  await assert.rejects(
-    releases.get('inkcre/catalog', '1.10.0', true),
-    /no Module Federation Distribution/,
+  assert.equal(
+    (await releases.get('inkcre/catalog', '1.10.0', true)).distribution,
+    'module_federation',
   )
+  const originalGet = ExtensionParticipationModel.get
+  const selection = {
+    name: 'inkcre/catalog',
+    peer_id: current,
+    distribution: 'module_federation',
+    version: '1.10.0',
+    enabled: true,
+    config_schema: { type: 'object' },
+    async setEnabled() {
+      return this
+    },
+  }
+  ExtensionParticipationModel.get = async () => selection
+  const manager = new ExtensionManager({
+    peerId: current,
+    releases,
+    moduleFederation: {
+      registerRemotes() {},
+      async loadRemote() {
+        return {}
+      },
+    },
+  })
+  try {
+    await assert.rejects(manager.getStatus(selection.name, target), /different Peer/)
+    await manager.enable(selection.name, current)
+    assert.equal(
+      await manager.install({ name: selection.name, version: selection.version }, current),
+      selection,
+    )
+    await assert.rejects(
+      manager.install({ name: selection.name, version: '1.2.0' }, current),
+      ExtensionEnabledError,
+    )
+    assert.equal(selection.version, '1.10.0')
+    assert.deepEqual(selection.config_schema, { type: 'object' })
+  } finally {
+    await manager.shutdown()
+    ExtensionParticipationModel.get = originalGet
+  }
   assert.deepEqual(
     (await listAdvertisedExtensionManagementPeers()).map(({ id }) => id),
     [target, current],
   )
   assert.equal(requests.at(-1).url.searchParams.get('lease_expires_at'), 'gt.now')
   for (const command of [
-    { action: 'install', extension: installed.name, version: installed.version },
+    {
+      action: 'select',
+      extension: installed.name,
+      distribution: 'python',
+      version: installed.version,
+    },
     { action: 'enable', extension: installed.name },
     { action: 'disable', extension: installed.name },
+    { action: 'unselect', extension: installed.name },
     { action: 'patch_config', extension: installed.name, patch: { personal_access_token: secret } },
   ]) {
     assert.deepEqual(await manageExtensionOnPeer(target, command), installed)
@@ -164,7 +248,7 @@ try {
     (error) => /HTTP 422/.test(error.message) && !JSON.stringify(error).includes(secret),
   )
   managementStatus = 200
-  managementBody = { ...installed, nickname: { [secret]: true } }
+  managementBody = { ...envelope, peer_id: secret }
   await assert.rejects(
     manageExtensionOnPeer(target, { action: 'enable', extension: installed.name }),
     (error) => !`${error.message}${JSON.stringify(error)}`.includes(secret),

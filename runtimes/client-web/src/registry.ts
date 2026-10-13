@@ -1,14 +1,14 @@
 import { prerelease, rcompare, satisfies, valid as validSemVer, validRange } from 'semver'
 import type {
-  ExtensionRecord,
   ExtensionSummary,
   ModuleFederationDistribution,
-  ReleaseRecord,
+  NativeReleaseRecord as ReleaseRecord,
+  NativeExtensionRecord as ExtensionRecord,
 } from './generated/types.gen'
 import {
-  zExtensionRecord,
+  zNativeExtensionRecord as zExtensionRecord,
   zListExtensionsV1ExtensionsGetResponse,
-  zReleaseRecord,
+  zNativeReleaseRecord as zReleaseRecord,
 } from './generated/zod.gen'
 import { HostSdkCompatibilityError, RegistryReleaseError } from './errors'
 
@@ -49,22 +49,33 @@ export class RegistryReleaseReader {
 
   async list(): Promise<ExtensionSummary[]> {
     const origin = registryOrigin(await this.#origin())
-    const value = await this.#getJson(new URL('/v1/extensions', origin))
+    const value = await this.#getJson(new URL('/v2/extensions', origin))
     return zListExtensionsV1ExtensionsGetResponse.parse(value)
   }
 
-  async getExtension(name: string): Promise<ExtensionRecord> {
+  async getExtension(
+    name: string,
+    distribution: 'python' | 'module_federation' = 'module_federation',
+  ): Promise<ExtensionRecord> {
     assertExtensionName(name)
     const origin = registryOrigin(await this.#origin())
     const [namespace, localName] = name.split('/') as [string, string]
     const value = await this.#getJson(
       new URL(
-        `/v1/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}`,
+        `/v2/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/distributions/${distribution}`,
         origin,
       ),
     )
     const extension = zExtensionRecord.parse(value)
-    if (extension.name !== name) {
+    if (
+      extension.name !== name ||
+      extension.releases.some(
+        (release) =>
+          release.name !== name ||
+          release.distribution !== distribution ||
+          !this.#hasNativeAssociation(release),
+      )
+    ) {
       throw new RegistryReleaseError('Registry returned a different Extension coordinate.')
     }
     return extension
@@ -74,9 +85,10 @@ export class RegistryReleaseReader {
     name: string,
     version: string,
     requirePublished: boolean,
+    distribution: 'python' | 'module_federation' = 'module_federation',
   ): Promise<ReleaseRecord> {
     const origin = registryOrigin(await this.#origin())
-    return this.#getRelease(origin, name, version, requirePublished)
+    return this.#getRelease(origin, name, version, requirePublished, distribution)
   }
 
   async get(name: string, version: string, requirePublished: boolean): Promise<WebReleaseRecord> {
@@ -103,15 +115,21 @@ export class RegistryReleaseReader {
     name: string,
     version: string,
     requirePublished: boolean,
+    distribution: 'python' | 'module_federation' = 'module_federation',
   ): Promise<ReleaseRecord> {
     assertCoordinate(name, version)
     const [namespace, localName] = name.split('/') as [string, string]
     const url = new URL(
-      `/v1/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/releases/${encodeURIComponent(version)}`,
+      `/v2/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/distributions/${distribution}/releases/${encodeURIComponent(version)}`,
       origin,
     )
     const release = zReleaseRecord.parse(await this.#getJson(url))
-    if (release.name !== name || release.version !== version) {
+    if (
+      release.name !== name ||
+      release.version !== version ||
+      release.distribution !== distribution ||
+      !this.#hasNativeAssociation(release)
+    ) {
       throw new RegistryReleaseError('Registry returned a different exact Release coordinate.')
     }
     if (
@@ -131,9 +149,16 @@ export class RegistryReleaseReader {
     if (!response.ok) {
       throw new RegistryReleaseError(
         `Extension Registry request failed with HTTP ${response.status}.`,
+        response.status,
       )
     }
     return response.json()
+  }
+
+  #hasNativeAssociation(release: ReleaseRecord): boolean {
+    return release.distribution === 'python'
+      ? release.python != null && release.module_federation == null
+      : release.module_federation != null && release.python == null
   }
 
   #assertHostSdk(distribution: ModuleFederationDistribution, name: string, version: string): void {
