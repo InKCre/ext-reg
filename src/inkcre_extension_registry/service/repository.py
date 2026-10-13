@@ -419,8 +419,11 @@ class RegistryRepository:
         return projected
 
     async def list_extensions(self) -> list[ExtensionSummary]:
-        rows = await db.Extension.filter(releases__state="published").distinct().order_by("name")
-        return [ExtensionSummary(name=row.name, nickname=row.nickname) for row in rows]
+        rows = await _legacy_query().filter(state="published").order_by("extension_id")
+        visible = {
+            row.extension_id: row.extension for row in rows if legacy_state(row) == "published"
+        }
+        return [ExtensionSummary(name=row.name, nickname=row.nickname) for row in visible.values()]
 
     async def get_extension(self, extension_name: str) -> ExtensionRecord | None:
         rows = (
@@ -428,7 +431,7 @@ class RegistryRepository:
             .filter(extension_id=extension_name, state="published")
             .order_by("-created_at", "-version")
         )
-        records = tuple(legacy_descriptor(row) for row in rows if legacy_state(row) != "blocked")
+        records = tuple(legacy_descriptor(row) for row in rows if legacy_state(row) == "published")
         return (
             ExtensionRecord(
                 name=extension_name, nickname=rows[0].extension.nickname, releases=records

@@ -243,6 +243,7 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
         and "distribution" not in historical
     )
     await db.NativeRelease.filter(distribution="python").update(state="blocked")
+    assert (await request("GET", "/v1/extensions")).json() == []
     await request("GET", python_path, 451)
     await request("GET", package, 451, headers={"If-None-Match": "*"})
     await request("GET", "/v1/extensions/check/extension/releases/1.0.0", 451)
