@@ -32,7 +32,7 @@ CI 创建 PostgreSQL 17 service；本地使用独立、一次性的 PostgreSQL �
 
 Registry 通过不可变 Git commit 安装 `InKCre/ui` 的 `@inkcre/ui-web` 公共 Sass 包。修改 `web/registry.scss` 后运行 `pnpm web:build`；生成 CSS 提交到源码，并由 `pnpm web:check` 比对。模板、CSS 和 JavaScript 都随 Python wheel 打包。视觉验收覆盖空态、详情版本选择、Publisher、键盘操作、窄屏和明暗主题。
 
-Toolkit、Core Runtime 与 Web Runtime 保持各自的版本和发布机制。`pnpm build` 构建这些独立产物；Registry 的容器部署不会发布它们，也不会引入单独的前端部署流程。
+Toolkit、Core Runtime 与 Web Runtime 保持各自的版本和发布机制。`pnpm build` 构建这些独立产物；Registry 的容器部署不会发布它们，也不会引入单独的前端部署流程。 Web Runtime 的 Core SDK 开发依赖使用官方预构建 GitHub Release tgz，完整性记录在 pnpm 锁文件中；构建无需跨仓检出源码或运行 SDK 准备脚本。
 
 `pnpm packages:check` 在构建后创建独立虚拟环境，通过 wheel metadata 解析安装 Registry 与本次 Toolkit 候选，再执行 `pip check` 和服务 import；它不加载 workspace 源码，防止可编辑安装掩盖错误依赖边界。该检查需要包索引访问并随 `pnpm check` 运行。Registry 的文档 API 要求 Toolkit `>=0.5,<0.6`。Python 改动在所属 project 的 `.changes/` 记录 Towncrier fragment；Web Runtime 使用 `.changeset/`。合并普通改动后，Version PR 才准备版本与 changelog，正式产物只从准备完成的 `main` 发布。
 
