@@ -10,7 +10,7 @@
 
 Runtime 的 Core peer dependency 以实际类型与构建验证为准，不使用 ambient SDK stub。新公共 API 通过 Changesets 声明 minor 发行意图，源包版本由正式版本流程修改。
 
-Core SDK 尚未提供独立发布产物，因此开发依赖固定 client-web 的 Git revision；该子目录包只提供 manifest 和依赖，不能冒充构建产物。`prepare:sdk` 在临时目录只检出同一 revision 的 `packages/core`，沿用其真实源码、TypeScript 配置及原始 tsdown 配置，用 ext-reg 自身冻结的工具和 SDK 依赖构建 ESM 与类型声明，再将产物放入当前 workspace 的 node_modules 私有目录。它不安装生产者 workspace，不需要 GitHub Packages 凭据，也不改 pnpm store、生产依赖、源码或锁文件；首次构建只需读取公开 GitHub 源码。type-check 与 build 共用这一准备步骤，仓库门禁还通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`。正式 SDK 产物可用后，应改为固定产物开发依赖并删除准备脚本，而不是继续维护另一套 SDK 声明。
+Core SDK 开发依赖固定官方 `core-v0.4.0` GitHub Release 的预构建 tgz，冻结锁文件验证下载完整性。该产物同时包含 ESM 和类型声明，type-check 与 build 直接消费它，不检出 client-web 源码、不安装生产者 workspace，也不需要私有 UI 包凭据。仓库门禁通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`；正式 Runtime 包由本仓独立版本流程发布，Core 的 peer dependency 继续声明兼容范围。
 
 Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选择 distribution；返回坐标和唯一原生关联均须匹配。安装将共享 Extension 身份与当前 Peer 的精确参与选择分别保存，enable/startup 读取当前 Peer 选择，不追随 latest，不修改其他 Peer 或清理业务 state。旧未知分发仅用当前浏览器支持的 MF 查询同一精确版本，缺失时失败而不替换版本。
 

@@ -18,12 +18,11 @@
   },
   "scripts": {
     "prepare": "pnpm build",
-    "prepare:sdk": "node prepare-sdk.mjs",
-    "build": "pnpm prepare:sdk && tsdown --platform neutral",
+    "build": "tsdown --platform neutral",
     "check:boundaries": "pnpm build && node check-boundaries.mjs",
     "check:bindings": "pnpm generate:bindings && git diff --exit-code -- src/generated",
     "generate:bindings": "openapi-ts -f openapi-ts.config.ts && prettier --write src/generated",
-    "type-check": "pnpm prepare:sdk && tsc --noEmit",
+    "type-check": "tsc --noEmit",
     "pack": "pnpm pack"
   },
   "dependencies": {
@@ -35,7 +34,7 @@
     "@module-federation/runtime": ">=0.21.4 <0.23.0"
   },
   "devDependencies": {
-    "@inkcre/core": "github:InKCre/client-web#0c93a9fd3e2cdbf9bca9b5b4a762cc60da9f008e&path:/packages/core",
+    "@inkcre/core": "https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz",
     "@module-federation/runtime": "0.21.6",
     "@types/semver": "7.7.1",
     "@vueuse/core": "14.1.0",
