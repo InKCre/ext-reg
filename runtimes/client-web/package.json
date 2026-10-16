@@ -34,7 +34,7 @@
     "@module-federation/runtime": ">=0.21.4 <0.23.0"
   },
   "devDependencies": {
-    "@inkcre/core": "https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz",
+    "@inkcre/core": "https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz",
     "@module-federation/runtime": "0.21.6",
     "@types/semver": "7.7.1",
     "@vueuse/core": "14.1.0",

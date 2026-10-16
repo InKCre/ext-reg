@@ -42,7 +42,7 @@ def seed(origin: str, token: str) -> None:
                             "name": "rss",
                             "object": "extensions.rss:Extension",
                         },
-                        "source_repository": "https://github.com/InKCre/core-py",
+                        "source_repository": "https://github.com/InKCre/impl-py",
                         "source_revision": "8f7a17343c13f6c4af19e5ea9b58ceb6b13654c2",
                         "build_id": "35591185410",
                     },

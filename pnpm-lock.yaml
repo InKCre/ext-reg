@@ -46,8 +46,8 @@ importers:
         version: 4.1.12
     devDependencies:
       '@inkcre/core':
-        specifier: https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz
-        version: https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
+        specifier: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz
+        version: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
       '@module-federation/runtime':
         specifier: 0.21.6
         version: 0.21.6
@@ -551,8 +551,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@inkcre/core@https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz':
-    resolution: {integrity: sha512-Ld5dj7EpRgB+hIj0qpuFwT1FAFGVMTQMDygAMEwv1d923gtaM0IH5cjQFaHpDooZZ8rZcl1m2bmEAfVTwD7x9A==, tarball: https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz}
+  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz':
+    resolution: {integrity: sha512-Ld5dj7EpRgB+hIj0qpuFwT1FAFGVMTQMDygAMEwv1d923gtaM0IH5cjQFaHpDooZZ8rZcl1m2bmEAfVTwD7x9A==, tarball: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz}
     version: 0.4.0
     peerDependencies:
       '@vueuse/core': ^14.0.0
@@ -2142,7 +2142,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.2':
     optional: true
 
-  '@inkcre/core@https://github.com/InKCre/client-web/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
+  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.12.0(@opentelemetry/api@1.9.1)
