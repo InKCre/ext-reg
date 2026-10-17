@@ -1,33 +1,38 @@
 # InKCre Extension Registry
 
-The public control plane and native Distribution host for InKCre Extensions.
+The public control plane and native Distribution host for InKCre Extensions — owns Extension identity, the strict-SemVer Release lifecycle, publisher authority, and typed associations to normal Python packages and Module Federation Remotes.
 
-The Registry owns Extension Name/Nickname, one strict-SemVer Release lifecycle,
-publisher authority, and typed associations to normal Python packages and
-Module Federation Remotes. Python consumers use the Simple Repository API;
-browser consumers use the producer's native `mf-manifest.json`. Deployment
-installation, per-Peer enablement, and running state remain outside this
-repository.
+`ext-reg` 是 InKCre 扩展的公共注册中心——负责扩展身份、Release 生命周期、发布者权威，以及 Python 包 / Module Federation Remote 的原生关联。
 
-服务使用 CPython、FastAPI / Jinja、Tortoise ORM 和 Neon PostgreSQL，私有文件继续存放于 R2，并通过 boto3 的 S3 接口访问。目录、详情、Publisher、API 与文件分发由同一个容器交付；没有独立前端部署。现有生产 Worker 的切换步骤见 [生产迁移](docs/40-deployment/production-registry.md)。
+The public Registry origin is [`https://registry.inkcre.dev`](https://registry.inkcre.dev); its root page is a read-only Extension catalog. Python consumers use the Simple Repository API; browser consumers use the producer's native `mf-manifest.json`. Deployment installation, per-Peer enablement, and running state remain outside this repository.
 
-This repository also releases the independent
-`inkcre-extension-toolkit` developer/CD distribution. Its `cli` extra exposes
-`inkcre-ext` to inspect native artifacts, publish Releases, and build
-deterministic static preview facades without depending on the Registry service
-implementation.
+The service runs as a Python Cloudflare Worker with D1 metadata and private R2 bytes.
 
-The public Registry origin is [`https://registry.inkcre.dev`](https://registry.inkcre.dev).
-Its root page is a read-only Extension catalog; package consumers continue to
-use the native APIs described above.
+## Quickstart
 
-## Local checks
+### Publish or inspect Extensions
+
+The independent `inkcre-extension-toolkit` developer/CD distribution exposes `inkcre-ext` for inspecting native artifacts, publishing Releases, and building deterministic static preview facades:
 
 ```bash
-pdm install --frozen-lockfile
-pnpm install --frozen-lockfile
-REGISTRY_TEST_DATABASE_URL=postgres://registry:registry-check@localhost:5432/registry_check pnpm check
+pip install 'inkcre-extension-toolkit[cli]'
+inkcre-ext --help
 ```
 
-See the [documentation index](docs/index.md) for internal design and deployment
-guidance. Contributor workflow lives in [CONTRIBUTING.md](CONTRIBUTING.md).
+### Develop locally
+
+```bash
+uv sync --frozen
+pnpm install --frozen-lockfile
+pnpm check
+```
+
+`pnpm check` is the required local/CI gate. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
+## Documentation
+
+- [Documentation index](docs/index.md)
+- [Agent operating guide](AGENTS.md)
+- [Local unit design](docs/30-unit-tdd/README.md)
+- [Deployment and runtime](docs/40-deployment/README.md)
+- Shared product truth Hub: [`InKCre/docs`](https://github.com/InKCre/docs)
