@@ -77,3 +77,5 @@ privileged operations. Extension publishers install the independent
 `inkcre-ext upload-module-federation` for a native Remote snapshot, and publish
 the Release explicitly. Source revision and build identity should accompany the
 prepare request.
+
+格式与 lint 覆盖正式维护的源码、测试和脚本；`tasks/`、外部维护的 `.agents/` 及共享文档挂载不按本仓库规则重写。Ruff 的范围由 `pyproject.toml` 拥有，Prettier 的范围由 `.prettierignore` 拥有。任务实验若成为正式验证或交付步骤，应迁入 `scripts/` 或 `tests/`。本地与 CI 都执行 `pnpm check`，修复格式另用 `pnpm format`。
