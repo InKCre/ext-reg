@@ -371,6 +371,20 @@ try {
     assert.ok(requests.at(-2).url.searchParams.getAll('id').includes(`eq.${target}`))
     assert.deepEqual(JSON.parse(requests.at(-1).body), command)
   }
+  const native = {
+    ...installed,
+    distribution: 'kotlin_apk',
+    supported_distributions: ['kotlin_apk'],
+  }
+  managementBody = { ...envelope, supported_distributions: ['kotlin_apk'], extensions: [native] }
+  const nativeCommand = {
+    action: 'select',
+    extension: native.name,
+    distribution: native.distribution,
+    version: native.version,
+  }
+  assert.deepEqual(await manageExtensionOnPeer(target, nativeCommand), native)
+  assert.deepEqual(JSON.parse(requests.at(-1).body), nativeCommand)
   managementStatus = 422
   managementBody = { detail: secret }
   await assert.rejects(
