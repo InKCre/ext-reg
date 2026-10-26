@@ -46,8 +46,8 @@ importers:
         version: 4.1.12
     devDependencies:
       '@inkcre/core':
-        specifier: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz
-        version: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
+        specifier: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz
+        version: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)
       '@module-federation/runtime':
         specifier: 0.21.6
         version: 0.21.6
@@ -551,9 +551,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz':
-    resolution: {integrity: sha512-Ld5dj7EpRgB+hIj0qpuFwT1FAFGVMTQMDygAMEwv1d923gtaM0IH5cjQFaHpDooZZ8rZcl1m2bmEAfVTwD7x9A==, tarball: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz}
-    version: 0.4.0
+  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz':
+    resolution: {integrity: sha512-O+HKRHSX6LaYV85mVt/bjvWJxfDtd1nFn2P20t1rOH/+DyyJqnZrr7m1Tng6HbYJa5BO64TX8k5WO26ldT9y4g==, tarball: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz}
+    version: 0.4.2
     peerDependencies:
       '@vueuse/core': ^14.0.0
       pinia: ^3.0.0
@@ -712,12 +712,14 @@ packages:
   '@opentelemetry/sdk-trace-base@2.12.0':
     resolution: {integrity: sha512-JOERgZCxRM06FEJ5kEWxlSRChah6MmXDx3KwCruqEv/iEyLkTokCSemf2y1w8oIHtfrr8EVTpzebq/31vn2Cpg==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
   '@opentelemetry/sdk-trace-web@2.12.0':
     resolution: {integrity: sha512-y0hCzbnBHScmioF0drJOyaPk1sQf2wwbIuy3rWlM0Fcx8mLfPDvFsQ7tJ+zMm8yAqI06rSlFKkL7ZpcrFOqAdQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
@@ -2142,7 +2144,7 @@ snapshots:
   '@img/sharp-win32-x64@0.35.2':
     optional: true
 
-  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.0/inkcre-core-0.4.0.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
+  '@inkcre/core@https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz(@vueuse/core@14.1.0(vue@3.5.18(typescript@5.9.3)))(dotenv@17.4.2)(pinia@3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3)))(vue@3.5.18(typescript@5.9.3))(yaml@2.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/core': 2.12.0(@opentelemetry/api@1.9.1)
