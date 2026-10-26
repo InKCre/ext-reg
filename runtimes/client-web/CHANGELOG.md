@@ -1,5 +1,11 @@
 # @inkcre/extension-runtime-client-web
 
+## 0.4.2
+
+### Patch Changes
+
+- 4abbf0c: Peer 管理协议接受宿主声明的分发标识，移除 Python／Module Federation 白名单；Registry 产物校验仍由实际支持的安装器承担。
+
 ## 0.4.1
 
 ### Patch Changes
