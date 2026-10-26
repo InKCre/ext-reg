@@ -15,7 +15,7 @@ export type ExtensionManagementCommand =
   | {
       action: 'select'
       extension: string
-      distribution: 'python' | 'module_federation'
+      distribution: string
       version: string
     }
   | { action: 'enable' | 'disable' | 'unselect'; extension: string }
@@ -34,12 +34,12 @@ export async function listAdvertisedExtensionManagementPeers(): Promise<Peer[]> 
 
 const ExtensionPeerStatusSchema = z.object({
   peer_id: z.uuid(),
-  supported_distributions: z.array(z.enum(['python', 'module_federation'])),
+  supported_distributions: z.array(z.string().min(1)),
   extensions: z.array(z.unknown()),
 })
 export interface ExtensionPeerStatus {
   peer_id: string
-  supported_distributions: ('python' | 'module_federation')[]
+  supported_distributions: string[]
   extensions: ExtensionRuntimeStatus[]
 }
 
