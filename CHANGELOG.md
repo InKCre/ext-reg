@@ -5,6 +5,14 @@ This changelog records notable changes to the Registry service. It is generated 
 
 <!-- towncrier release notes start -->
 
+## 0.3.1 - 2026-10-27
+
+### Fixed
+
+- 固定与 PDM 2.28 兼容的下载依赖，使 CI、发布流程及 Registry 镜像能够从冻结依赖完成构建。
+- 格式与 lint 检查按维护责任排除临时任务及外部技能，贡献说明与 CI 使用相同的正式源码范围。
+- 生产 verify 在维护前使用既有凭据只读确认 Heroku app 与 container stack；部署阶段日志立即输出，失效控制凭据不再等到停机后才被发现。
+
 ## 0.3.0 - 2026-10-13
 
 ### Added
