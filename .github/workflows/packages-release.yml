@@ -73,12 +73,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python and PDM
-        uses: pdm-project/setup-pdm@973541a5febeafcfdadf8a51211435be6ecfd90f # v4.5
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version-file: .python-version
-          version: 2.28.0
-          cache: true
+
+      - name: Install compatible release tooling
+        run: python -m pip install -r requirements-pdm.txt
 
       - name: Install locked release tooling
         run: pdm install -G dev --frozen-lockfile
@@ -112,12 +113,13 @@ jobs:
           current_main=$(git ls-remote origin refs/heads/main | cut -f1)
           test "$current_main" = "$GITHUB_SHA"
 
-      - name: Set up Python and PDM
-        uses: pdm-project/setup-pdm@973541a5febeafcfdadf8a51211435be6ecfd90f # v4.5
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version-file: .python-version
-          version: 2.28.0
-          cache: true
+
+      - name: Install compatible release tooling
+        run: python -m pip install -r requirements-pdm.txt
 
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
