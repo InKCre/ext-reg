@@ -3,6 +3,7 @@
 Registry 使用 Python 3.13、PDM 和 Node 22 / pnpm。Node 只用于现有设计样式、契约及独立 Web Runtime 包的构建；服务进程只运行 Python。
 
 ```bash
+python -m pip install -r requirements-pdm.txt
 pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 ```

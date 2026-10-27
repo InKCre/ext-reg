@@ -9,10 +9,14 @@ Verification follows the organization-wide
 repository's admitted local evidence.
 
 ```bash
+python -m pip install -r requirements-pdm.txt
 pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 pnpm check
 ```
+
+本地、CI 与服务镜像都通过 `requirements-pdm.txt` 安装兼容的 PDM 及其依赖。
+运行 PDM 前应先执行这条安装命令，因为项目锁文件不会约束 PDM 自身的下载客户端。
 
 Shared InKCre product truth and cross-unit contracts are mounted read-only from
 `InKCre/docs`. Initialize the pinned reference after cloning:

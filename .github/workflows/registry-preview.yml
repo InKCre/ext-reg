@@ -86,7 +86,7 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Install PDM
-        run: python -m pip install pdm==2.28.0
+        run: python -m pip install -r requirements-pdm.txt
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:
@@ -186,7 +186,7 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Install PDM
-        run: python -m pip install pdm==2.28.0
+        run: python -m pip install -r requirements-pdm.txt
       - name: Install pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         with:

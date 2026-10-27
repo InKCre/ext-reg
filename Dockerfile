@@ -2,7 +2,8 @@
 FROM python:3.13-slim AS builder
 ENV PDM_CHECK_UPDATE=false PDM_IGNORE_SAVED_PYTHON=1 PDM_VENV_IN_PROJECT=1
 WORKDIR /app
-RUN pip install --no-cache-dir pdm==2.28.0
+COPY requirements-pdm.txt ./
+RUN pip install --no-cache-dir -r requirements-pdm.txt
 COPY pyproject.toml pdm.lock README.md ./
 COPY src/ src/
 COPY toolkit/ toolkit/
