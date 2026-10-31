@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from urllib.parse import quote
 
 import httpx
@@ -194,7 +192,7 @@ class RegistryClient:
         distribution: str,
     ) -> NativeDocumentationReceipt:
         """Try the saved publication at most twice; never infer success from current."""
-        from .documentation import inspect_documentation
+        from .documentation import documentation_fingerprint, inspect_documentation
 
         inspected = inspect_documentation(archive, metadata.entry)
         if inspected.digest != metadata.content_sha256:
@@ -209,13 +207,14 @@ class RegistryClient:
             "version": version,
             "scope": scope,
         }
-        fingerprint = hashlib.sha256(
-            json.dumps(
-                {**expected_receipt, "expected_etag": expected_etag},
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        fingerprint = documentation_fingerprint(
+            f"{namespace}/{name}",
+            distribution,
+            version,
+            scope,
+            metadata.model_dump(mode="json"),
+            expected_etag,
+        )
         path = self._native_path(namespace, name, distribution, version) + f"/documentation/{scope}"
         last_error: Exception | None = None
         for _attempt in range(2):

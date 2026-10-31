@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import cast
 from urllib.parse import quote
 
-from inkcre_extension_toolkit.documentation import DocumentationBundle
+from inkcre_extension_toolkit.documentation import DocumentationBundle, documentation_fingerprint
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
@@ -127,7 +125,7 @@ class DocumentationRepository:
     """Own documentation queries, atomic pointer replacement, and bounded object staging."""
 
     def __init__(self, artifacts: ArtifactStore) -> None:
-        self._artifacts = artifacts
+        self._artifacts = artifacts.batch(concurrency=4)
 
     async def discover(
         self,
@@ -204,19 +202,9 @@ class DocumentationRepository:
         if bundle.digest != payload.content_sha256:
             raise RegistryConflictError("documentation content digest does not match metadata")
         metadata = payload.model_dump(mode="json")
-        etag = hashlib.sha256(
-            json.dumps(
-                {
-                    **metadata,
-                    "name": extension,
-                    "distribution": distribution,
-                    "version": version,
-                    "scope": scope,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        etag = documentation_fingerprint(
+            extension, distribution, version, scope, metadata, payload.expected_etag
+        )
 
         async def check(
             release: db.NativeRelease,

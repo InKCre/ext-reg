@@ -1,14 +1,14 @@
 """Generated public models plus native semantic contract helpers."""
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from typing import Literal
+
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from inkcre_extension_toolkit.generated.contracts import (
     ExtensionRecord,
     ExtensionSummary,
     ModuleFederationAssociationInput,
     ModuleFederationDistribution,
-    NativeExtensionRecord,
-    NativeReleaseRecord,
     PythonAssociationInput,
     PythonDistribution,
     ReleaseRecord,
@@ -16,6 +16,9 @@ from inkcre_extension_toolkit.generated.contracts import (
 )
 from inkcre_extension_toolkit.generated.contracts import (
     NativePrepareReleaseRequest as GeneratedNativePrepareReleaseRequest,
+)
+from inkcre_extension_toolkit.generated.contracts import (
+    NativeReleaseRecord as GeneratedNativeReleaseRecord,
 )
 from inkcre_extension_toolkit.generated.contracts import (
     PrepareReleaseRequest as GeneratedPrepareReleaseRequest,
@@ -68,13 +71,26 @@ class PrepareReleaseRequest(GeneratedPrepareReleaseRequest):
         return self
 
 
-class NativePrepareReleaseRequest(GeneratedNativePrepareReleaseRequest):
+class NativePrepareReleaseRequest(PrepareReleaseRequest):
+    """Keep the flat public API while delegating native shape to the generated union."""
+
     @model_validator(mode="after")
     def native_association_is_valid(self) -> "NativePrepareReleaseRequest":
-        PrepareReleaseRequest.model_validate(self.model_dump(mode="json"))
-        if (self.python is None) == (self.module_federation is None):
-            raise ValueError("prepare exactly one native Distribution")
+        GeneratedNativePrepareReleaseRequest.model_validate(self.model_dump(mode="json"))
         return self
+
+
+class NativeReleaseRecord(ReleaseRecord):
+    distribution: Literal["python", "module_federation"]
+
+    @model_validator(mode="after")
+    def native_association_is_valid(self) -> "NativeReleaseRecord":
+        GeneratedNativeReleaseRecord.model_validate(self.model_dump(mode="json"))
+        return self
+
+
+class NativeExtensionRecord(ExtensionSummary):
+    releases: list[NativeReleaseRecord] = Field(default_factory=list)
 
 
 __all__ = [

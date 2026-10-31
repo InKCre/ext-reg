@@ -74,7 +74,11 @@ inkcre-ext docs show --registry-url REGISTRY_URL \
 
 Toolkit 收到回执后，会确认原生坐标、快照 ID、内容与来源 metadata，以及包含原始写入条件的 ETag 指纹；结构合法但不属于此次候选的回执不能证明成功。
 
-当前服务端 `DocumentationRepository.publish()` 和 Toolkit `RegistryClient.upload_documentation()` 分别计算该指纹：候选 metadata、原生坐标、scope 与原始 `expected_etag` 按键排序为紧凑 JSON，再计算 SHA-256。Toolkit 保持独立发行，不反向依赖 Registry 服务；修改字段或序列化规则时必须同时检查两端及已发行 Toolkit 的兼容性。这里尚未集中成独立合同实现。
+v2 候选身份已冻结，由 Toolkit 纯模块的 `documentation_fingerprint()` 实现，Registry 复用它。字段恰为 `name`、`distribution`、`version`、`scope`、`snapshot_id`、`content_sha256`、`entry`、`source_repository`、`source_revision`、`build_id`、`expected_etag`。省略 `entry` 取 `index.html`，省略 `build_id` 取 null；创建时原始 `expected_etag` 为 null，修订时保留带双引号的强 ETag。可选值以 JSON null 参与身份，不省略字段。
+
+编码为按字段名升序排列、无多余空白的 JSON：分隔符是 `,` 和 `:`，所有非 ASCII 字符使用 JSON `\u` 转义（非 BMP 字符为 surrogate pair），不做 Unicode 规范化，字符串中的换行、反斜杠与双引号遵守 JSON 转义。对该 ASCII JSON 的 UTF-8 字节做 SHA-256，返回小写十六进制；receipt 的 `snapshot_etag` 在其外添加一对双引号。
+
+DTO 新增非身份字段不能自动加入上述字段集；新增会改变候选身份的含义或编码规则需要新的协议及显式兼容安排，不能通过默认字段静默更改 v2。`scripts/fixtures/documentation-v2.json` 冻结了重构前 Registry `58610f7` / Toolkit 0.5.0 的默认值、Unicode 和条件修订候选、规范 JSON 与摘要，检查时不得用当前算法重新生成期望值。`pnpm protocols:check` 无需数据库即可验证旧候选和有限重试；真实 HTTP/数据库旅程另外确认服务提交的 receipt 能被客户端接受。已发行 Toolkit 不会随共享函数变化，因此这些固定向量仍是兼容依据。
 
 Toolkit 仅做 best-effort 交付：网络错误、500/502/503/504 、无法解析或不匹配保存候选的回执最多触发一次原样重试，共两次前台请求，沿用每次 HTTP 请求的超时。仍无法获得回执时，以非零退出码报告“结果未知”；这不表示发布失败。保存的候选不会被删除，可以稍后原样重试。其他 HTTP 错误不会自动重试；409 的身份冲突或 stale precondition 需要作者检查并决定是否创建新的修订。工具不会后台重试、刷新 ETag 或承诺最终送达。旧快照继续服从其所属 Release 的生命周期：yanked 仍可读，blocked 拒绝历史内容和提交确认。
 

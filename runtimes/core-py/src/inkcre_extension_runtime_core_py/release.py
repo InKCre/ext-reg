@@ -57,8 +57,6 @@ class RegistryReleaseClient:
             Distribution.python,
         ):
             raise ExtensionRegistryError("Registry returned a different exact Release")
-        if release.python is None or release.module_federation is not None:
-            raise ExtensionRegistryError("Registry returned a different native association")
         return release
 
 

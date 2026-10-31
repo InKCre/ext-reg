@@ -7,6 +7,7 @@ import io
 import json
 import stat
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
@@ -24,6 +25,37 @@ class DocumentationCandidate(ContractModel):
     scope: Literal["global", "python", "module-federation"]
     metadata: DocumentationUpload
     expected_etag: str | None = Field(default=None, pattern=r'^"[0-9a-f]{64}"$')
+
+
+def documentation_fingerprint(
+    name: str,
+    distribution: str,
+    version: str,
+    scope: str,
+    metadata: Mapping[str, object],
+    expected_etag: str | None,
+) -> str:
+    """Frozen v2 publication identity; DTO additions must not change saved candidates.
+
+    Inputs are admitted metadata, not arbitrary JSON. Defaults match Toolkit 0.5.
+    The explicit field set and ASCII-escaped compact JSON are a wire contract:
+    changing either requires a new protocol, not a new default on a DTO.
+    """
+    identity = {
+        "name": name,
+        "distribution": distribution,
+        "version": version,
+        "scope": scope,
+        "snapshot_id": metadata["snapshot_id"],
+        "content_sha256": metadata["content_sha256"],
+        "entry": metadata.get("entry", "index.html"),
+        "source_repository": metadata["source_repository"],
+        "source_revision": metadata["source_revision"],
+        "build_id": metadata.get("build_id"),
+        "expected_etag": expected_etag,
+    }
+    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024

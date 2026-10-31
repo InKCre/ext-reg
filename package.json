@@ -9,7 +9,7 @@
   "scripts": {
     "build": "SOURCE_DATE_EPOCH=315532800 pdm build --no-sdist --dest \"$INIT_CWD/dist\" && SOURCE_DATE_EPOCH=315532800 pdm build --project toolkit --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && SOURCE_DATE_EPOCH=315532800 pdm build --project runtimes/core-py --no-sdist --no-clean --dest \"$INIT_CWD/dist\" && pnpm --filter @inkcre/extension-runtime-client-web build",
     "changeset": "changeset",
-    "check": "pnpm release:check && pnpm web:check && pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm --filter @inkcre/extension-runtime-client-web exec node check-boundaries.mjs && pnpm packages:check && pnpm registry:check",
+    "check": "pnpm release:check && pnpm web:check && pnpm protocols:check && pnpm artifacts:check && pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check && pnpm build && pnpm --filter @inkcre/extension-runtime-client-web exec node check-boundaries.mjs && node runtimes/client-web/check-native-contracts.mjs && pnpm packages:check && pnpm registry:check",
     "packages:check": "pdm run python scripts/check_packages.py",
     "contracts:check": "pdm run python scripts/generate_contracts.py --check && pdm run python runtimes/core-py/scripts/generate_contracts.py --check && pnpm --filter @inkcre/extension-runtime-client-web check:bindings",
     "contracts:generate": "pdm run python scripts/generate_contracts.py && pdm run python runtimes/core-py/scripts/generate_contracts.py && pnpm --filter @inkcre/extension-runtime-client-web generate:bindings",
@@ -23,7 +23,10 @@
     "web:build": "sass --pkg-importer=node --no-source-map --style=compressed web/registry.scss src/inkcre_extension_registry/service/static/registry.css",
     "web:check": "node --check src/inkcre_extension_registry/service/static/registry.js && node scripts/check-web-styles.mjs",
     "db:migrate": "pdm run tortoise -c inkcre_extension_registry.migration_config.TORTOISE_ORM upgrade",
-    "db:makemigrations": "pdm run tortoise -c inkcre_extension_registry.migration_config.TORTOISE_ORM makemigrations models"
+    "db:makemigrations": "pdm run tortoise -c inkcre_extension_registry.migration_config.TORTOISE_ORM makemigrations models",
+    "protocols:check": "pdm run python scripts/check_documentation_protocol.py && pdm run python scripts/check_native_contracts.py",
+    "artifacts:check": "pdm run python scripts/check_artifacts.py",
+    "core-py:check": "pdm run python scripts/check_core_runtime.py"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.0",

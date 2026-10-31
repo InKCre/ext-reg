@@ -151,6 +151,91 @@ export type ModuleFederationDistribution = {
 }
 
 /**
+ * ModuleFederationNativePrepare
+ */
+export type ModuleFederationNativePrepare = {
+  module_federation: ModuleFederationAssociationInput
+  /**
+   * Nickname
+   */
+  nickname: string
+  /**
+   * Python
+   */
+  python?: null
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * ModuleFederationNativePublisherRelease
+ */
+export type ModuleFederationNativePublisherRelease = {
+  /**
+   * Distribution
+   */
+  distribution: 'module_federation'
+  module_federation: ModuleFederationDistribution
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  /**
+   * Python
+   */
+  python?: null
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Uploaded
+   */
+  uploaded: boolean
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * ModuleFederationNativeRelease
+ */
+export type ModuleFederationNativeRelease = {
+  /**
+   * Distribution
+   */
+  distribution: 'module_federation'
+  module_federation: ModuleFederationDistribution
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  /**
+   * Python
+   */
+  python?: null
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
  * NativeDocumentationReceipt
  */
 export type NativeDocumentationReceipt = {
@@ -226,53 +311,15 @@ export type NativeExtensionRecord = {
   releases?: Array<NativeReleaseRecord>
 }
 
-/**
- * NativePrepareReleaseRequest
- */
-export type NativePrepareReleaseRequest = {
-  module_federation?: ModuleFederationAssociationInput | null
-  /**
-   * Nickname
-   */
-  nickname: string
-  python?: PythonAssociationInput | null
-  /**
-   * Version
-   */
-  version: string
-}
+export type NativePrepareReleaseRequest = PythonNativePrepare | ModuleFederationNativePrepare
 
-/**
- * NativePublisherRelease
- */
-export type NativePublisherRelease = {
-  /**
-   * Distribution
-   */
-  distribution: 'python' | 'module_federation'
-  module_federation?: ModuleFederationDistribution | null
-  /**
-   * Name
-   */
-  name: string
-  /**
-   * Nickname
-   */
-  nickname: string
-  python?: PythonDistribution | null
-  /**
-   * State
-   */
-  state: 'preparing' | 'published' | 'yanked' | 'blocked'
-  /**
-   * Uploaded
-   */
-  uploaded: boolean
-  /**
-   * Version
-   */
-  version: string
-}
+export type NativePublisherRelease =
+  | ({
+      distribution: 'python'
+    } & PythonNativePublisherRelease)
+  | ({
+      distribution: 'module_federation'
+    } & ModuleFederationNativePublisherRelease)
 
 /**
  * NativePublisherWorkspace
@@ -322,33 +369,13 @@ export type NativeReleaseDocumentation = {
   version: string
 }
 
-/**
- * NativeReleaseRecord
- */
-export type NativeReleaseRecord = {
-  /**
-   * Distribution
-   */
-  distribution: 'python' | 'module_federation'
-  module_federation?: ModuleFederationDistribution | null
-  /**
-   * Name
-   */
-  name: string
-  /**
-   * Nickname
-   */
-  nickname: string
-  python?: PythonDistribution | null
-  /**
-   * State
-   */
-  state: 'preparing' | 'published' | 'yanked' | 'blocked'
-  /**
-   * Version
-   */
-  version: string
-}
+export type NativeReleaseRecord =
+  | ({
+      distribution: 'python'
+    } & PythonNativeRelease)
+  | ({
+      distribution: 'module_federation'
+    } & ModuleFederationNativeRelease)
 
 /**
  * PublisherRelease
@@ -474,6 +501,91 @@ export type PythonEntryPoint = {
    * Object
    */
   object: string
+}
+
+/**
+ * PythonNativePrepare
+ */
+export type PythonNativePrepare = {
+  /**
+   * Module Federation
+   */
+  module_federation?: null
+  /**
+   * Nickname
+   */
+  nickname: string
+  python: PythonAssociationInput
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * PythonNativePublisherRelease
+ */
+export type PythonNativePublisherRelease = {
+  /**
+   * Distribution
+   */
+  distribution: 'python'
+  /**
+   * Module Federation
+   */
+  module_federation?: null
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  python: PythonDistribution
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Uploaded
+   */
+  uploaded: boolean
+  /**
+   * Version
+   */
+  version: string
+}
+
+/**
+ * PythonNativeRelease
+ */
+export type PythonNativeRelease = {
+  /**
+   * Distribution
+   */
+  distribution: 'python'
+  /**
+   * Module Federation
+   */
+  module_federation?: null
+  /**
+   * Name
+   */
+  name: string
+  /**
+   * Nickname
+   */
+  nickname: string
+  python: PythonDistribution
+  /**
+   * State
+   */
+  state: 'preparing' | 'published' | 'yanked' | 'blocked'
+  /**
+   * Version
+   */
+  version: string
 }
 
 /**

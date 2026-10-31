@@ -61,3 +61,9 @@ Host 的事务实现。Runtime 层的 scripted 验证可证明 await、typed rou
 Runtime 的精确选择是 `(Peer, Extension, python, version)`，不再读取部署级全局版本或 enabled 列表。`RegistryReleaseClient` 只读取 v2 Python 原生发行；历史 wheel 内 schema 1 安装记录保持不变，版本表示其 Python 分发版本。宿主注入共享 Extension 模型与 `ParticipationStore`，业务 config/state 继续共用，安装与启用意图只作用于当前 Peer。
 
 `PipDistributionConsumer.download` 在调用者目录下载并验证 wheel，不修改解释器环境；`apply` 才调用 pip 安装并重新发现精确安装记录。宿主必须先停止整个 Peer，在安装后从新进程启动。Runtime manager 的 enable 仅发现已安装包，缺包时抛出 `ExtensionEnvironmentApplicationRequiredError`，不会在运行进程里隐式安装或替换依赖。`acquire` 仅作为已停止 Peer 的宿主组合调用，不能作为在线预检。
+
+## 发行物的生命周期验证
+
+`runtimes/core-py/check_lifecycle.py` 是正式的公共 Interface 验收，使用明确的同步/异步 Host capability 测试 adapter。它验证 typed config/state、两个持久化 await 点的取消、启动失败补偿、精确 routes/inbounds/claims 的撤销、保留无关资源及重新启动。它不冒充 Core 的 PostgreSQL 事务实现。
+
+构建 wheel 后，`pnpm core-py:check` 在新的隔离环境只安装 Runtime wheel、声明依赖与测试用 HTTP 客户端，以 `python -I` 验证载入位置并执行上述验收。默认 `pnpm packages:check` 和独立包发布工作流都运行此门禁；快速迭代可直接用 `pdm run python runtimes/core-py/check_lifecycle.py`。这些入口取代 task 目录中的旧临时探针。受支持的真实 Host 仍需在消费仓验证事务提交/回滚、锁和版本窗口；测试 adapter 的成功不能证明任意 Host 兼容。

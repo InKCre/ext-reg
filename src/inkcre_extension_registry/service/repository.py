@@ -243,6 +243,7 @@ class RegistryRepository:
 
     def __init__(self, artifacts: ArtifactStore) -> None:
         self.artifacts = artifacts
+        self._mf_artifacts = artifacts.batch(concurrency=4)
 
     async def authenticate(self, token_hash: str) -> str | None:
         row = (
@@ -516,7 +517,7 @@ class RegistryRepository:
         if mf is not None and mf.manifest_r2_key is not None:
             prefix = mf.manifest_r2_key.removesuffix("mf-manifest.json")
             started = perf_counter()
-            mf_ready = await self.artifacts.available(prefix + path for path in mf.asset_paths)
+            mf_ready = await self._mf_artifacts.available(prefix + path for path in mf.asset_paths)
             logger.info(
                 "mf_publish extension=%s version=%s phase=objects files=%d duration_ms=%.1f",
                 row.extension.name,
@@ -745,7 +746,7 @@ class RegistryRepository:
         )
         prefix = f"staging/module-federation/{extension_name}/{version}/{snapshot_hash}/"
         started = perf_counter()
-        await self.artifacts.ensure_many(
+        await self._mf_artifacts.ensure_many(
             Artifact(prefix + path, files[path], media_types[path]) for path in sorted(files)
         )
         logger.info(
