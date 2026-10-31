@@ -50,6 +50,39 @@
       "title": "ModuleFederationAssociationInput",
       "type": "object"
     },
+    "ModuleFederationNativePrepare": {
+      "additionalProperties": false,
+      "properties": {
+        "module_federation": {
+          "$ref": "#/$defs/ModuleFederationAssociationInput"
+        },
+        "nickname": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Nickname",
+          "type": "string"
+        },
+        "python": {
+          "default": null,
+          "title": "Python",
+          "type": "null"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nickname",
+        "version",
+        "module_federation"
+      ],
+      "title": "ModuleFederationNativePrepare",
+      "type": "object"
+    },
     "PythonAssociationInput": {
       "additionalProperties": false,
       "properties": {
@@ -144,50 +177,47 @@
       ],
       "title": "PythonEntryPoint",
       "type": "object"
-    }
-  },
-  "additionalProperties": false,
-  "properties": {
-    "module_federation": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ModuleFederationAssociationInput"
-        },
-        {
+    },
+    "PythonNativePrepare": {
+      "additionalProperties": false,
+      "properties": {
+        "module_federation": {
+          "default": null,
+          "title": "Module Federation",
           "type": "null"
-        }
-      ],
-      "default": null
-    },
-    "nickname": {
-      "maxLength": 128,
-      "minLength": 1,
-      "title": "Nickname",
-      "type": "string"
-    },
-    "python": {
-      "anyOf": [
-        {
+        },
+        "nickname": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Nickname",
+          "type": "string"
+        },
+        "python": {
           "$ref": "#/$defs/PythonAssociationInput"
         },
-        {
-          "type": "null"
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
         }
+      },
+      "required": [
+        "nickname",
+        "version",
+        "python"
       ],
-      "default": null
-    },
-    "version": {
-      "maxLength": 128,
-      "minLength": 5,
-      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-      "title": "Version",
-      "type": "string"
+      "title": "PythonNativePrepare",
+      "type": "object"
     }
   },
-  "required": [
-    "nickname",
-    "version"
-  ],
-  "title": "NativePrepareReleaseRequest",
-  "type": "object"
+  "anyOf": [
+    {
+      "$ref": "#/$defs/PythonNativePrepare"
+    },
+    {
+      "$ref": "#/$defs/ModuleFederationNativePrepare"
+    }
+  ]
 }

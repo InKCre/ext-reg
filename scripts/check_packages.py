@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import email
 import io
 import json
@@ -18,6 +19,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from check_core_runtime import check_core_runtime
 from inkcre_extension_toolkit.preview import build_preview_registry
 from packaging.requirements import Requirement
 
@@ -424,6 +426,8 @@ def check_coordinated_version_preparation() -> None:
         archive = subprocess.check_output(["git", "archive", base], cwd=ROOT)
         with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
             bundle.extractall(fixture, filter="data")
+        # The Git history is a fixture; execute the candidate working-tree tool.
+        shutil.copy2(ROOT / "scripts/release.py", fixture / "scripts/release.py")
 
         def git(*arguments):
             return subprocess.check_output(
@@ -519,11 +523,7 @@ def check_coordinated_version_preparation() -> None:
     print("Coordinated version CLI admission and strict residual boundaries passed.")
 
 
-def main() -> None:
-    check_production_delivery_boundary()
-    check_coordinated_version_preparation()
-    check_native_runtime_boundary()
-    check_preview_catalog()
+def check_wheels() -> None:
     wheels = []
     for directory in (ROOT, ROOT / "toolkit"):
         project = tomllib.loads((directory / "pyproject.toml").read_text())["project"]
@@ -542,9 +542,9 @@ def main() -> None:
         for value in metadata.get_all("Requires-Dist", [])
         if (item := Requirement(value)).name == "inkcre-extension-toolkit"
     )
-    # 0.2.1 lacks documentation admission, even if the workspace import succeeds.
-    assert "0.2.1" not in requirement.specifier, (
-        "Registry wheel admits Toolkit without documentation API"
+    # The Registry imports the frozen fingerprint helper introduced in 0.5.1.
+    assert "0.5.0" not in requirement.specifier, (
+        "Registry wheel admits Toolkit without the v2 fingerprint API"
     )
     with tempfile.TemporaryDirectory(prefix="registry-wheel-check-") as temporary:
         environment = Path(temporary)
@@ -592,6 +592,23 @@ def main() -> None:
         )
         check_native_toolkit_cli(python)
     print("Registry and Toolkit wheel metadata, isolated installation and service import passed.")
+
+
+def main() -> None:
+    checks = {
+        "delivery": check_production_delivery_boundary,
+        "release": check_coordinated_version_preparation,
+        "native": check_native_runtime_boundary,
+        "preview": check_preview_catalog,
+        "wheels": check_wheels,
+        "core-runtime": check_core_runtime,
+    }
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--only", choices=checks, help="Run one independent contract check")
+    selection = parser.parse_args().only
+    for name, check in checks.items():
+        if selection is None or selection == name:
+            check()
 
 
 if __name__ == "__main__":

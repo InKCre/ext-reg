@@ -5,7 +5,18 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetJsonSchemaHandler,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 from semantic_version import NpmSpec, Version
 
 SEGMENT_PATTERN_TEXT = r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$"
@@ -250,9 +261,12 @@ class ModuleFederationAssociationInput(ContractModel):
         return validate_host_sdk_range(value)
 
 
-class PrepareReleaseRequest(ContractModel):
+class PrepareReleaseIdentity(ContractModel):
     nickname: str = Field(min_length=1, max_length=128)
     version: StrictSemVer
+
+
+class PrepareReleaseRequest(PrepareReleaseIdentity):
     python: PythonAssociationInput | None = None
     module_federation: ModuleFederationAssociationInput | None = None
 
@@ -279,35 +293,80 @@ class ModuleFederationDistribution(ContractModel):
     host_sdk_version: str
 
 
-class ReleaseRecord(ContractModel):
+class ReleaseIdentity(ContractModel):
     name: CanonicalExtensionName
     nickname: str
     version: StrictSemVer
     state: ReleaseState
+
+
+class ReleaseRecord(ReleaseIdentity):
     python: PythonDistribution | None = None
     module_federation: ModuleFederationDistribution | None = None
 
 
+class PythonNativeRelease(ReleaseIdentity):
+    distribution: Literal["python"]
+    python: PythonDistribution
+    module_federation: None = None
+
+
+class ModuleFederationNativeRelease(ReleaseIdentity):
+    distribution: Literal["module_federation"]
+    python: None = None
+    module_federation: ModuleFederationDistribution
+
+
+_NATIVE_RELEASE = TypeAdapter(
+    Annotated[
+        PythonNativeRelease | ModuleFederationNativeRelease, Field(discriminator="distribution")
+    ]
+)
+
+
 class NativeReleaseRecord(ReleaseRecord):
+    """Flat Python API; the same native union owns validation and wire projection."""
+
     distribution: NativeDistribution
 
     @model_validator(mode="after")
     def native_association_matches(self) -> NativeReleaseRecord:
-        if self.distribution == "python":
-            valid = self.python is not None and self.module_federation is None
-        else:
-            valid = self.module_federation is not None and self.python is None
-        if not valid:
-            raise ValueError("native Release must have exactly its own Distribution association")
+        _NATIVE_RELEASE.validate_python(
+            self.model_dump(mode="json", include=set(NativeReleaseRecord.model_fields))
+        )
         return self
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(_NATIVE_RELEASE.core_schema)
+
+
+class PythonNativePrepare(PrepareReleaseIdentity):
+    python: PythonAssociationInput
+    module_federation: None = None
+
+
+class ModuleFederationNativePrepare(PrepareReleaseIdentity):
+    python: None = None
+    module_federation: ModuleFederationAssociationInput
+
+
+_NATIVE_PREPARE = TypeAdapter(PythonNativePrepare | ModuleFederationNativePrepare)
 
 
 class NativePrepareReleaseRequest(PrepareReleaseRequest):
     @model_validator(mode="after")
     def exactly_one_association(self) -> NativePrepareReleaseRequest:
-        if (self.python is None) == (self.module_federation is None):
-            raise ValueError("prepare exactly one native Distribution")
+        _NATIVE_PREPARE.validate_python(self.model_dump(mode="json"))
         return self
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(_NATIVE_PREPARE.core_schema)
 
 
 class ExtensionSummary(ContractModel):
@@ -327,8 +386,30 @@ class NativeExtensionRecord(ContractModel):
     releases: tuple[NativeReleaseRecord, ...] = ()
 
 
+class PythonNativePublisherRelease(PythonNativeRelease):
+    uploaded: bool
+
+
+class ModuleFederationNativePublisherRelease(ModuleFederationNativeRelease):
+    uploaded: bool
+
+
+_NATIVE_PUBLISHER_RELEASE = TypeAdapter(
+    Annotated[
+        PythonNativePublisherRelease | ModuleFederationNativePublisherRelease,
+        Field(discriminator="distribution"),
+    ]
+)
+
+
 class NativePublisherRelease(NativeReleaseRecord):
     uploaded: bool
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(_NATIVE_PUBLISHER_RELEASE.core_schema)
 
 
 class NativePublisherWorkspace(ContractModel):

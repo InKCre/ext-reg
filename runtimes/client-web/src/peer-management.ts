@@ -9,6 +9,9 @@ import {
 } from '@inkcre/core'
 import { WebExtensionRuntimeError } from './errors'
 
+// Compatibility implementation for the published Core 0.4.2 dependency. New TS consumers
+// use Core's management client. Replace this after that Core artifact is published;
+// preserve WebExtensionRuntimeError at this legacy entry (see client-web-runtime.md).
 export const EXTENSION_MANAGEMENT_CAPABILITY = 'core.extension.management.v2'
 
 export type ExtensionManagementCommand =

@@ -1,8 +1,10 @@
-"""Task-scoped SDK public-boundary experiment, independent of a Core database."""
+"""Core-Py public lifecycle contract using explicit Host capability adapters (no database)."""
 
+import argparse
 import asyncio
 import sys
 import types
+from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
 
@@ -248,5 +250,13 @@ async def exercise():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--installed", action="store_true")
+    if parser.parse_args().installed:
+        import inkcre_extension_runtime_core_py
+
+        location = Path(inkcre_extension_runtime_core_py.__file__).resolve()
+        assert location.is_relative_to(Path(sys.prefix).resolve()), location
+        assert "site-packages" in location.parts, location
     with patch.dict(sys.modules, host_modules()):
         asyncio.run(exercise())

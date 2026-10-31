@@ -12,11 +12,8 @@ import zipfile
 from unittest.mock import patch
 
 import httpx
-from inkcre_extension_toolkit.client import (
-    DocumentationOutcomeUnknown,
-    RegistryClient,
-    RegistryHTTPError,
-)
+from check_documentation_protocol import FIXTURE, fixture_archive
+from inkcre_extension_toolkit.client import RegistryClient
 from inkcre_extension_toolkit.documentation import inspect_documentation
 from inkcre_extension_toolkit.generated.documentation import DocumentationUpload
 from tortoise.exceptions import IntegrityError
@@ -130,6 +127,42 @@ async def check_documentation(
             data={"metadata": json.dumps(payload)},
             files={"content": ("docs.zip", content)},
         )
+
+    # Replay a Toolkit 0.5.0 saved candidate (omitted entry/build defaults) against
+    # the real service. Its expected identity is frozen from Registry 58610f7.
+    fixture = json.loads(FIXTURE.read_text())
+    vector = fixture["vectors"][0]
+    saved = vector["candidate"]
+    compat_base = f"/v2/extensions/{saved['name']}/distributions/{saved['distribution']}/releases"
+    await request(
+        "POST",
+        compat_base,
+        headers=authorization,
+        json={
+            "nickname": "Saved documentation compatibility",
+            "version": saved["version"],
+            "module_federation": {
+                "source_repository": saved["metadata"]["source_repository"],
+                "source_revision": saved["metadata"]["source_revision"],
+                "host_sdk": "@inkcre/core",
+                "host_sdk_version": "^1.0.0",
+            },
+        },
+    )
+    compat_payload = {**saved["metadata"], "expected_etag": saved["expected_etag"]}
+    committed = None
+    for _ in range(2):
+        response = await request(
+            "POST",
+            f"{compat_base}/{saved['version']}/documentation/{saved['scope']}",
+            headers=authorization,
+            data={"metadata": json.dumps(compat_payload)},
+            files={"content": ("documentation.zip", fixture_archive(fixture["files"]))},
+        )
+        assert response.json()["snapshot_etag"] == f'"{vector["fingerprint"]}"'
+        if committed is not None:
+            assert response.json() == committed
+        committed = response.json()
 
     first = metadata()
     await upload(first, expected=401, headers={"Authorization": ""})
@@ -347,22 +380,16 @@ async def check_documentation(
     else:
         raise AssertionError("documentation symlink admitted")
 
-    # A finite retry resends the candidate, never queries or adopts current.
+    # The independent protocol gate owns retry/fault vectors. This integration
+    # witness confirms that a real committed receipt agrees with the client.
     payload = DocumentationUpload.model_validate(
         {key: value for key, value in first.items() if key != "expected_etag"}
     )
-    requests: list[httpx.Request] = []
-
-    def recover(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        if len(requests) == 1:
-            raise httpx.ReadTimeout("lost response", request=request)
-        return httpx.Response(200, json=first_record)
-
     with RegistryClient(
-        "http://localhost", token=token, transport=httpx.MockTransport(recover)
+        "http://localhost",
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, json=first_record)),
     ) as toolkit:
-        recovered = toolkit.upload_documentation(
+        confirmed = toolkit.upload_documentation(
             "check",
             "documentation",
             "1.0.0",
@@ -371,31 +398,4 @@ async def check_documentation(
             zipped,
             distribution="module_federation",
         )
-        assert recovered.snapshot_id == first["snapshot_id"]
-    assert [item.method for item in requests] == ["POST", "POST"]
-
-    for unavailable in (503, 409, 200):
-        attempts = 0
-
-        def fail(request: httpx.Request, status=unavailable) -> httpx.Response:
-            nonlocal attempts
-            attempts += 1
-            return httpx.Response(status, json={"detail": "unavailable"})
-
-        with RegistryClient("http://localhost", transport=httpx.MockTransport(fail)) as toolkit:
-            try:
-                toolkit.upload_documentation(
-                    "check",
-                    "documentation",
-                    "1.0.0",
-                    "global",
-                    payload,
-                    zipped,
-                    distribution="module_federation",
-                )
-            except DocumentationOutcomeUnknown:
-                assert unavailable in {503, 200} and attempts == 2
-            except RegistryHTTPError:
-                assert unavailable == 409 and attempts == 1
-            else:
-                raise AssertionError("a missing receipt must not be reported as success")
+        assert confirmed.snapshot_id == first["snapshot_id"]

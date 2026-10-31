@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import cast
 from urllib.parse import quote
 
-import anyio
-from inkcre_extension_toolkit.documentation import DocumentationBundle
+from inkcre_extension_toolkit.documentation import DocumentationBundle, documentation_fingerprint
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
 
@@ -24,15 +21,15 @@ from ..contracts.models import (
     ReleaseState,
 )
 from . import database as db
-from .repository import (
+from .errors import (
     RegistryBlockedError,
     RegistryConflictError,
     RegistryNotFoundError,
     RegistryStateError,
-    legacy_state,
 )
+from .repository import legacy_state
 from .settings import Settings
-from .storage import ArtifactStore
+from .storage import Artifact, ArtifactStore
 
 
 class DocumentationPreconditionError(RuntimeError):
@@ -128,8 +125,7 @@ class DocumentationRepository:
     """Own documentation queries, atomic pointer replacement, and bounded object staging."""
 
     def __init__(self, artifacts: ArtifactStore) -> None:
-        self._artifacts = artifacts
-        self._capacity = anyio.CapacityLimiter(4)
+        self._artifacts = artifacts.batch(concurrency=4)
 
     async def discover(
         self,
@@ -206,19 +202,9 @@ class DocumentationRepository:
         if bundle.digest != payload.content_sha256:
             raise RegistryConflictError("documentation content digest does not match metadata")
         metadata = payload.model_dump(mode="json")
-        etag = hashlib.sha256(
-            json.dumps(
-                {
-                    **metadata,
-                    "name": extension,
-                    "distribution": distribution,
-                    "version": version,
-                    "scope": scope,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        etag = documentation_fingerprint(
+            extension, distribution, version, scope, metadata, payload.expected_etag
+        )
 
         async def check(
             release: db.NativeRelease,
@@ -263,35 +249,10 @@ class DocumentationRepository:
         existing = await check(release)
         if isinstance(existing, db.DocumentationSnapshot):
             return receipt(existing, release, settings)
-        paths = iter(bundle.files)
-        failure: Exception | None = None
-
-        async def stage() -> None:
-            nonlocal failure
-            try:
-                for path in paths:
-                    async with self._capacity:
-                        key = object_key(bundle.digest, path)
-                        stored = await self._artifacts.head(key)
-                        if stored is None:
-                            await self._artifacts.put(
-                                key,
-                                bundle.files[path],
-                                content_type=bundle.manifest[path]["media_type"],
-                            )
-                        elif stored.size != len(bundle.files[path]):
-                            raise RegistryConflictError(
-                                "documentation staging object size conflict"
-                            )
-            except Exception as error:
-                failure = failure or error
-                group.cancel_scope.cancel()
-
-        async with anyio.create_task_group() as group:
-            for _ in range(min(4, len(bundle.files))):
-                group.start_soon(stage)
-        if failure is not None:
-            raise failure
+        await self._artifacts.ensure_many(
+            Artifact(object_key(bundle.digest, path), content, bundle.manifest[path]["media_type"])
+            for path, content in bundle.files.items()
+        )
         try:
             async with in_transaction():
                 release = await db.NativeRelease.filter(id=release.id).select_for_update().get()

@@ -8,6 +8,12 @@ production 环境需要 `HEROKU_APP_NAME`、`S3_ENDPOINT_URL`、`S3_BUCKET`、`D
 
 Heroku 交付为 Uvicorn 设置 `FORWARDED_ALLOW_IPS=*`，由平台 HTTP 入口提供外部请求协议，补斜杠跳转保持 HTTPS。转发头不参与 namespace 授权或身份判断；认证仍由 publisher credential 决定。部署 smoke 同时检查 `/simple` 跳转到该 origin 的 HTTPS `/simple/`。
 
+## 文档指纹 SDK 依赖
+
+Registry 的 v2 文档指纹复用 Toolkit 0.5.1 提供的纯函数，包依赖最低版本为 `>=0.5.1,<0.6`。独立安装 Registry wheel 时，先提供并安装通过验收的 Toolkit wheel，再安装 Registry；不能让旧 0.5.0 或 editable 工作区掩盖缺失函数。当前服务镜像从同一精确源码及冻结锁文件构建并非 editable 安装 Toolkit 与 Registry，因此该镜像必须包含配套的 Toolkit 版本。协调版本准备与包/镜像验证都不等同于正式发布或生产部署。
+
+旧 Toolkit 0.5.0 保存的 v2 文档候选仍可重放到新服务：字段、默认值、编码和历史 receipt 身份保持不变；`protocols:check` 的冻结向量和 Registry HTTP 旅程共同保护此合同。无需为此次实现收敛修改数据库迁移或已有快照。
+
 ## 当前 PostgreSQL 原生发行切换
 
 生产 Registry 已于 2026-10-13 完成原生发行 v2 切换，服务来源为 `ab5a225f632a83c067269f92967b2307ba79c1b1`，数据库迁移位置为 `0006_auto_20261013_1914`。正式发布资产为 Toolkit 0.5.0、Python Runtime 0.2.0 和 Web Runtime 0.4.0；合并后的 controller 修复不意味着生产服务已部署到新的 main。

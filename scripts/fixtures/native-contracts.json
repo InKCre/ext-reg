@@ -1,0 +1,276 @@
+{
+  "release": [
+    {
+      "id": "python",
+      "valid": true,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "python",
+        "python": {
+          "project": "inkcre-example",
+          "simple_url": "/simple/inkcre-example/",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          }
+        }
+      }
+    },
+    {
+      "id": "mf",
+      "valid": true,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "module_federation",
+        "module_federation": {
+          "manifest_url": "/example/mf-manifest.json",
+          "host_sdk": "@inkcre/core",
+          "host_sdk_version": ">=0.4.0 <0.5.0"
+        }
+      }
+    },
+    {
+      "id": "python-null-other",
+      "valid": true,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "python",
+        "python": {
+          "project": "inkcre-example",
+          "simple_url": "/simple/inkcre-example/",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          }
+        },
+        "module_federation": null
+      }
+    },
+    {
+      "id": "mf-null-other",
+      "valid": true,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "module_federation",
+        "python": null,
+        "module_federation": {
+          "manifest_url": "/example/mf-manifest.json",
+          "host_sdk": "@inkcre/core",
+          "host_sdk_version": ">=0.4.0 <0.5.0"
+        }
+      }
+    },
+    {
+      "id": "neither",
+      "valid": false,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "python"
+      }
+    },
+    {
+      "id": "null-own",
+      "valid": false,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "python",
+        "python": null
+      }
+    },
+    {
+      "id": "both",
+      "valid": false,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "python",
+        "python": {
+          "project": "inkcre-example",
+          "simple_url": "/simple/inkcre-example/",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          }
+        },
+        "module_federation": {
+          "manifest_url": "/example/mf-manifest.json",
+          "host_sdk": "@inkcre/core",
+          "host_sdk_version": ">=0.4.0 <0.5.0"
+        }
+      }
+    },
+    {
+      "id": "mismatched",
+      "valid": false,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "module_federation",
+        "python": {
+          "project": "inkcre-example",
+          "simple_url": "/simple/inkcre-example/",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          }
+        }
+      }
+    },
+    {
+      "id": "peer-only-kind",
+      "valid": false,
+      "payload": {
+        "name": "inkcre/example",
+        "nickname": "Example",
+        "version": "1.0.0",
+        "state": "published",
+        "distribution": "swift_bundled",
+        "python": {
+          "project": "inkcre-example",
+          "simple_url": "/simple/inkcre-example/",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          }
+        }
+      }
+    }
+  ],
+  "prepare": [
+    {
+      "id": "python",
+      "valid": true,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0",
+        "python": {
+          "project": "inkcre-example",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          },
+          "source_repository": "https://example.test/source",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "mf",
+      "valid": true,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0",
+        "module_federation": {
+          "host_sdk": "@inkcre/core",
+          "host_sdk_version": ">=0.4.0 <0.5.0",
+          "source_repository": "https://example.test/source",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "python-null-other",
+      "valid": true,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0",
+        "python": {
+          "project": "inkcre-example",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          },
+          "source_repository": "https://example.test/source",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "module_federation": null
+      }
+    },
+    {
+      "id": "neither",
+      "valid": false,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "id": "both",
+      "valid": false,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0",
+        "python": {
+          "project": "inkcre-example",
+          "host_sdk": "core-py",
+          "host_sdk_version": ">=0.3.0 <0.4.0",
+          "entry_point": {
+            "group": "inkcre.core.extensions",
+            "name": "example",
+            "object": "example:Extension"
+          },
+          "source_repository": "https://example.test/source",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "module_federation": {
+          "host_sdk": "@inkcre/core",
+          "host_sdk_version": ">=0.4.0 <0.5.0",
+          "source_repository": "https://example.test/source",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "id": "null-only",
+      "valid": false,
+      "payload": {
+        "nickname": "Example",
+        "version": "1.0.0",
+        "python": null
+      }
+    }
+  ]
+}

@@ -25,6 +25,62 @@
       "title": "ModuleFederationDistribution",
       "type": "object"
     },
+    "ModuleFederationNativeRelease": {
+      "additionalProperties": false,
+      "properties": {
+        "distribution": {
+          "const": "module_federation",
+          "title": "Distribution",
+          "type": "string"
+        },
+        "module_federation": {
+          "$ref": "#/$defs/ModuleFederationDistribution"
+        },
+        "name": {
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        },
+        "python": {
+          "default": null,
+          "title": "Python",
+          "type": "null"
+        },
+        "state": {
+          "enum": [
+            "preparing",
+            "published",
+            "yanked",
+            "blocked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "nickname",
+        "version",
+        "state",
+        "distribution",
+        "module_federation"
+      ],
+      "title": "ModuleFederationNativeRelease",
+      "type": "object"
+    },
     "PythonDistribution": {
       "additionalProperties": false,
       "properties": {
@@ -92,76 +148,77 @@
       ],
       "title": "PythonEntryPoint",
       "type": "object"
-    }
-  },
-  "additionalProperties": false,
-  "properties": {
-    "distribution": {
-      "enum": [
-        "python",
-        "module_federation"
-      ],
-      "title": "Distribution",
-      "type": "string"
     },
-    "module_federation": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ModuleFederationDistribution"
+    "PythonNativeRelease": {
+      "additionalProperties": false,
+      "properties": {
+        "distribution": {
+          "const": "python",
+          "title": "Distribution",
+          "type": "string"
         },
-        {
+        "module_federation": {
+          "default": null,
+          "title": "Module Federation",
           "type": "null"
-        }
-      ],
-      "default": null
-    },
-    "name": {
-      "maxLength": 129,
-      "minLength": 3,
-      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-      "title": "Name",
-      "type": "string"
-    },
-    "nickname": {
-      "title": "Nickname",
-      "type": "string"
-    },
-    "python": {
-      "anyOf": [
-        {
+        },
+        "name": {
+          "maxLength": 129,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+          "title": "Name",
+          "type": "string"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        },
+        "python": {
           "$ref": "#/$defs/PythonDistribution"
         },
-        {
-          "type": "null"
+        "state": {
+          "enum": [
+            "preparing",
+            "published",
+            "yanked",
+            "blocked"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 128,
+          "minLength": 5,
+          "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+          "title": "Version",
+          "type": "string"
         }
+      },
+      "required": [
+        "name",
+        "nickname",
+        "version",
+        "state",
+        "distribution",
+        "python"
       ],
-      "default": null
-    },
-    "state": {
-      "enum": [
-        "preparing",
-        "published",
-        "yanked",
-        "blocked"
-      ],
-      "title": "State",
-      "type": "string"
-    },
-    "version": {
-      "maxLength": 128,
-      "minLength": 5,
-      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-      "title": "Version",
-      "type": "string"
+      "title": "PythonNativeRelease",
+      "type": "object"
     }
   },
-  "required": [
-    "name",
-    "nickname",
-    "version",
-    "state",
-    "distribution"
-  ],
-  "title": "NativeReleaseRecord",
-  "type": "object"
+  "discriminator": {
+    "mapping": {
+      "module_federation": "#/$defs/ModuleFederationNativeRelease",
+      "python": "#/$defs/PythonNativeRelease"
+    },
+    "propertyName": "distribution"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/PythonNativeRelease"
+    },
+    {
+      "$ref": "#/$defs/ModuleFederationNativeRelease"
+    }
+  ]
 }

@@ -138,7 +138,7 @@ jobs:
           pnpm install --frozen-lockfile
 
       - name: Check package contracts before building release assets
-        run: pnpm contracts:check && pnpm format:check && pnpm lint && pnpm type-check
+        run: pnpm contracts:check && pnpm protocols:check && pnpm format:check && pnpm lint && pnpm type-check
 
       - name: Verify managed package versions
         run: |
@@ -156,6 +156,14 @@ jobs:
           pnpm --filter @inkcre/extension-runtime-client-web build
           pnpm --filter @inkcre/extension-runtime-client-web pack \
             --pack-destination "$GITHUB_WORKSPACE/release-assets/runtime-client-web"
+
+      - name: Verify the built Web Runtime native contract
+        run: node runtimes/client-web/check-native-contracts.mjs
+
+      - name: Verify the built Core Python Runtime lifecycle
+        run: |
+          pdm run python scripts/check_core_runtime.py \
+            --wheel "$(find release-assets/runtime-core-py -name '*.whl' -print -quit)"
 
       - name: Create missing independent package releases
         env:

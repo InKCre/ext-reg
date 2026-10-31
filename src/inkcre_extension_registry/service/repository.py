@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from time import perf_counter
 from typing import Literal, cast
 
-import anyio
 from inkcre_extension_toolkit.simple import PythonFileRecord
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
@@ -33,26 +32,15 @@ from ..contracts.models import (
     python_project_version,
 )
 from . import database as db
-from .storage import ArtifactStore
+from .errors import (
+    RegistryBlockedError,
+    RegistryConflictError,
+    RegistryNotFoundError,
+    RegistryStateError,
+)
+from .storage import Artifact, ArtifactStore
 
 logger = logging.getLogger(__name__)
-MF_STORAGE_CONCURRENCY = 4
-
-
-class RegistryConflictError(RuntimeError):
-    pass
-
-
-class RegistryNotFoundError(RuntimeError):
-    pass
-
-
-class RegistryStateError(RuntimeError):
-    pass
-
-
-class RegistryBlockedError(RegistryStateError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -255,9 +243,7 @@ class RegistryRepository:
 
     def __init__(self, artifacts: ArtifactStore) -> None:
         self.artifacts = artifacts
-        # Shared across MF uploads and publication checks. Downloads and Python
-        # uploads retain their existing concurrency policy.
-        self._mf_capacity = anyio.CapacityLimiter(MF_STORAGE_CONCURRENCY)
+        self._mf_artifacts = artifacts.batch(concurrency=4)
 
     async def authenticate(self, token_hash: str) -> str | None:
         row = (
@@ -530,29 +516,8 @@ class RegistryRepository:
             return False
         if mf is not None and mf.manifest_r2_key is not None:
             prefix = mf.manifest_r2_key.removesuffix("mf-manifest.json")
-            paths = iter(mf.asset_paths)
-            failure: Exception | None = None
             started = perf_counter()
-
-            async def check_objects() -> None:
-                nonlocal mf_ready, failure
-                try:
-                    for path in paths:
-                        async with self._mf_capacity:
-                            if await self.artifacts.head(prefix + path) is None:
-                                mf_ready = False
-                                group.cancel_scope.cancel()
-                                return
-                except Exception as error:
-                    if failure is None:
-                        failure = error
-                    group.cancel_scope.cancel()
-
-            async with anyio.create_task_group() as group:
-                for _ in range(min(MF_STORAGE_CONCURRENCY, len(mf.asset_paths))):
-                    group.start_soon(check_objects)
-            if failure is not None:
-                raise failure
+            mf_ready = await self._mf_artifacts.available(prefix + path for path in mf.asset_paths)
             logger.info(
                 "mf_publish extension=%s version=%s phase=objects files=%d duration_ms=%.1f",
                 row.extension.name,
@@ -617,13 +582,6 @@ class RegistryRepository:
         ).select_related("release__extension")
         return [_prepared_python(row) for row in rows]
 
-    async def _ensure_object(self, key: str, content: bytes, media_type: str) -> None:
-        stored = await self.artifacts.head(key)
-        if stored is not None and stored.size != len(content):
-            raise RegistryConflictError("Distribution staging object size conflict")
-        if stored is None:
-            await self.artifacts.put(key, content, content_type=media_type)
-
     async def put_python_file(
         self,
         distribution: PreparedPythonDistribution,
@@ -655,8 +613,8 @@ class RegistryRepository:
             if existing
             else f"staging/python-metadata/{metadata_sha256}.metadata"
         )
-        await self._ensure_object(r2_key, content, "application/octet-stream")
-        await self._ensure_object(metadata_key, metadata, "application/octet-stream")
+        await self.artifacts.ensure(r2_key, content, "application/octet-stream")
+        await self.artifacts.ensure(metadata_key, metadata, "application/octet-stream")
         try:
             async with in_transaction():
                 release = await self._locked_release(
@@ -787,28 +745,10 @@ class RegistryRepository:
             (perf_counter() - started) * 1000,
         )
         prefix = f"staging/module-federation/{extension_name}/{version}/{snapshot_hash}/"
-        paths = iter(sorted(files))
-        failure: Exception | None = None
         started = perf_counter()
-
-        async def stage_objects() -> None:
-            nonlocal failure
-            try:
-                for path in paths:
-                    async with self._mf_capacity:
-                        await self._ensure_object(prefix + path, files[path], media_types[path])
-            except Exception as error:
-                if failure is None:
-                    failure = error
-                group.cancel_scope.cancel()
-
-        async with anyio.create_task_group() as group:
-            for _ in range(min(MF_STORAGE_CONCURRENCY, len(files))):
-                group.start_soon(stage_objects)
-        if failure is not None:
-            # Re-raise the original error after sibling I/O has stopped so that
-            # immutable conflicts keep their HTTP 409 mapping.
-            raise failure
+        await self._mf_artifacts.ensure_many(
+            Artifact(prefix + path, files[path], media_types[path]) for path in sorted(files)
+        )
         logger.info(
             "mf_upload extension=%s version=%s phase=staging files=%d duration_ms=%.1f",
             extension_name,

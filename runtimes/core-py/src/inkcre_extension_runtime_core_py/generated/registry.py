@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 
 class DocumentationHosting(BaseModel):
@@ -71,6 +71,70 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: str = Field(..., title="Manifest Url")
 
 
+class ModuleFederationNativePrepare(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    module_federation: ModuleFederationAssociationInput
+    nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
+    python: None = Field(None, title="Python")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class State(Enum):
+    preparing = "preparing"
+    published = "published"
+    yanked = "yanked"
+    blocked = "blocked"
+
+
+class ModuleFederationNativePublisherRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Literal["module_federation"] = Field(..., title="Distribution")
+    module_federation: ModuleFederationDistribution
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: None = Field(None, title="Python")
+    state: State = Field(..., title="State")
+    uploaded: bool = Field(..., title="Uploaded")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class ModuleFederationNativeRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Literal["module_federation"] = Field(..., title="Distribution")
+    module_federation: ModuleFederationDistribution
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: None = Field(None, title="Python")
+    state: State = Field(..., title="State")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
 class Distribution(Enum):
     python = "python"
     module_federation = "module_federation"
@@ -101,13 +165,6 @@ class NativeDocumentationReceipt(BaseModel):
         min_length=5,
         max_length=128,
     ) = Field(..., title="Version")
-
-
-class State(Enum):
-    preparing = "preparing"
-    published = "published"
-    yanked = "yanked"
-    blocked = "blocked"
 
 
 class NativeReleaseDocumentation(BaseModel):
@@ -226,6 +283,63 @@ class PythonDistribution(BaseModel):
     simple_url: str = Field(..., title="Simple Url")
 
 
+class PythonNativePrepare(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    module_federation: None = Field(None, title="Module Federation")
+    nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
+    python: PythonAssociationInput
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class PythonNativePublisherRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Literal["python"] = Field(..., title="Distribution")
+    module_federation: None = Field(None, title="Module Federation")
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: PythonDistribution
+    state: State = Field(..., title="State")
+    uploaded: bool = Field(..., title="Uploaded")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
+class PythonNativeRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    distribution: Literal["python"] = Field(..., title="Distribution")
+    module_federation: None = Field(None, title="Module Federation")
+    name: constr(
+        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+        min_length=3,
+        max_length=129,
+    ) = Field(..., title="Name")
+    nickname: str = Field(..., title="Nickname")
+    python: PythonDistribution
+    state: State = Field(..., title="State")
+    version: constr(
+        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+        min_length=5,
+        max_length=128,
+    ) = Field(..., title="Version")
+
+
 class ReleaseRecord(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -259,40 +373,16 @@ class ExtensionRecord(BaseModel):
     releases: list[ReleaseRecord] | None = Field([], title="Releases")
 
 
-class NativePrepareReleaseRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    module_federation: ModuleFederationAssociationInput | None = None
-    nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
-    python: PythonAssociationInput | None = None
-    version: constr(
-        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-        min_length=5,
-        max_length=128,
-    ) = Field(..., title="Version")
+class NativePrepareReleaseRequest(RootModel[PythonNativePrepare | ModuleFederationNativePrepare]):
+    root: PythonNativePrepare | ModuleFederationNativePrepare
 
 
-class NativePublisherRelease(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
+class NativePublisherRelease(
+    RootModel[PythonNativePublisherRelease | ModuleFederationNativePublisherRelease]
+):
+    root: PythonNativePublisherRelease | ModuleFederationNativePublisherRelease = Field(
+        ..., discriminator="distribution"
     )
-    distribution: Distribution = Field(..., title="Distribution")
-    module_federation: ModuleFederationDistribution | None = None
-    name: constr(
-        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-        min_length=3,
-        max_length=129,
-    ) = Field(..., title="Name")
-    nickname: str = Field(..., title="Nickname")
-    python: PythonDistribution | None = None
-    state: State = Field(..., title="State")
-    uploaded: bool = Field(..., title="Uploaded")
-    version: constr(
-        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-        min_length=5,
-        max_length=128,
-    ) = Field(..., title="Version")
 
 
 class NativePublisherWorkspace(BaseModel):
@@ -307,25 +397,10 @@ class NativePublisherWorkspace(BaseModel):
     releases: list[NativePublisherRelease] = Field(..., title="Releases")
 
 
-class NativeReleaseRecord(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
+class NativeReleaseRecord(RootModel[PythonNativeRelease | ModuleFederationNativeRelease]):
+    root: PythonNativeRelease | ModuleFederationNativeRelease = Field(
+        ..., discriminator="distribution"
     )
-    distribution: Distribution = Field(..., title="Distribution")
-    module_federation: ModuleFederationDistribution | None = None
-    name: constr(
-        pattern=r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-        min_length=3,
-        max_length=129,
-    ) = Field(..., title="Name")
-    nickname: str = Field(..., title="Nickname")
-    python: PythonDistribution | None = None
-    state: State = Field(..., title="State")
-    version: constr(
-        pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-        min_length=5,
-        max_length=128,
-    ) = Field(..., title="Version")
 
 
 class PublisherRelease(BaseModel):

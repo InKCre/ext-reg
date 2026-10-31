@@ -66,14 +66,14 @@ export class RegistryReleaseReader {
         origin,
       ),
     )
-    const extension = zExtensionRecord.parse(value)
+    const parsed = zExtensionRecord.safeParse(value)
+    if (!parsed.success)
+      throw new RegistryReleaseError('Registry returned an invalid native Extension record.')
+    const extension = parsed.data
     if (
       extension.name !== name ||
       extension.releases.some(
-        (release) =>
-          release.name !== name ||
-          release.distribution !== distribution ||
-          !this.#hasNativeAssociation(release),
+        (release) => release.name !== name || release.distribution !== distribution,
       )
     ) {
       throw new RegistryReleaseError('Registry returned a different Extension coordinate.')
@@ -123,12 +123,14 @@ export class RegistryReleaseReader {
       `/v2/extensions/${encodeURIComponent(namespace)}/${encodeURIComponent(localName)}/distributions/${distribution}/releases/${encodeURIComponent(version)}`,
       origin,
     )
-    const release = zReleaseRecord.parse(await this.#getJson(url))
+    const parsed = zReleaseRecord.safeParse(await this.#getJson(url))
+    if (!parsed.success)
+      throw new RegistryReleaseError('Registry returned an invalid native Release record.')
+    const release = parsed.data
     if (
       release.name !== name ||
       release.version !== version ||
-      release.distribution !== distribution ||
-      !this.#hasNativeAssociation(release)
+      release.distribution !== distribution
     ) {
       throw new RegistryReleaseError('Registry returned a different exact Release coordinate.')
     }
@@ -153,12 +155,6 @@ export class RegistryReleaseReader {
       )
     }
     return response.json()
-  }
-
-  #hasNativeAssociation(release: ReleaseRecord): boolean {
-    return release.distribution === 'python'
-      ? release.python != null && release.module_federation == null
-      : release.module_federation != null && release.python == null
   }
 
   #assertHostSdk(distribution: ModuleFederationDistribution, name: string, version: string): void {

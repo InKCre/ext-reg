@@ -59,6 +59,69 @@ export const zModuleFederationDistribution = z.object({
 })
 
 /**
+ * ModuleFederationNativePrepare
+ */
+export const zModuleFederationNativePrepare = z.object({
+  module_federation: zModuleFederationAssociationInput,
+  nickname: z.string().min(1).max(128),
+  python: z.null().optional(),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
+ * ModuleFederationNativePublisherRelease
+ */
+export const zModuleFederationNativePublisherRelease = z.object({
+  distribution: z.literal('module_federation'),
+  module_federation: zModuleFederationDistribution,
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  python: z.null().optional(),
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  uploaded: z.boolean(),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
+ * ModuleFederationNativeRelease
+ */
+export const zModuleFederationNativeRelease = z.object({
+  distribution: z.literal('module_federation'),
+  module_federation: zModuleFederationDistribution,
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  python: z.null().optional(),
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
  * NativeDocumentationReceipt
  */
 export const zNativeDocumentationReceipt = z.object({
@@ -147,22 +210,6 @@ export const zPythonAssociationInput = z.object({
 })
 
 /**
- * NativePrepareReleaseRequest
- */
-export const zNativePrepareReleaseRequest = z.object({
-  module_federation: zModuleFederationAssociationInput.nullish(),
-  nickname: z.string().min(1).max(128),
-  python: zPythonAssociationInput.nullish(),
-  version: z
-    .string()
-    .min(5)
-    .max(128)
-    .regex(
-      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
-    ),
-})
-
-/**
  * PythonDistribution
  */
 export const zPythonDistribution = z.object({
@@ -171,80 +218,6 @@ export const zPythonDistribution = z.object({
   host_sdk_version: z.string(),
   project: z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,198}[A-Za-z0-9])?$/),
   simple_url: z.string(),
-})
-
-/**
- * NativePublisherRelease
- */
-export const zNativePublisherRelease = z.object({
-  distribution: z.enum(['python', 'module_federation']),
-  module_federation: zModuleFederationDistribution.nullish(),
-  name: z
-    .string()
-    .min(3)
-    .max(129)
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  nickname: z.string(),
-  python: zPythonDistribution.nullish(),
-  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
-  uploaded: z.boolean(),
-  version: z
-    .string()
-    .min(5)
-    .max(128)
-    .regex(
-      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
-    ),
-})
-
-/**
- * NativePublisherWorkspace
- */
-export const zNativePublisherWorkspace = z.object({
-  namespace: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  next_offset: z.int().gte(0).nullable(),
-  offset: z.int().gte(0),
-  releases: z.array(zNativePublisherRelease),
-})
-
-/**
- * NativeReleaseRecord
- */
-export const zNativeReleaseRecord = z.object({
-  distribution: z.enum(['python', 'module_federation']),
-  module_federation: zModuleFederationDistribution.nullish(),
-  name: z
-    .string()
-    .min(3)
-    .max(129)
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  nickname: z.string(),
-  python: zPythonDistribution.nullish(),
-  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
-  version: z
-    .string()
-    .min(5)
-    .max(128)
-    .regex(
-      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
-    ),
-})
-
-/**
- * NativeExtensionRecord
- */
-export const zNativeExtensionRecord = z.object({
-  name: z
-    .string()
-    .min(3)
-    .max(129)
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  nickname: z.string(),
-  releases: z.array(zNativeReleaseRecord).optional().default([]),
 })
 
 /**
@@ -283,6 +256,111 @@ export const zPublisherWorkspace = z.object({
   next_offset: z.int().gte(0).nullable(),
   offset: z.int().gte(0),
   releases: z.array(zPublisherRelease),
+})
+
+/**
+ * PythonNativePrepare
+ */
+export const zPythonNativePrepare = z.object({
+  module_federation: z.null().optional(),
+  nickname: z.string().min(1).max(128),
+  python: zPythonAssociationInput,
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+export const zNativePrepareReleaseRequest = z.union([
+  zPythonNativePrepare,
+  zModuleFederationNativePrepare,
+])
+
+/**
+ * PythonNativePublisherRelease
+ */
+export const zPythonNativePublisherRelease = z.object({
+  distribution: z.literal('python'),
+  module_federation: z.null().optional(),
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  python: zPythonDistribution,
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  uploaded: z.boolean(),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+export const zNativePublisherRelease = z.discriminatedUnion('distribution', [
+  zPythonNativePublisherRelease,
+  zModuleFederationNativePublisherRelease,
+])
+
+/**
+ * NativePublisherWorkspace
+ */
+export const zNativePublisherWorkspace = z.object({
+  namespace: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  next_offset: z.int().gte(0).nullable(),
+  offset: z.int().gte(0),
+  releases: z.array(zNativePublisherRelease),
+})
+
+/**
+ * PythonNativeRelease
+ */
+export const zPythonNativeRelease = z.object({
+  distribution: z.literal('python'),
+  module_federation: z.null().optional(),
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  python: zPythonDistribution,
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+export const zNativeReleaseRecord = z.discriminatedUnion('distribution', [
+  zPythonNativeRelease,
+  zModuleFederationNativeRelease,
+])
+
+/**
+ * NativeExtensionRecord
+ */
+export const zNativeExtensionRecord = z.object({
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  nickname: z.string(),
+  releases: z.array(zNativeReleaseRecord).optional().default([]),
 })
 
 /**

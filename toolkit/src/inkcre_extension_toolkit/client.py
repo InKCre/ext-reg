@@ -3,7 +3,6 @@ from __future__ import annotations
 from urllib.parse import quote
 
 import httpx
-from pydantic import ValidationError
 
 from .contracts import (
     NativePrepareReleaseRequest,
@@ -193,7 +192,7 @@ class RegistryClient:
         distribution: str,
     ) -> NativeDocumentationReceipt:
         """Try the saved publication at most twice; never infer success from current."""
-        from .documentation import inspect_documentation
+        from .documentation import documentation_fingerprint, inspect_documentation
 
         inspected = inspect_documentation(archive, metadata.entry)
         if inspected.digest != metadata.content_sha256:
@@ -201,19 +200,38 @@ class RegistryClient:
         publication = DocumentationPublication.model_validate(
             {**metadata.model_dump(mode="json"), "expected_etag": expected_etag}
         )
+        expected_receipt = {
+            **metadata.model_dump(mode="json"),
+            "name": f"{namespace}/{name}",
+            "distribution": distribution,
+            "version": version,
+            "scope": scope,
+        }
+        fingerprint = documentation_fingerprint(
+            f"{namespace}/{name}",
+            distribution,
+            version,
+            scope,
+            metadata.model_dump(mode="json"),
+            expected_etag,
+        )
+        path = self._native_path(namespace, name, distribution, version) + f"/documentation/{scope}"
         last_error: Exception | None = None
         for _attempt in range(2):
             try:
                 response = self._require_success(
                     self._client.post(
-                        self._native_path(namespace, name, distribution, version)
-                        + f"/documentation/{scope}",
+                        path,
                         data={"metadata": publication.model_dump_json()},
                         files={"content": ("documentation.zip", archive, "application/zip")},
                     )
                 )
-                return NativeDocumentationReceipt.model_validate_json(response.content)
-            except (httpx.TransportError, RegistryHTTPError, ValidationError) as error:
+                receipt = NativeDocumentationReceipt.model_validate_json(response.content)
+                confirmed = receipt.model_dump(mode="json", include=set(expected_receipt))
+                if confirmed != expected_receipt or receipt.snapshot_etag != f'"{fingerprint}"':
+                    raise ValueError("Registry receipt does not confirm the saved publication")
+                return receipt
+            except (httpx.TransportError, RegistryHTTPError, ValueError) as error:
                 if isinstance(error, RegistryHTTPError) and error.status_code not in {
                     500,
                     502,

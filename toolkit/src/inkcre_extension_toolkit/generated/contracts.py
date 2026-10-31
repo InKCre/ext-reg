@@ -56,6 +56,55 @@ class ModuleFederationDistribution(BaseModel):
     manifest_url: Annotated[str, Field(title="Manifest Url")]
 
 
+class ModuleFederationNativePrepare(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    module_federation: ModuleFederationAssociationInput
+    nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
+    python: Annotated[None, Field(title="Python")] = None
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
+class ModuleFederationNativeRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    distribution: Annotated[Literal["module_federation"], Field(title="Distribution")]
+    module_federation: ModuleFederationDistribution
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    nickname: Annotated[str, Field(title="Nickname")]
+    python: Annotated[None, Field(title="Python")] = None
+    state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
 class PythonEntryPoint(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -142,6 +191,55 @@ class PythonDistribution(BaseModel):
     simple_url: Annotated[str, Field(title="Simple Url")]
 
 
+class PythonNativePrepare(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    module_federation: Annotated[None, Field(title="Module Federation")] = None
+    nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
+    python: PythonAssociationInput
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
+class PythonNativeRelease(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    distribution: Annotated[Literal["python"], Field(title="Distribution")]
+    module_federation: Annotated[None, Field(title="Module Federation")] = None
+    name: Annotated[
+        str,
+        Field(
+            max_length=129,
+            min_length=3,
+            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+            title="Name",
+        ),
+    ]
+    nickname: Annotated[str, Field(title="Nickname")]
+    python: PythonDistribution
+    state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
+    version: Annotated[
+        str,
+        Field(
+            max_length=128,
+            min_length=5,
+            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+            title="Version",
+        ),
+    ]
+
+
 class ReleaseRecord(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -189,52 +287,20 @@ class ExtensionRecord(BaseModel):
     releases: Annotated[list[ReleaseRecord], Field(title="Releases")] = []
 
 
-class NativePrepareReleaseRequest(BaseModel):
+class NativePrepareReleaseRequest(RootModel[PythonNativePrepare | ModuleFederationNativePrepare]):
     model_config = ConfigDict(
-        extra="forbid",
         frozen=True,
     )
-    module_federation: ModuleFederationAssociationInput | None = None
-    nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
-    python: PythonAssociationInput | None = None
-    version: Annotated[
-        str,
-        Field(
-            max_length=128,
-            min_length=5,
-            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-            title="Version",
-        ),
-    ]
+    root: PythonNativePrepare | ModuleFederationNativePrepare
 
 
-class NativeReleaseRecord(BaseModel):
+class NativeReleaseRecord(RootModel[PythonNativeRelease | ModuleFederationNativeRelease]):
     model_config = ConfigDict(
-        extra="forbid",
         frozen=True,
     )
-    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
-    module_federation: ModuleFederationDistribution | None = None
-    name: Annotated[
-        str,
-        Field(
-            max_length=129,
-            min_length=3,
-            pattern="^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
-            title="Name",
-        ),
-    ]
-    nickname: Annotated[str, Field(title="Nickname")]
-    python: PythonDistribution | None = None
-    state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
-    version: Annotated[
-        str,
-        Field(
-            max_length=128,
-            min_length=5,
-            pattern="^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
-            title="Version",
-        ),
+    root: Annotated[
+        PythonNativeRelease | ModuleFederationNativeRelease,
+        Field(discriminator="distribution"),
     ]
 
 

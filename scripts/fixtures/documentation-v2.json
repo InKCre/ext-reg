@@ -1,0 +1,66 @@
+{
+  "provenance": "Registry 58610f7 / Toolkit 0.5.0 v2 identity; expected values captured before helper extraction. Never regenerate to accept an identity change.",
+  "files": {
+    "index.html": "<h1>Saved candidate</h1>",
+    "guide/说明.html": "<p>unchanged</p>"
+  },
+  "vectors": [
+    {
+      "case": "defaults",
+      "candidate": {
+        "name": "check/documentation-compat",
+        "distribution": "module_federation",
+        "version": "1.0.0",
+        "scope": "global",
+        "metadata": {
+          "snapshot_id": "11111111111111111111111111111111",
+          "content_sha256": "d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3",
+          "source_repository": "https://example.invalid/inkcre/docs",
+          "source_revision": "revision"
+        },
+        "expected_etag": null
+      },
+      "canonical_json": "{\"build_id\":null,\"content_sha256\":\"d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3\",\"distribution\":\"module_federation\",\"entry\":\"index.html\",\"expected_etag\":null,\"name\":\"check/documentation-compat\",\"scope\":\"global\",\"snapshot_id\":\"11111111111111111111111111111111\",\"source_repository\":\"https://example.invalid/inkcre/docs\",\"source_revision\":\"revision\",\"version\":\"1.0.0\"}",
+      "fingerprint": "ccdc98d7174495adecc03f4e47ac9c7a90f206329f44a453623fdee412b6379b"
+    },
+    {
+      "case": "unicode",
+      "candidate": {
+        "name": "check/documentation-compat",
+        "distribution": "module_federation",
+        "version": "1.0.0",
+        "scope": "global",
+        "metadata": {
+          "snapshot_id": "22222222222222222222222222222222",
+          "content_sha256": "d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3",
+          "source_repository": "https://example.invalid/inkcre/docs",
+          "source_revision": "版本🌐\nsecond",
+          "entry": "guide/说明.html",
+          "build_id": "构建\\01"
+        },
+        "expected_etag": null
+      },
+      "canonical_json": "{\"build_id\":\"\\u6784\\u5efa\\\\01\",\"content_sha256\":\"d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3\",\"distribution\":\"module_federation\",\"entry\":\"guide/\\u8bf4\\u660e.html\",\"expected_etag\":null,\"name\":\"check/documentation-compat\",\"scope\":\"global\",\"snapshot_id\":\"22222222222222222222222222222222\",\"source_repository\":\"https://example.invalid/inkcre/docs\",\"source_revision\":\"\\u7248\\u672c\\ud83c\\udf10\\nsecond\",\"version\":\"1.0.0\"}",
+      "fingerprint": "154b7f62a2e72e763cd9f79788c6296cea4641db0940dd563cd4f1b8ac2eec53"
+    },
+    {
+      "case": "correction",
+      "candidate": {
+        "name": "check/documentation-compat",
+        "distribution": "python",
+        "version": "1.0.0",
+        "scope": "global",
+        "metadata": {
+          "snapshot_id": "33333333333333333333333333333333",
+          "content_sha256": "d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3",
+          "source_repository": "https://example.invalid/inkcre/docs",
+          "source_revision": "revision",
+          "build_id": "build-2"
+        },
+        "expected_etag": "\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""
+      },
+      "canonical_json": "{\"build_id\":\"build-2\",\"content_sha256\":\"d9066d54397bb18c386ca5f7caefbc0713ccc15e6c07cb51a89c0a8518a3d9c3\",\"distribution\":\"python\",\"entry\":\"index.html\",\"expected_etag\":\"\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"\",\"name\":\"check/documentation-compat\",\"scope\":\"global\",\"snapshot_id\":\"33333333333333333333333333333333\",\"source_repository\":\"https://example.invalid/inkcre/docs\",\"source_revision\":\"revision\",\"version\":\"1.0.0\"}",
+      "fingerprint": "8500a2154f21a13d7a8f35b08277d48a1e21993c968dc978748a42bd4d845144"
+    }
+  ]
+}

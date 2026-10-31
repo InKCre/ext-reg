@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:6ad45137c54a4bf40538bb3f715cd54f46e220e7bf549405640edace24a670f0"
+content_hash = "sha256:e313858b30b42e8289077d34c87a32ffd2ba7ff687b9ed0af843e5bf28cbfbd0"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.14"
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "inkcre-extension-toolkit"
-version = "0.5.0"
+version = "0.5.1"
 requires_python = ">=3.12,<3.14"
 editable = true
 path = "./toolkit"

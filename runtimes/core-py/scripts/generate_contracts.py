@@ -20,7 +20,6 @@ COMMON = [
     "3.12",
     "--use-standard-collections",
     "--use-union-operator",
-    "--collapse-root-models",
     "--disable-timestamp",
 ]
 

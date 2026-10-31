@@ -41,6 +41,10 @@ const partialModule = new WebExtensionModuleHandle('inkcre/partial', '1.0.0', {
 await assert.rejects(partialModule.activate(), (error) => error === partialFailure)
 await partialModule.dispose()
 assert.deepEqual(initialized, ['initialize', 'dispose'])
+// Disposal is terminal, including after partial startup. Reactivation would leave
+// new resources behind because the next dispose call is already idempotent.
+await assert.rejects(partialModule.activate(), /disposed Extension module/)
+assert.deepEqual(initialized, ['initialize', 'dispose'])
 
 // Exercise the built package and real SDK over HTTP, without a deployment or real credentials.
 const target = '11111111-1111-4111-8111-111111111111'

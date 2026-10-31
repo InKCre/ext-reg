@@ -19,3 +19,11 @@ Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选�
 显式 enable/disable 先按同一 Host、同一 Extension 的命令顺序保存 enabled 意图，再串行执行模块生命周期。disable 在等待在途启动之前保存 false，并在资源清理完成后返回。startup 只恢复已有意图，成功或失败都不反写 enabled；初始化失败保留意图及错误，允许后续恢复重试。
 
 恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回、分发或版本改变，迟到的模块会执行 dispose，不能登记为 running。shutdown 等待在途恢复与命令完成并清理模块。同 Host 的串行队列不锁住其他已准入客户端对共享数据库的写入，因此离线意图更新不等于瞬时、原子的进程切换；这些客户端的修改通过重新读取被识别。
+
+`WebExtensionModuleHandle.dispose()` 成功后，句柄进入终止状态，后续 `activate()` 会拒绝执行。这样可以避免重新创建资源后被幂等的 dispose 跳过；需要再次启动时，调用者必须加载新的句柄。
+
+## Peer 管理客户端的兼容过渡
+
+Peer 管理的 wire schema、精确委派与响应校验由 `@inkcre/core` 的新公开客户端拥有；新 TS 应用和扩展消费 Core 的 `readExtensionPeerStatus`、`manageExtensionOnPeer` 等入口。Registry 发行查询、候选选择和 MF 模块生命周期仍由本 Runtime 承担，迁移不把首次选择或 Registry 地址政策放入通用 wire client。
+
+该 Core API 随待发布的 0.4.4 patch 候选交付。本 Runtime 当前仍以已经发布的 Core 0.4.2 资产独立构建，因此暂保留 `peer-management.ts` 为历史兼容实现，不能提前引用不存在的发行包，也不在运行时探测 API 后选择不同协议。正式 Core 制品发布后，下一次 Runtime patch 提高最低 Core 版本并改为委托 Core；仅将 Core 的 `ExtensionManagementError` 映射为旧入口的 `WebExtensionRuntimeError`，Peer transport 错误原样传播。类型、能力标识与 discovery 可直接 re-export。已有 Runtime 消费者不必立即改 import；独立安装和 HTTP boundary 必须同时验证这次最后切换。
