@@ -6,7 +6,7 @@ The public control plane and native Distribution host for InKCre Extensions — 
 
 The public Registry origin is [`https://registry.inkcre.dev`](https://registry.inkcre.dev); its root page is a read-only Extension catalog. Python consumers use the Simple Repository API; browser consumers use the producer's native `mf-manifest.json`. Deployment installation, per-Peer enablement, and running state remain outside this repository.
 
-The service runs as a Python Cloudflare Worker with D1 metadata and private R2 bytes.
+服务使用 CPython / FastAPI、PostgreSQL 元数据和私有 S3 兼容对象存储。
 
 ## Quickstart
 
@@ -22,7 +22,7 @@ inkcre-ext --help
 ### Develop locally
 
 ```bash
-uv sync --frozen
+pdm install --frozen-lockfile
 pnpm install --frozen-lockfile
 pnpm check
 ```

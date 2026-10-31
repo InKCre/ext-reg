@@ -60,13 +60,17 @@ and `blocked` denies discovery, stable entries, and every historical snapshot be
 
 ## Persistence and Security
 
-持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有 Release、Distribution 与发布身份的查询和事务，`service/documentation.py` 的 `DocumentationRepository` 拥有文档查询、对象 staging 和 current-set 替换事务。两者由 lifespan 创建，共享同一个 `ArtifactStore`，各自持有进程内并发额度；文档仓储不依赖另一个仓储的实例或内部状态。Release、Distribution 和 File 使用独立内部主键，新公开发行身份是 Extension Name / Distribution / Version，原生文件仍是 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
+持久化由 PostgreSQL 与 Tortoise ORM / asyncpg 承担。`service/database.py` 定义模型、业务唯一约束、外键和状态约束；`service/repository.py` 拥有 Release、Distribution 与发布身份的查询和事务，`service/documentation.py` 的 `DocumentationRepository` 拥有文档查询、对象 staging 和 current-set 替换事务。两者由 lifespan 创建，共享同一个 `ArtifactStore`；文档仓储不依赖另一个仓储的实例或内部状态。不可变对象的暂存、批量存在性检查、并发额度与失败取消统一由 `service/storage.py` 管理，业务仓储只决定对象身份及事务提交。批处理退出并完成兄弟任务清理后，存储层重新抛出原始异常，使冲突保留其领域类型。Release、Distribution 和 File 使用独立内部主键，新公开发行身份是 Extension Name / Distribution / Version，原生文件仍是 Python Project / Version / Filename。内部 ID 不进入公开 URL 或契约。
 
 文档指针由 PostgreSQL 的 `(snapshot_id, release_id, scope)` 复合外键保证归属一致。Tortoise 保留单列关系用于查询，复合外键由 `0004_documentation_ownership` 原生 DDL 补充；已有指针不能关联其他 Release/scope，所指快照也不能在保留该指针时改变归属。`0006` 对新 native owner 增加同等复合外键，并以 XOR 约束保证每个快照与指针恰有一个历史或原生 owner。
 
 准备关联时，namespace 行锁串行化同一发布者的身份创建，release 行锁保护关联和状态。唯一约束保证 Python Project / Version 不被另一个 release 占用；失败会回滚同一事务中的 Extension、Release 和关联创建。上传、发布、撤回和恢复均重新检查锁定后的 release 状态。关联、文件名和内容身份不可变，相同提交可以重试。模型的联合约束明确使用数据库外键列名；不依赖迁移生成器猜测关系字段的物理列名。
 
-R2 的网络访问不持有数据库事务锁。boto3 的同步调用在线程中执行；上传先写内容寻址的 staging 对象，再在 PostgreSQL 事务中增加可见关联。发布前检查关联对象存在，文件大小一致。失败可能留下不可达的 staging 对象，它们不是公开状态的来源。每次文件读取先检查 release 可读性，再通过 S3 流式返回；HEAD 只读取对象元数据。响应使用 `Cache-Control: public, no-cache` 和内容 SHA-256 ETag；条件 GET / HEAD 在 release 可读、对象存在之后才能返回 304。缓存必须逐次重验证，blocked 的 451 响应使用 `no-store`。已经被客户端下载的内容无法通过服务端状态变化收回。
+`ArtifactStore` 的同一进程内额度为 4，由文档、MF 暂存及发布检查、Python 文件暂存共同使用；不同类型上传之间不再拥有独立额度。直接下载不经过该额度。对象存储策略的变更集中在此处，但需要一起考虑这些调用方的等待时间；它不是部署范围的限流或公平调度承诺。
+
+已知的冲突、状态与查找异常定义在 `service/errors.py`，由 FastAPI exception handler 统一转换为既有 HTTP 状态和 `detail` 响应结构；对象大小冲突的消息统一为 `staging object size conflict`，未知异常继续传播。内容域 middleware 不经过管理路由，仍在自己的边界转换读取错误。
+
+S3 的网络访问不持有数据库事务锁。boto3 的同步调用在线程中执行；上传先写内容寻址的 staging 对象，再在 PostgreSQL 事务中增加可见关联。发布前检查关联对象存在，文件大小一致。失败可能留下不可达的 staging 对象，它们不是公开状态的来源。每次文件读取先检查 release 可读性，再通过 S3 流式返回；HEAD 只读取对象元数据。响应使用 `Cache-Control: public, no-cache` 和内容 SHA-256 ETag；条件 GET / HEAD 在 release 可读、对象存在之后才能返回 304。缓存必须逐次重验证，blocked 的 451 响应使用 `no-store`。已经被客户端下载的内容无法通过服务端状态变化收回。
 
 应用启动只初始化连接池，不建表、不运行迁移、不创建凭据或示例数据。交付在启动新版本前运行包内 Tortoise 迁移，并仅允许向前执行。数据迁移工具只在旧 SQLite 快照读取边界使用 SQL，PostgreSQL 业务读写与发布凭据维护使用 ORM。角色与 GRANT 是 PostgreSQL 原生授权 DDL，由追加迁移维护；登录密码由可信交付端设置。运行角色 `registry_app` 仅获得明确列出的业务表的 SELECT / INSERT / UPDATE / DELETE、对应序列的 USAGE 和 schema 的 USAGE，不能修改 schema、角色或迁移记录。后续新增表须在同一迁移显式授予所需权限，不自动授权全部未来表。旧 D1 历史保留用于导入验收，迁移工具不自动访问生产 D1。
 

@@ -30,7 +30,9 @@ Do not edit `docs/_shared/**` from this repository. The repo-root
 canonical Hub-first edit and isolated ref-bump workflow.
 
 `pnpm check` verifies generated contracts, formatting, lint, types,
-the Registry packages, and the real Pyodide Worker build. To update an executable
+the Registry packages, Web Runtime build, and real PostgreSQL / S3 HTTP acceptance.
+The database checks require an isolated disposable PostgreSQL instance; see
+[local development](docs/40-deployment/local-development.md). To update an executable
 contract intentionally:
 
 ```bash
@@ -74,7 +76,7 @@ Package publication runs static and generated-contract checks, then builds its
 own release assets. The Registry database journey remains in repository CI; it
 is not a dependency of Toolkit or Runtime publication.
 
-Registry, Toolkit publication, Runtime publication and Cloudflare production changes are separate
+Registry, Toolkit publication, Runtime publication and Registry production changes are separate
 privileged operations. Extension publishers install the independent
 `inkcre-extension-toolkit[cli]` distribution, prepare typed associations with
 `inkcre-ext prepare-release`, use PDM/Twine for wheels or

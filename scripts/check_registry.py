@@ -134,6 +134,20 @@ async def journey(client: httpx.AsyncClient, token: str, other_token: str, artif
     )
     stored_mf = await db.ModuleFederationDistribution.get()
     remote_key = stored_mf.manifest_r2_key.removesuffix("mf-manifest.json") + "remoteEntry.js"
+    # Corrupt immutable staging bytes must remain a domain conflict through the
+    # concurrent storage boundary, and must not publish or change the association.
+    await artifacts.put(remote_key, b"corrupt", content_type="text/javascript")
+    await request(
+        "POST",
+        mf_path + "/module-federation",
+        409,
+        private=True,
+        files={"content": ("extension.zip", snapshot)},
+    )
+    assert (await db.ModuleFederationDistribution.get()).internal_snapshot_hash == (
+        stored_mf.internal_snapshot_hash
+    )
+    assert (await db.NativeRelease.get(distribution="module_federation")).state == "preparing"
     artifacts.client.delete_object(Bucket=artifacts.bucket, Key=remote_key)
     await request("POST", mf_path + "/publish", 409, private=True)
     await artifacts.put(remote_key, b"export const check = true;", content_type="text/javascript")

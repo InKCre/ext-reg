@@ -50,6 +50,12 @@ from ..contracts.models import (
     validate_version,
 )
 from . import documentation
+from .errors import (
+    RegistryBlockedError,
+    RegistryConflictError,
+    RegistryNotFoundError,
+    RegistryStateError,
+)
 from .module_federation import (
     ModuleFederationValidationError,
     inspect_module_federation_snapshot,
@@ -61,14 +67,7 @@ from .python_distribution import (
     semver_to_pep440,
     sha256_hex,
 )
-from .repository import (
-    PublicObject,
-    RegistryBlockedError,
-    RegistryConflictError,
-    RegistryNotFoundError,
-    RegistryRepository,
-    RegistryStateError,
-)
+from .repository import PublicObject, RegistryRepository
 from .settings import Settings, database_config
 from .simple import (
     SIMPLE_HTML,
@@ -203,7 +202,7 @@ def _validate_identity(namespace: str, name: str, version: str | None = None) ->
 def _map_repository_error(error: Exception) -> HTTPException:
     if isinstance(error, RegistryBlockedError):
         return HTTPException(status.HTTP_451_UNAVAILABLE_FOR_LEGAL_REASONS, str(error))
-    if isinstance(error, RegistryConflictError):
+    if isinstance(error, (RegistryConflictError, documentation.DocumentationPreconditionError)):
         return HTTPException(status.HTTP_409_CONFLICT, str(error))
     if isinstance(error, RegistryNotFoundError):
         return HTTPException(status.HTTP_404_NOT_FOUND, str(error))
@@ -308,6 +307,14 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT"],
         allow_headers=["Authorization", "Content-Type", "If-Match", "If-None-Match"],
     )
+
+    @app.exception_handler(RegistryConflictError)
+    @app.exception_handler(RegistryNotFoundError)
+    @app.exception_handler(RegistryStateError)
+    @app.exception_handler(documentation.DocumentationPreconditionError)
+    async def registry_error(_request: Request, error: Exception) -> JSONResponse:
+        mapped = _map_repository_error(error)
+        return JSONResponse({"detail": mapped.detail}, status_code=mapped.status_code)
 
     @app.middleware("http")
     async def reject_legacy_writes(request: Request, call_next):
@@ -446,12 +453,9 @@ def create_app() -> FastAPI:
         extension = _validate_identity(namespace, name, version)
         settings = documentation_settings(request)
         response.headers["Cache-Control"] = "no-store"
-        try:
-            return await _documentation(request).discover(
-                extension, version, settings, public=public, distribution=distribution
-            )
-        except (RegistryBlockedError, RegistryNotFoundError) as error:
-            raise _map_repository_error(error) from error
+        return await _documentation(request).discover(
+            extension, version, settings, public=public, distribution=distribution
+        )
 
     @app.get(
         "/v1/extensions/{namespace}/{name}/releases/{version}/documentation",
@@ -582,20 +586,15 @@ def create_app() -> FastAPI:
                 )
             except (ValueError, ValidationError) as error:
                 raise HTTPException(400, str(error)) from error
-            try:
-                result = await _documentation(request).publish(
-                    extension,
-                    version,
-                    scope,
-                    payload,
-                    bundle,
-                    settings,
-                    distribution=distribution,
-                )
-            except documentation.DocumentationPreconditionError as error:
-                raise HTTPException(409, str(error)) from error
-            except (RegistryConflictError, RegistryStateError, RegistryNotFoundError) as error:
-                raise _map_repository_error(error) from error
+            result = await _documentation(request).publish(
+                extension,
+                version,
+                scope,
+                payload,
+                bundle,
+                settings,
+                distribution=distribution,
+            )
         finally:
             await form.close()
         response.headers["Cache-Control"] = "no-store"
@@ -628,8 +627,6 @@ def create_app() -> FastAPI:
             documentation.static_path(snapshot, path)
         except ValueError as error:
             raise HTTPException(404, "invalid documentation path") from error
-        except (RegistryBlockedError, RegistryNotFoundError) as error:
-            raise _map_repository_error(error) from error
         target = documentation.snapshot_link(settings, selected.snapshot_id, path)
         if found.state == "yanked":
             return html_response(
@@ -677,8 +674,6 @@ def create_app() -> FastAPI:
             documentation.static_path(snapshot, path)
         except ValueError as error:
             raise HTTPException(404, "invalid documentation path") from error
-        except (RegistryBlockedError, RegistryNotFoundError) as error:
-            raise _map_repository_error(error) from error
         target = documentation.snapshot_link(settings, selected.snapshot_id, path)
         if found.state == "yanked":
             return html_response(
@@ -859,10 +854,7 @@ def create_app() -> FastAPI:
         response: Response,
     ) -> ReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
-        try:
-            release = await _repository(request).get_release(extension_name, version)
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        release = await _repository(request).get_release(extension_name, version)
         if release is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "public Release does not exist")
         response.headers["Cache-Control"] = "no-store"
@@ -881,12 +873,9 @@ def create_app() -> FastAPI:
         response: Response,
     ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
-        try:
-            release = await _repository(request).get_native_release(
-                extension_name, version, distribution=distribution
-            )
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        release = await _repository(request).get_native_release(
+            extension_name, version, distribution=distribution
+        )
         if release is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "public Release does not exist")
         response.headers["Cache-Control"] = "no-store"
@@ -905,12 +894,9 @@ def create_app() -> FastAPI:
         _publisher: Annotated[str, Depends(_publisher_namespace)],
     ) -> NativeReleaseRecord:
         _validate_identity(namespace, name, payload.version)
-        try:
-            return await _repository(request).prepare_release(
-                namespace, name, payload, distribution=distribution
-            )
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        return await _repository(request).prepare_release(
+            namespace, name, payload, distribution=distribution
+        )
 
     @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/publish",
@@ -925,12 +911,9 @@ def create_app() -> FastAPI:
         _publisher: Annotated[str, Depends(_publisher_namespace)],
     ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
-        try:
-            return await _repository(request).publish(
-                extension_name, version, distribution=distribution
-            )
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        return await _repository(request).publish(
+            extension_name, version, distribution=distribution
+        )
 
     @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/yank",
@@ -946,15 +929,12 @@ def create_app() -> FastAPI:
         payload: YankRequest | None = None,
     ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
-        try:
-            return await _repository(request).yank(
-                extension_name,
-                version,
-                (payload or YankRequest()).reason,
-                distribution=distribution,
-            )
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        return await _repository(request).yank(
+            extension_name,
+            version,
+            (payload or YankRequest()).reason,
+            distribution=distribution,
+        )
 
     @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/unyank",
@@ -969,12 +949,7 @@ def create_app() -> FastAPI:
         _publisher: Annotated[str, Depends(_publisher_namespace)],
     ) -> NativeReleaseRecord:
         extension_name = _validate_identity(namespace, name, version)
-        try:
-            return await _repository(request).unyank(
-                extension_name, version, distribution=distribution
-            )
-        except Exception as error:
-            raise _map_repository_error(error) from error
+        return await _repository(request).unyank(extension_name, version, distribution=distribution)
 
     @app.post("/legacy/", status_code=status.HTTP_200_OK)
     async def legacy_upload(
@@ -1065,19 +1040,16 @@ def create_app() -> FastAPI:
                     status.HTTP_409_CONFLICT,
                     "form metadata_version does not match wheel Core Metadata",
                 )
-            try:
-                await _repository(request).put_python_file(
-                    distribution,
-                    filename=upload.filename,
-                    content=content,
-                    sha256=digest,
-                    filetype=form_filetype,
-                    requires_python=inspected.requires_python,
-                    metadata=inspected.metadata,
-                    metadata_sha256=metadata_digest,
-                )
-            except Exception as error:
-                raise _map_repository_error(error) from error
+            await _repository(request).put_python_file(
+                distribution,
+                filename=upload.filename,
+                content=content,
+                sha256=digest,
+                filetype=form_filetype,
+                requires_python=inspected.requires_python,
+                metadata=inspected.metadata,
+                metadata_sha256=metadata_digest,
+            )
         finally:
             await form.close()
         return Response(status_code=status.HTTP_200_OK)
@@ -1136,8 +1108,6 @@ def create_app() -> FastAPI:
                 )
             except ModuleFederationValidationError as error:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
-            except Exception as error:
-                raise _map_repository_error(error) from error
         finally:
             await form.close()
 
@@ -1196,10 +1166,6 @@ def create_app() -> FastAPI:
             return await _public_response(request, descriptor)
         except ValueError as error:
             raise HTTPException(404, "Distribution file does not exist") from error
-        except Exception as error:
-            if isinstance(error, HTTPException):
-                raise
-            raise _map_repository_error(error) from error
 
     @app.head(
         "/extensions/{namespace}/{name}/{version}/module-federation/{relative_path:path}",
@@ -1227,10 +1193,6 @@ def create_app() -> FastAPI:
             return await _public_response(request, descriptor)
         except ModuleFederationValidationError as error:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "asset does not exist") from error
-        except Exception as error:
-            if isinstance(error, HTTPException):
-                raise
-            raise _map_repository_error(error) from error
 
     return app
 

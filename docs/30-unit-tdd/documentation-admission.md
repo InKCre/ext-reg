@@ -72,7 +72,11 @@ inkcre-ext docs show --registry-url REGISTRY_URL \
 
 每次新修订必须生成新快照 ID；重试同一次发布则保留原 ZIP、metadata、ID 和写入前提。服务端识别已提交的完整候选并返回稳定回执，即使其他候选已经替换 current，也不会把旧快照重新设为 current。回执的 `committed_at` 与 `snapshot_etag` 描述该次历史提交；要判断当前文档或准备下一次修订，请使用 `show`。同 ID 改变已提交候选的任一身份字段会得到 409。
 
-Toolkit 仅做 best-effort 交付：网络错误、500/502/503/504 或无法解析的回执最多触发一次原样重试，共两次前台请求，沿用每次 HTTP 请求的超时。仍无法获得回执时，以非零退出码报告“结果未知”；这不表示发布失败。保存的候选不会被删除，可以稍后原样重试。其他 HTTP 错误不会自动重试；409 的身份冲突或 stale precondition 需要作者检查并决定是否创建新的修订。工具不会后台重试、刷新 ETag 或承诺最终送达。旧快照继续服从其所属 Release 的生命周期：yanked 仍可读，blocked 拒绝历史内容和提交确认。
+Toolkit 收到回执后，会确认原生坐标、快照 ID、内容与来源 metadata，以及包含原始写入条件的 ETag 指纹；结构合法但不属于此次候选的回执不能证明成功。
+
+当前服务端 `DocumentationRepository.publish()` 和 Toolkit `RegistryClient.upload_documentation()` 分别计算该指纹：候选 metadata、原生坐标、scope 与原始 `expected_etag` 按键排序为紧凑 JSON，再计算 SHA-256。Toolkit 保持独立发行，不反向依赖 Registry 服务；修改字段或序列化规则时必须同时检查两端及已发行 Toolkit 的兼容性。这里尚未集中成独立合同实现。
+
+Toolkit 仅做 best-effort 交付：网络错误、500/502/503/504 、无法解析或不匹配保存候选的回执最多触发一次原样重试，共两次前台请求，沿用每次 HTTP 请求的超时。仍无法获得回执时，以非零退出码报告“结果未知”；这不表示发布失败。保存的候选不会被删除，可以稍后原样重试。其他 HTTP 错误不会自动重试；409 的身份冲突或 stale precondition 需要作者检查并决定是否创建新的修订。工具不会后台重试、刷新 ETag 或承诺最终送达。旧快照继续服从其所属 Release 的生命周期：yanked 仍可读，blocked 拒绝历史内容和提交确认。
 
 ## 直接使用 HTTP
 

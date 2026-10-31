@@ -19,6 +19,7 @@ export class WebExtensionModuleHandle<T extends WebExtensionModule = WebExtensio
   ) {}
 
   async activate(): Promise<void> {
+    if (this.#disposed) throw new Error('A disposed Extension module cannot be activated.')
     if (this.#active) return
     try {
       await this.module.initialize?.()

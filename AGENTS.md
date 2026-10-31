@@ -24,11 +24,11 @@ Registry Release, deployment `installed`, Peer `enabled`, and process/browser `r
 
 ## Repository Map
 
-- `src/inkcre_extension_registry/`: Registry contracts and Worker service (Python)
-- `src/worker.py`: Cloudflare Worker entrypoint
+- `src/inkcre_extension_registry/`: Registry contracts and FastAPI service (Python)
+- `src/inkcre_extension_registry/__main__.py`: CPython service entrypoint
 - `toolkit/`: independently released developer and delivery tooling (Python, `inkcre_extension_toolkit`)
 - `contracts/`: generated schemas and OpenAPI; never edit by hand
-- `migrations/`: checked-in D1 schema history (append-only after deployment)
+- `src/inkcre_extension_registry/migrations/`: checked-in PostgreSQL schema history (append-only after deployment)
 - `scripts/`: contract generation, verification, and release tooling
 - `runtimes/`: runtime topology for local and preview
 - `docs/30-unit-tdd/`: internal design
@@ -39,9 +39,10 @@ Registry Release, deployment `installed`, Peer `enabled`, and process/browser `r
 
 - Default to Python. Use TypeScript only at a browser or `impl-ts` seam.
 - Keep manifest and protocol truth language-neutral.
-- Install with `uv sync --frozen && pnpm install --frozen-lockfile`. Exact commands live in `package.json` and `pyproject.toml`.
+- Install with `pdm install --frozen-lockfile && pnpm install --frozen-lockfile`. Exact commands live in `package.json` and `pyproject.toml`.
+- Database acceptance requires a disposable PostgreSQL instance because migrations create instance-level roles; an empty database on a shared instance is insufficient.
 - Never hand-edit `contracts/*`; change the source model or route and run `pnpm contracts:generate`.
-- Treat checked-in D1 migrations as append-only after deployment. Production resource mutation requires a separate, explicit authorization.
+- Treat checked-in PostgreSQL migrations as append-only after deployment. Production resource mutation requires a separate, explicit authorization.
 
 ## Governance And Workflow
 

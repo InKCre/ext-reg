@@ -399,3 +399,34 @@ async def check_documentation(
                 assert unavailable == 409 and attempts == 1
             else:
                 raise AssertionError("a missing receipt must not be reported as success")
+
+    # Structurally valid receipts must still prove the exact saved publication.
+    for field, value in (
+        ("distribution", "python"),
+        ("content_sha256", "f" * 64),
+        ("snapshot_etag", '"' + "f" * 64 + '"'),
+    ):
+        attempts = 0
+
+        def wrong_receipt(request: httpx.Request, field=field, value=value) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(200, json={**first_record, field: value})
+
+        with RegistryClient(
+            "http://localhost", transport=httpx.MockTransport(wrong_receipt)
+        ) as toolkit:
+            try:
+                toolkit.upload_documentation(
+                    "check",
+                    "documentation",
+                    "1.0.0",
+                    "global",
+                    payload,
+                    zipped,
+                    distribution="module_federation",
+                )
+            except DocumentationOutcomeUnknown:
+                assert attempts == 2, field
+            else:
+                raise AssertionError(f"receipt with incorrect {field} reported success")
