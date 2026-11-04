@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
+from urllib.parse import quote
 
 from inkcre_extension_toolkit.preview import build_preview_registry
 from packaging.requirements import Requirement
@@ -64,21 +65,37 @@ def check_web_app_handoff() -> None:
     browser = TestClient(app)
     try:
         for path in ("/", "/explore/check/example"):
-            for query in (
-                {"app_origin": "https://app.example"},
-                {"client_origin": "https://app.example/"},
-                {
-                    "app_origin": "https://app.example",
-                    "client_origin": "https://app.example/",
-                },
+            for query, expected_origin in (
+                ({"app_origin": "https://app.example"}, "https://app.example"),
+                ({"client_origin": "https://app.example/"}, "https://app.example"),
+                (
+                    {"app_origin": "https://app.example", "client_origin": "https://app.example/"},
+                    "https://app.example",
+                ),
+                (
+                    {
+                        "app_origin": "https://APP.example:443",
+                        "client_origin": "https://app.example/",
+                    },
+                    "https://app.example",
+                ),
+                (
+                    {"app_origin": "http://LOCALHOST:80", "client_origin": "http://localhost/"},
+                    "http://localhost",
+                ),
+                (
+                    {"app_origin": "https://[::1]:443", "client_origin": "https://[::1]/"},
+                    "https://[::1]",
+                ),
+                ({"app_origin": "http://[::1]:5173"}, "http://[::1]:5173"),
             ):
                 response = browser.get(path, params=query)
                 assert response.status_code == 200, response.text
                 assert "client_origin" not in response.text
-                assert "app_origin=https%3A//app.example" in response.text
+                assert f"app_origin={quote(expected_origin)}" in response.text
                 if path != "/":
                     assert (
-                        'href="https://app.example/extensions?install=check%2Fexample'
+                        f'href="{expected_origin}/extensions?install=check%2Fexample'
                         in response.text
                     )
             assert browser.get(path).status_code == 200

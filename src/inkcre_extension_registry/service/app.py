@@ -118,7 +118,8 @@ def _web_app_origin(value: str | None, legacy_origin: str | None = None) -> str:
     try:
         parsed = urlparse(value)
         hostname = parsed.hostname
-        if parsed.port == 0:
+        port = parsed.port
+        if port == 0:
             raise ValueError("invalid port")
     except ValueError as error:
         raise HTTPException(400, "app_origin must be a Web origin") from error
@@ -134,7 +135,11 @@ def _web_app_origin(value: str | None, legacy_origin: str | None = None) -> str:
         or parsed.fragment
     ):
         raise HTTPException(400, "app_origin must be a Web origin")
-    return f"{parsed.scheme}://{parsed.netloc}"
+    host = f"[{hostname}]" if ":" in hostname else hostname
+    authority = (
+        host if port in {None, 443 if parsed.scheme == "https" else 80} else f"{host}:{port}"
+    )
+    return f"{parsed.scheme}://{authority}"
 
 
 DOCUMENTATION_ERRORS = {
