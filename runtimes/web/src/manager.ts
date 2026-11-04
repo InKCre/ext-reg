@@ -312,7 +312,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
         return current
       }
       await handle.activate()
-      // Other admitted clients may change a sleeping Peer directly in the shared store.
+      // Other admitted Peers may change a sleeping Peer directly in the shared store.
       // A local queue does not claim ownership of their durable intent.
       current = await ExtensionParticipationModel.get(peerId, name)
       if (!this.#matches(current, selected)) {

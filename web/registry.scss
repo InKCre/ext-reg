@@ -3,7 +3,7 @@
 @use 'pkg:@inkcre/ui-web/styles/functions' as tokens;
 @use 'pkg:@inkcre/ui-web/styles/mixins' as *;
 
-// Match client-web's InkHeader, InkButton and extension-card geometry.
+// Match Web app's InkHeader, InkButton and extension-card geometry.
 html[data-theme='dark'] {
   color-scheme: dark;
   @include tokens.emit-css-variables(sys.$color-dark, 'sys', 'color');

@@ -142,20 +142,20 @@ jobs:
 
       - name: Verify managed package versions
         run: |
-          web_runtime_version=$(node -p 'require("./runtimes/client-web/package.json").version')
+          web_runtime_version=$(node -p 'require("./runtimes/web/package.json").version')
           pdm run check:releases
-          grep -F -m1 "## $web_runtime_version" runtimes/client-web/CHANGELOG.md
+          grep -F -m1 "## $web_runtime_version" runtimes/web/CHANGELOG.md
 
       - name: Build independent package assets
         env:
           SOURCE_DATE_EPOCH: '315532800'
         run: |
-          mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-client-web
+          mkdir -p release-assets/toolkit release-assets/runtime-core-py release-assets/runtime-web
           pdm build --project toolkit --dest "$GITHUB_WORKSPACE/release-assets/toolkit"
           pdm build --project runtimes/core-py --dest "$GITHUB_WORKSPACE/release-assets/runtime-core-py"
-          pnpm --filter @inkcre/extension-runtime-client-web build
-          pnpm --filter @inkcre/extension-runtime-client-web pack \
-            --pack-destination "$GITHUB_WORKSPACE/release-assets/runtime-client-web"
+          pnpm --filter @inkcre/extension-runtime-web build
+          pnpm --filter @inkcre/extension-runtime-web pack \
+            --pack-destination "$GITHUB_WORKSPACE/release-assets/runtime-web"
 
       - name: Create missing independent package releases
         env:
@@ -192,6 +192,10 @@ jobs:
           else
             echo "Core Python Runtime has pending release fragments; publication waits for its Version PR." >> "$GITHUB_STEP_SUMMARY"
           fi
-          release_package runtime-client-web \
-            "$(node -p 'require("./runtimes/client-web/package.json").version')" \
-            release-assets/runtime-client-web
+          if ! find .changeset -maxdepth 1 -name '*.md' ! -name README.md | grep -q .; then
+            release_package runtime-web \
+              "$(node -p 'require("./runtimes/web/package.json").version')" \
+              release-assets/runtime-web
+          else
+            echo "Web Runtime has pending Changesets; publication waits for its Version PR." >> "$GITHUB_STEP_SUMMARY"
+          fi

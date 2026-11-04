@@ -1,5 +1,5 @@
 packages:
-  - runtimes/client-web
+  - runtimes/web
 
 autoInstallPeers: false
 

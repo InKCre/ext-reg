@@ -20,15 +20,22 @@ version. Missing or withdrawn versions return a human-readable 404. Existing
 `/v1`, `/simple`, `/packages`, and Module Federation asset paths retain their
 machine-facing semantics.
 
-The detail page links to client-web's `/extensions?install=<name>&distribution=<kind>&version=<exact>`.
+The detail page links to Web app's `/extensions?install=<name>&distribution=<kind>&version=<exact>`.
 The Registry neither reads deployment state nor installs the Release. When a
-client-web page opens the Registry, it passes only its Web origin as
-`client_origin`; the catalog preserves it through search, filters, and version
+Web app page opens the Registry, it passes only its Web origin as
+`app_origin`; the catalog preserves it through search, filters, and version
 links. The Registry accepts HTTPS origins (and local HTTP for development),
-then constructs a fixed client-web path and displays the destination host. A
+then constructs a fixed Web app path and displays the destination host. A
 direct Registry visit defaults to `https://app.inkcre.dev`. The return query
-contains the Extension name, distribution and exact version; client-web reads the
+contains the Extension name, distribution and exact version; Web app reads the
 Release anew from its own configured Registry and requires confirmation.
+
+The deprecated `client_origin` query remains an input alias for older Apps and
+bookmarks. Both names pass the same origin validation; when both are supplied,
+the normalized origins must match or the request fails with `400`. The Registry
+emits only `app_origin` in new navigation links and forms. During mixed deployment,
+Web Apps may send both names with the same value so an older Registry still
+returns to the chosen App. This alias carries no credentials or Peer identity.
 
 The UI does not invent descriptions, popularity, trust badges, compatibility
 verdicts, installation state, or download counts that Registry does not own.
@@ -87,9 +94,9 @@ Remote previews run the same CPython image with an isolated PostgreSQL branch an
 resource lifecycle and source identity belong to the delivery controller; see
 [Pull-Request Previews](../40-deployment/pull-request-previews.md).
 
-Registry follows the client-web product surface: the 32px geometric InKCre logo,
+Registry follows the Web app product surface: the 32px geometric InKCre logo,
 InkHeader spacing and typography, square InkButton-style controls, bordered
 extension rows, and compact metadata. `templates/brand.html` contains the SVG
-from client-web's `apps/client-web/public/logo/32.svg`. Page content consists of
+from Web app's `apps/web/public/logo/32.svg`. Page content consists of
 catalog, release metadata, and publishing controls; it has no marketing hero,
 illustration, promotional footer, or persistent tutorial panels.

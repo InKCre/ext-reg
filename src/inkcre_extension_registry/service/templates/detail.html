@@ -1,6 +1,6 @@
 {% extends "base.html" %} {% block content %}
 <div class="detail-page">
-  <a class="back-link" href="/?client_origin={{ client_origin | urlencode }}">← Extensions</a>
+  <a class="back-link" href="/?app_origin={{ app_origin | urlencode }}">← Extensions</a>
   <header class="detail-heading">
     <div>
       <h1>{{ extension.nickname }}</h1>
@@ -10,7 +10,7 @@
       <button type="button" class="button copy-button" data-copy="{{ extension.name }}" disabled>
         Copy ID
       </button>
-      {% if distribution == "module_federation" %}<a class="button button-primary" href="{{ install_url }}">Install in {{ client_host }}</a>{% endif %}
+      {% if distribution == "module_federation" %}<a class="button button-primary" href="{{ install_url }}">Install in {{ app_host }}</a>{% endif %}
     </div>
   </header>
   <div class="detail-layout">
@@ -84,7 +84,7 @@
           {% for item in releases %}
           <li>
             <a
-              href="/explore/{{ extension.name }}?distribution={{ distribution }}&amp;version={{ item.version | urlencode }}&amp;client_origin={{ client_origin | urlencode }}"
+              href="/explore/{{ extension.name }}?distribution={{ distribution }}&amp;version={{ item.version | urlencode }}&amp;app_origin={{ app_origin | urlencode }}"
               {% if item.version == release.version %}
               aria-current="true"
               {% endif %}
@@ -102,7 +102,7 @@
         <div>
           <dt>Publisher</dt>
           <dd>
-            <a href="/?publisher={{ publisher | urlencode }}&amp;client_origin={{ client_origin | urlencode }}">{{ publisher }}</a>
+            <a href="/?publisher={{ publisher | urlencode }}&amp;app_origin={{ app_origin | urlencode }}">{{ publisher }}</a>
           </dd>
         </div>
       </dl>

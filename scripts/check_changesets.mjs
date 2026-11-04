@@ -9,7 +9,7 @@ const files = (await readdir(directory)).filter(
 for (const file of files) {
   const changeset = parse(await readFile(new URL(file, directory), 'utf8'))
   for (const release of changeset.releases) {
-    if (release.name !== '@inkcre/extension-runtime-client-web') {
+    if (release.name !== '@inkcre/extension-runtime-web') {
       throw new Error(`${file}: Changesets cannot release Python package ${release.name}`)
     }
   }

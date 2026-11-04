@@ -81,7 +81,7 @@ from .simple import (
 )
 from .storage import ArtifactStore
 from .ui import (
-    DEFAULT_CLIENT_WEB_ORIGIN,
+    DEFAULT_WEB_APP_ORIGIN,
     SCRIPT,
     extension_catalog_html,
     extension_detail_html,
@@ -99,22 +99,29 @@ UPLOAD_PATH_PATTERN = re.compile(
 )
 
 
-def _client_web_origin(value: str | None) -> str:
+def _web_app_origin(value: str | None, legacy_origin: str | None = None) -> str:
+    # Older Web Apps use client_origin. Normalize before comparing either spelling.
+    if legacy_origin is not None:
+        legacy_origin = _web_app_origin(legacy_origin)
+        if value is None:
+            return legacy_origin
+        if _web_app_origin(value) != legacy_origin:
+            raise HTTPException(400, "app_origin and legacy client_origin must agree")
     if value is None:
-        return DEFAULT_CLIENT_WEB_ORIGIN
+        return DEFAULT_WEB_APP_ORIGIN
     if (
         not value
         or any(character.isspace() for character in value)
         or any(character in value for character in ("\\", "%"))
     ):
-        raise HTTPException(400, "client_origin must be a Web origin")
+        raise HTTPException(400, "app_origin must be a Web origin")
     try:
         parsed = urlparse(value)
         hostname = parsed.hostname
         if parsed.port == 0:
             raise ValueError("invalid port")
     except ValueError as error:
-        raise HTTPException(400, "client_origin must be a Web origin") from error
+        raise HTTPException(400, "app_origin must be a Web origin") from error
     local_http = parsed.scheme == "http" and hostname in {"localhost", "127.0.0.1", "::1"}
     if (
         not (parsed.scheme == "https" or local_http)
@@ -126,7 +133,7 @@ def _client_web_origin(value: str | None) -> str:
         or parsed.query
         or parsed.fragment
     ):
-        raise HTTPException(400, "client_origin must be a Web origin")
+        raise HTTPException(400, "app_origin must be a Web origin")
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
@@ -738,16 +745,17 @@ def create_app() -> FastAPI:
         request: Request,
         q: Annotated[str, Query(max_length=200)] = "",
         publisher: Annotated[str, Query(max_length=64)] = "",
-        client_origin: Annotated[str | None, Query(max_length=512)] = None,
+        app_origin: Annotated[str | None, Query(max_length=512)] = None,
+        client_origin: Annotated[str | None, Query(max_length=512, deprecated=True)] = None,
     ) -> HTMLResponse:
-        web_origin = _client_web_origin(client_origin)
+        web_origin = _web_app_origin(app_origin, client_origin)
         extensions = await _repository(request).list_native_extensions()
         return html_response(
             extension_catalog_html(
                 extensions,
                 query=q.strip(),
                 namespace=publisher,
-                client_origin=web_origin,
+                app_origin=web_origin,
             )
         )
 
@@ -769,9 +777,10 @@ def create_app() -> FastAPI:
         request: Request,
         distribution: NativeDistribution | None = None,
         version: Annotated[str | None, Query(max_length=128)] = None,
-        client_origin: Annotated[str | None, Query(max_length=512)] = None,
+        app_origin: Annotated[str | None, Query(max_length=512)] = None,
+        client_origin: Annotated[str | None, Query(max_length=512, deprecated=True)] = None,
     ) -> HTMLResponse:
-        web_origin = _client_web_origin(client_origin)
+        web_origin = _web_app_origin(app_origin, client_origin)
         extension_name = _validate_identity(namespace, name)
         selected_distribution = distribution or "module_federation"
         extension = await _repository(request).get_native_extension(
@@ -797,7 +806,7 @@ def create_app() -> FastAPI:
                 extension,
                 version,
                 hosted,
-                client_origin=web_origin,
+                app_origin=web_origin,
                 distribution=selected_distribution,
             )
             if extension

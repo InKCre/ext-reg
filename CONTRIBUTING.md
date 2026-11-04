@@ -51,7 +51,7 @@ Package release intent uses the ecosystem-native release tool:
   `pdm run towncrier create --config towncrier.toml --dir toolkit 123.added.md`.
   The root `.changes/` belongs to the Registry service; `toolkit/.changes/` and
   `runtimes/core-py/.changes/` belong to those independently versioned packages.
-- Client Web Runtime changes use `pnpm changeset`. Changesets creates the
+- Web Runtime changes use `pnpm changeset`. Changesets creates the
   protected-main Version PR and updates its version and changelog.
 
 The four versions are independent. A Python Version PR consumes pending
