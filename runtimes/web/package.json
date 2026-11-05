@@ -1,6 +1,6 @@
 {
   "name": "@inkcre/extension-runtime-web",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "InKCre Web Extension Host Runtime",
   "type": "module",
   "files": [
