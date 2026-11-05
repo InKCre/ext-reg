@@ -16,12 +16,112 @@ import venv
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
+from urllib.parse import quote
 
 from inkcre_extension_toolkit.preview import build_preview_registry
 from packaging.requirements import Requirement
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def check_web_app_handoff() -> None:
+    """Exercise the HTTP naming boundary with a controlled repository, without persistence."""
+    from fastapi.testclient import TestClient
+
+    from inkcre_extension_registry.contracts.models import (
+        ExtensionSummary,
+        ModuleFederationDistribution,
+        NativeExtensionRecord,
+        NativeReleaseRecord,
+    )
+    from inkcre_extension_registry.service.app import create_app
+
+    release = NativeReleaseRecord(
+        name="check/example",
+        nickname="Example",
+        version="1.0.0",
+        state="published",
+        distribution="module_federation",
+        module_federation=ModuleFederationDistribution(
+            manifest_url="https://registry.invalid/mf-manifest.json",
+            host_sdk="@inkcre/core",
+            host_sdk_version=">=0.4.2 <0.5.0",
+        ),
+    )
+    app = create_app()
+    app.state.repository = SimpleNamespace(
+        list_native_extensions=AsyncMock(
+            return_value=[ExtensionSummary(name=release.name, nickname=release.nickname)]
+        ),
+        get_native_extension=AsyncMock(
+            return_value=NativeExtensionRecord(
+                name=release.name, nickname=release.nickname, releases=(release,)
+            )
+        ),
+    )
+    app.state.settings = SimpleNamespace(documentation_origin_template=None)
+    # Deliberately omit lifespan: these routes consume only the controlled repository above.
+    browser = TestClient(app)
+    try:
+        for path in ("/", "/explore/check/example"):
+            for query, expected_origin in (
+                ({"app_origin": "https://app.example"}, "https://app.example"),
+                ({"client_origin": "https://app.example/"}, "https://app.example"),
+                (
+                    {"app_origin": "https://app.example", "client_origin": "https://app.example/"},
+                    "https://app.example",
+                ),
+                (
+                    {
+                        "app_origin": "https://APP.example:443",
+                        "client_origin": "https://app.example/",
+                    },
+                    "https://app.example",
+                ),
+                (
+                    {"app_origin": "http://LOCALHOST:80", "client_origin": "http://localhost/"},
+                    "http://localhost",
+                ),
+                (
+                    {"app_origin": "https://[::1]:443", "client_origin": "https://[::1]/"},
+                    "https://[::1]",
+                ),
+                ({"app_origin": "http://[::1]:5173"}, "http://[::1]:5173"),
+            ):
+                response = browser.get(path, params=query)
+                assert response.status_code == 200, response.text
+                assert "client_origin" not in response.text
+                assert f"app_origin={quote(expected_origin)}" in response.text
+                if path != "/":
+                    assert (
+                        f'href="{expected_origin}/extensions?install=check%2Fexample'
+                        in response.text
+                    )
+            assert browser.get(path).status_code == 200
+            assert (
+                browser.get(
+                    path,
+                    params={
+                        "app_origin": "https://one.example",
+                        "client_origin": "https://two.example",
+                    },
+                ).status_code
+                == 400
+            )
+            for parameter in ("app_origin", "client_origin"):
+                for invalid in (
+                    "",
+                    "http://public.example",
+                    "https://app.example/path",
+                    "javascript:bad",
+                ):
+                    assert browser.get(path, params={parameter: invalid}).status_code == 400
+                assert browser.get(path, params={parameter: "x" * 513}).status_code == 422
+        assert "https://app.inkcre.dev/extensions?" in browser.get("/explore/check/example").text
+    finally:
+        browser.close()
+    print("Web App handoff preserves legacy origins, canonical links and conflict rejection.")
 
 
 def check_production_delivery_boundary() -> None:
@@ -520,6 +620,7 @@ def check_coordinated_version_preparation() -> None:
 
 
 def main() -> None:
+    check_web_app_handoff()
     check_production_delivery_boundary()
     check_coordinated_version_preparation()
     check_native_runtime_boundary()

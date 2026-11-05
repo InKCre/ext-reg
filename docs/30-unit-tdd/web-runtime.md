@@ -1,6 +1,6 @@
-# Client Web Extension Runtime
+# Web Extension Runtime
 
-`@inkcre/extension-runtime-client-web` 是独立发行的浏览器 Runtime。Host SDK `@inkcre/core` 拥有部署持久化模型、Peer 发现、传输和错误分类；Runtime 拥有 Extension 生命周期编排、管理命令消费和 Registry 发行读取。应用继续决定操作当前浏览器 Runtime、在线远端 Host，还是只改变部署中的 desired state。
+`@inkcre/extension-runtime-web` 是独立发行的浏览器 Runtime。Host SDK `@inkcre/core` 拥有部署持久化模型、Peer 发现、传输和错误分类；Runtime 拥有 Extension 生命周期编排、管理命令消费和 Registry 发行读取。应用继续决定操作当前浏览器 Runtime、在线远端 Host，还是只改变部署中的 desired state。
 
 `listAdvertisedExtensionManagementPeers()` 读取 `PeerManager.listLive()`，只保留宣告精确管理 capability 的 Peer。宣告不是协议支持、路由就绪或运行证明。`manageExtensionOnPeer(peerId, command)` 使用调用者指定的精确 Peer 和固定 capability，发送一次 select、enable、disable 或 patch_config 命令。它不替换目标、不重试、不改写 PeerManager 的传输失败分类；管理 HTTP 错误及无效业务响应不附带可能回显配置凭据的原始正文或校验详情。返回的运行投影区分持久化选择与实际加载结果。
 
@@ -10,7 +10,7 @@
 
 Runtime 的 Core peer dependency 以实际类型与构建验证为准，不使用 ambient SDK stub。新公共 API 通过 Changesets 声明 minor 发行意图，源包版本由正式版本流程修改。
 
-Core SDK 开发依赖固定官方 `core-v0.4.2` GitHub Release 的预构建 tgz，冻结锁文件验证下载完整性。该产物同时包含 ESM 和类型声明，type-check 与 build 直接消费它，不检出 client-web 源码、不安装生产者 workspace，也不需要私有 UI 包凭据。仓库门禁通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`；正式 Runtime 包由本仓独立版本流程发布，Core 的 peer dependency 要求至少 0.4.2，以支持宿主声明的开放分发标识。
+Core SDK 开发依赖固定官方 `core-v0.4.2` GitHub Release 的预构建 tgz，冻结锁文件验证下载完整性。该产物同时包含 ESM 和类型声明，type-check 与 build 直接消费它，不检出 Web app 源码、不安装生产者 workspace，也不需要私有 UI 包凭据。仓库门禁通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`；正式 Runtime 包由本仓独立版本流程发布，Core 的 peer dependency 要求至少 0.4.2，以支持宿主声明的开放分发标识。
 
 Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选择 distribution；返回坐标和唯一原生关联均须匹配。安装将共享 Extension 身份与当前 Peer 的精确参与选择分别保存，enable/startup 读取当前 Peer 选择，不追随 latest，不修改其他 Peer 或清理业务 state。旧未知分发仅用当前浏览器支持的 MF 查询同一精确版本，缺失时失败而不替换版本。
 
@@ -18,4 +18,17 @@ Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选�
 
 显式 enable/disable 先按同一 Host、同一 Extension 的命令顺序保存 enabled 意图，再串行执行模块生命周期。disable 在等待在途启动之前保存 false，并在资源清理完成后返回。startup 只恢复已有意图，成功或失败都不反写 enabled；初始化失败保留意图及错误，允许后续恢复重试。
 
-恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回、分发或版本改变，迟到的模块会执行 dispose，不能登记为 running。shutdown 等待在途恢复与命令完成并清理模块。同 Host 的串行队列不锁住其他已准入客户端对共享数据库的写入，因此离线意图更新不等于瞬时、原子的进程切换；这些客户端的修改通过重新读取被识别。
+恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回、分发或版本改变，迟到的模块会执行 dispose，不能登记为 running。shutdown 等待在途恢复与命令完成并清理模块。同 Host 的串行队列不锁住其他已准入 Peer对共享数据库的写入，因此离线意图更新不等于瞬时、原子的进程切换；这些 Peer 的修改通过重新读取被识别。
+
+## 名称迁移与交付
+
+源码目录为 `runtimes/web`，包名为 `@inkcre/extension-runtime-web`。正式发布使用
+`runtime-web-v<version>` 标签与 `inkcre-extension-runtime-web-<version>.tgz`，Changeset
+由 Version PR 消费后才发布；本次重命名不改变 Runtime 导出 API、Host SDK 要求或
+`module_federation` Distribution 标识。
+
+已发布的 `@inkcre/extension-runtime-client-web` 包、`runtime-client-web-v0.4.2`
+标签与对应 TGZ 保持不可变。新名称包发布前，消费者可把新的 dependency/import key
+指向该精确旧 TGZ，锁定其完整性；这只是安装别名，不能描述为新包已经发布。新名称正式产物
+可用后，消费者再替换依赖来源。旧 Host 和 Extension 继续消费已有产物，不要求同时升级。
+Registry 的 `app_origin` 交接及旧参数兼容由 [Registry Web](registry-web.md) 拥有。

@@ -1,7 +1,7 @@
 {
-  "name": "@inkcre/extension-runtime-client-web",
+  "name": "@inkcre/extension-runtime-web",
   "version": "0.4.2",
-  "description": "InKCre Client Web Extension Host Runtime",
+  "description": "InKCre Web Extension Host Runtime",
   "type": "module",
   "files": [
     "dist",
@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "semver": "7.8.5",
-    "zod": "4.1.12"
+    "zod": "4.6.6"
   },
   "peerDependencies": {
     "@inkcre/core": ">=0.4.2 <0.5.0",

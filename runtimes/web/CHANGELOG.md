@@ -1,4 +1,4 @@
-# @inkcre/extension-runtime-client-web
+# @inkcre/extension-runtime-web
 
 ## 0.4.2
 

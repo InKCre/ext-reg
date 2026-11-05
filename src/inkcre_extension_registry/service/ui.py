@@ -23,7 +23,7 @@ TEMPLATES = Environment(
 )
 STYLES = (ROOT / "static" / "registry.css").read_text()
 SCRIPT = (ROOT / "static" / "registry.js").read_text()
-DEFAULT_CLIENT_WEB_ORIGIN = "https://app.inkcre.dev"
+DEFAULT_WEB_APP_ORIGIN = "https://app.inkcre.dev"
 
 
 def page(template: str, **context: object) -> str:
@@ -52,7 +52,7 @@ def extension_catalog_html(
     *,
     query: str = "",
     namespace: str = "",
-    client_origin: str = DEFAULT_CLIENT_WEB_ORIGIN,
+    app_origin: str = DEFAULT_WEB_APP_ORIGIN,
 ) -> str:
     publishers = sorted({extension.name.split("/")[0] for extension in extensions})
     filtered = [
@@ -70,7 +70,7 @@ def extension_catalog_html(
         publishers=publishers,
         query=query,
         namespace=namespace,
-        client_origin=client_origin,
+        app_origin=app_origin,
     )
 
 
@@ -97,7 +97,7 @@ def extension_detail_html(
     version: str | None = None,
     documentation: ReleaseDocumentation | None = None,
     *,
-    client_origin: str = DEFAULT_CLIENT_WEB_ORIGIN,
+    app_origin: str = DEFAULT_WEB_APP_ORIGIN,
     distribution: str = "module_federation",
 ) -> str | None:
     releases = sorted(extension.releases, key=lambda item: Version(item.version), reverse=True)
@@ -117,7 +117,7 @@ def extension_detail_html(
         publisher=extension.name.split("/")[0],
         distribution=distribution,
         documentation=documentation,
-        client_origin=client_origin,
-        client_host=urlparse(client_origin).netloc,
-        install_url=f"{client_origin}/extensions?{install_query}",
+        app_origin=app_origin,
+        app_host=urlparse(app_origin).netloc,
+        install_url=f"{app_origin}/extensions?{install_query}",
     )

@@ -36,14 +36,14 @@ importers:
         specifier: 4.120.0
         version: 4.120.0
 
-  runtimes/client-web:
+  runtimes/web:
     dependencies:
       semver:
         specifier: 7.8.5
         version: 7.8.5
       zod:
-        specifier: 4.1.12
-        version: 4.1.12
+        specifier: 4.6.6
+        version: 4.6.6
     devDependencies:
       '@inkcre/core':
         specifier: https://github.com/InKCre/impl-ts/releases/download/core-v0.4.2/inkcre-core-0.4.2.tgz
@@ -1744,8 +1744,8 @@ packages:
       yaml:
         optional: true
 
-  zod@4.1.12:
-    resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
+  zod@4.6.6:
+    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
 
 snapshots:
 
@@ -2162,9 +2162,9 @@ snapshots:
       pinia: 3.0.3(typescript@5.9.3)(vue@3.5.18(typescript@5.9.3))
       semver: 7.8.5
       vue: 3.5.18(typescript@5.9.3)
-      zod: 4.1.12
-      zod-class: 0.0.18(zod@4.1.12)
-      zod-config: 1.4.0(dotenv@17.4.2)(yaml@2.9.0)(zod@4.1.12)
+      zod: 4.6.6
+      zod-class: 0.0.18(zod@4.6.6)
+      zod-config: 1.4.0(dotenv@17.4.2)(yaml@2.9.0)(zod@4.6.6)
     transitivePeerDependencies:
       - dotenv
       - json5
@@ -3184,16 +3184,16 @@ snapshots:
       '@yuku-parser/binding-win32-arm64': 0.8.7
       '@yuku-parser/binding-win32-x64': 0.8.7
 
-  zod-class@0.0.18(zod@4.1.12):
+  zod-class@0.0.18(zod@4.6.6):
     dependencies:
       type-fest: 4.41.0
-      zod: 4.1.12
+      zod: 4.6.6
 
-  zod-config@1.4.0(dotenv@17.4.2)(yaml@2.9.0)(zod@4.1.12):
+  zod-config@1.4.0(dotenv@17.4.2)(yaml@2.9.0)(zod@4.6.6):
     dependencies:
-      zod: 4.1.12
+      zod: 4.6.6
     optionalDependencies:
       dotenv: 17.4.2
       yaml: 2.9.0
 
-  zod@4.1.12: {}
+  zod@4.6.6: {}
