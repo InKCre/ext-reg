@@ -26,3 +26,6 @@ coverage/
 # Local secrets
 .dev.vars
 .env
+
+# Rust SDK build output
+target/

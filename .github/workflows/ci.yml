@@ -18,6 +18,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  rust-sdk:
+    name: core-rs checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Rust
+        run: rustup toolchain install 1.93.0 --profile minimal --component rustfmt --component clippy
+      - name: Check standalone SDK
+        run: |
+          cargo +1.93.0 fmt --manifest-path runtimes/core-rs/Cargo.toml --check
+          cargo +1.93.0 check --manifest-path runtimes/core-rs/Cargo.toml --all-targets --locked
+          cargo +1.93.0 clippy --manifest-path runtimes/core-rs/Cargo.toml --all-targets --locked -- -D warnings
+
   dependency-review:
     name: Dependency review
     if: github.event_name == 'pull_request'
