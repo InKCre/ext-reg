@@ -1,4 +1,4 @@
-"""显式执行真实 executable 的关键生命周期验收；无 mock 或测试框架。"""
+"""显式执行真实 executable 的关键生命周期验收。"""
 
 from __future__ import annotations
 
