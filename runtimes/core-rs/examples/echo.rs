@@ -19,6 +19,7 @@ impl Extension for Echo {
             protocol_version: PROTOCOL_VERSION,
             config_schema: json!({"type":"object", "properties":{"prefix":{"type":"string"}}, "additionalProperties":false}),
             methods: vec!["echo".into()],
+            capabilities: Default::default(),
         }
     }
     async fn start(&mut self, context: StartContext) -> Result<Value, RpcError> {
