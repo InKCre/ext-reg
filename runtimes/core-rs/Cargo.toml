@@ -1,0 +1,25 @@
+[package]
+name = "inkcre-extension-sdk"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+description = "InKCre Rust executable extension protocol and author SDK"
+license = "AGPL-3.0-only"
+repository = "https://github.com/InKCre/ext-reg"
+
+[workspace]
+
+[dependencies]
+async-trait = "0.1"
+semver = { version = "1", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["io-util", "io-std", "macros", "rt-multi-thread"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"

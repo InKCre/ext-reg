@@ -37,7 +37,7 @@ Registry Release, deployment `installed`, Peer `enabled`, and process/browser `r
 
 ## Development Constraints
 
-- Default to Python. Use TypeScript only at a browser or `impl-ts` seam.
+- Registry and Toolkit default to Python. Use TypeScript only at a browser or `impl-ts` seam. `runtimes/core-rs/` owns the independently versioned Rust executable Extension SDK.
 - Keep manifest and protocol truth language-neutral.
 - Install with `uv sync --frozen && pnpm install --frozen-lockfile`. Exact commands live in `package.json` and `pyproject.toml`.
 - Never hand-edit `contracts/*`; change the source model or route and run `pnpm contracts:generate`.

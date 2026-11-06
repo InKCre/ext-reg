@@ -60,6 +60,11 @@ lock. The Web Version PR consumes Changesets. Registry production deployment
 remains separate from package publication even though the service has its own
 version and changelog.
 
+`runtimes/core-rs` 是独立 Cargo workspace，当前通过本地精确路径消费，未接入上述
+四个发行单元的自动发布。Rust SDK 变更运行其 README 中的 fmt、check、Clippy
+静态命令；独立 CI job 使用 Rust 1.93.0 执行同样检查。本次初始化阶段不编写
+自动化测试，真实 executable 的关键生命周期由显式验收脚本验证。
+
 Every protected-main update reconciles both kinds of Version PR and publishes
 prepared package versions. Python packages with pending fragments wait for the
 Python Version PR instead of silently treating an existing tag as successful
