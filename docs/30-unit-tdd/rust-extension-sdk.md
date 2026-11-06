@@ -42,6 +42,44 @@ stdin/stdout 使用 UTF-8 JSON-line，每帧（包含换行）最多 1 MiB。SDK
 initialize/start/invoke/stop 状态机，收到 stop 后响应并退出；stdin 正常关闭时调用
 活动扩展的 stop。强制结束不能保证插件自己的外部业务副作用已回滚。
 
+## Typed 业务能力与撤销
+
+`Descriptor.capabilities` 分别声明 Resolver、Storage、Source、Job 的精确身份与
+schema。SDK 只拥有这些纯数据 DTO、固定 RPC 命令及作者 trait；impl-rs 拥有对应
+runtime trait、registry 和持久 catalog。通用 `invoke` 不隐式发布任何业务能力。
+空 capabilities 声明合法，便于只提供通用调用的扩展明确表达自己的范围。
+
+Resolver 声明 hydrated content 的 text/bytes/json 契约、必要的直接关系方向、自定义
+typed read 及可选 graph draft。宿主可在本地同步验证 canonical content；读取时按
+声明获取实际内容与直接关系，再通过 resolver_read 发送明确的 solve/text/label/read
+操作。文本 null、作者写入的空字符串、未知 decoder 和不支持投影分别保留含义。
+resolver_draft 返回带临时 Block ID 的图数据，最终图完整性与持久事务仍归 Core。
+
+Storage 负责不透明 pointer 与字节；writable 声明必须对应 create/update/delete。
+Source 普通采集与 backfill 使用独立命令，不支持 backfill 时 schema 为 null。
+Job 的参数 schema、默认 timeout 和领取前 eligibility 单独声明。Source/Job 返回的
+state 是 Job.state 对象 patch；Source 自身的 state/cursor 通过已准入数据库维护，
+不借启动快照覆盖其他参与者的新状态。字节及图结果仍遵守 1 MiB 帧边界，当前没有
+跨进程大对象流式 API。外部 Storage 不能加入宿主传入的 PostgreSQL connection，
+宿主图事务回滚不意味着外部字节已经回滚。
+
+宿主在 start 成功并复核精确选择后注册能力，注册集合由该次启动的唯一 owner 标识。
+停止、替换或部分启动失败只撤销这个 owner，不删除共享 catalog。注册 adapter 只持
+Weak process handle；进程控制持有撤销信息，注册表不会通过引用环保留已关闭的进程。
+协议错误或调用取消会同步撤销注册并终止子进程，正常停止先撤销注册再关闭进程。
+
+RPC I/O 锁与进程控制分开。一个长采集不会占有整个 Host 状态锁，停用仍能立即
+取消它。短 RPC 的期限包含等待协议锁与发送/接收，排队会消耗同一份预算；排队超时
+尚未发送请求，只结束这个调用，不关闭正在执行其他工作的进程。Source/Job 没有
+通用 20 秒期限；Worker 的执行预算、abort 与本机能力撤回
+控制它们。执行 future 取消会 kill 实际进程，合作取消路径回收后才返回 Worker，
+终态不能被当作外部副作用已回滚。同一进程中的其他调用可能受其结束影响；仅取消
+尚未取得协议锁的排队工作不会结束正在执行的另一个工作。
+
+宿主明确记录停止原因。Job 取消、执行预算到期或调用 future 取消触发的回收可以
+按仍存在且启用的精确选择恢复新实例，不重新执行原 Job；崩溃、协议错误和初始化
+失败保持错误，不重复自动启动同版本。这不依赖对子进程退出码的猜测。
+
 ## 持久参与与恢复
 
 本地分发只提供已安装产物；`Peer × Extension` selection、enabled intent

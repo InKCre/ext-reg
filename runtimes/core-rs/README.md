@@ -44,3 +44,26 @@ config/state 启动快照；需要读取最新业务 state 或原子写入时，
 业务副作用与幂等性。原生 executable 是可信代码，进程边界不是安全沙箱。
 
 完整运行边界见 [Rust SDK 设计](../../docs/30-unit-tdd/rust-extension-sdk.md)。
+
+## 业务能力
+
+`Descriptor.capabilities` 显式声明 Resolver、Storage、Source 和 Job 能力。空声明表示
+只有通用调用；`methods` 中出现一个名字不会自动成为业务 handler。能力的数据结构
+位于 `src/capabilities.rs`，对应的 Core trait 与本机 registry 由 impl-rs 拥有。
+
+扩展按声明实现 `Extension::resolver_read/resolver_draft`、
+`storage_read/storage_create/storage_update/storage_delete`、
+`source_collect/source_backfill` 或 `job_can_handle/job_execute`。runner 只向已声明的
+类型分派相应固定命令，未声明或不支持的能力明确返回 `unsupported_capability`。
+通用 `invoke` 与这些入口分别管理。Resolver 自定义读方法具有 `get_` 或 `read_`
+前缀和参数 schema；Source 不支持历史采集时将 backfill schema 保持为 null。
+
+SourceRequest 包含 source/type/job ID 和本次命令 config；插件通过自己的 Core 连接
+读取最新 Source 配置、state 与 cursor。SourceOutcome/JobOutcome 的 `state` 是 Job
+状态对象 patch，不是整份 Source.state 或部署 Extension.state 的替换。Job eligibility
+发生在领取前，`job_can_handle` 应只判断可执行性，不提前执行工作。
+
+Source/Job 执行由 Job timeout 和取消控制，不受通用 invoke 的 20 秒上限约束。
+短 RPC 的期限包含协议锁排队；仅排队超时不会终止另一个正在执行的工作。
+Storage bytes 使用 JSON 字节数组，仍须遵守每帧 1 MiB 限制。取消、进程恢复和外部
+Storage 的事务边界见[能力注册与撤销](../../docs/30-unit-tdd/rust-extension-sdk.md#typed-业务能力与撤销)。
