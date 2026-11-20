@@ -1,3 +1,5 @@
 pdm==2.28.0
 # unearth 0.19 改用 httpx2，与 PDM 2.28 的下载客户端不兼容。
 unearth==0.18.3
+# Hishel 2.0 移除了 PDM 2.28 仍使用的 SyncSqliteStorage。
+hishel==1.4.0
