@@ -33,7 +33,7 @@ ENTRY_OBJECT_PATTERN = re.compile(ENTRY_OBJECT_PATTERN_TEXT)
 HEX_DIGEST_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _PROJECT_NORMALIZER = re.compile(r"[-_.]+")
 
-NativeDistribution = Literal["python", "module_federation"]
+NativeDistribution = Literal["python", "module_federation", "rust_stdio"]
 ReleaseState = Literal["preparing", "published", "yanked", "blocked"]
 
 
@@ -250,15 +250,60 @@ class ModuleFederationAssociationInput(ContractModel):
         return validate_host_sdk_range(value)
 
 
+class RustAssociationInput(ContractModel):
+    host_sdk: Literal["core-rs"]
+    host_sdk_version: str = Field(min_length=1, max_length=256)
+    source_repository: str = Field(min_length=1, max_length=512)
+    source_revision: str = Field(min_length=1, max_length=128)
+    build_id: str | None = Field(default=None, min_length=1, max_length=256)
+    targets: tuple[
+        Literal[
+            "aarch64-apple-darwin",
+            "x86_64-apple-darwin",
+            "x86_64-unknown-linux-gnu",
+            "aarch64-unknown-linux-gnu",
+            "x86_64-pc-windows-msvc",
+        ],
+        ...,
+    ] = Field(min_length=1)
+
+    @field_validator("targets")
+    @classmethod
+    def unique_targets(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError("target triples must be unique")
+        return tuple(sorted(value))
+
+    @field_validator("host_sdk_version")
+    @classmethod
+    def range_is_valid(cls, value: str) -> str:
+        return validate_host_sdk_range(value)
+
+
+class RustArtifact(ContractModel):
+    target: str
+    executable_url: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(gt=0)
+
+
+class RustDistribution(ContractModel):
+    host_sdk: Literal["core-rs"] = "core-rs"
+    host_sdk_version: str
+    protocol_version: Literal[1] = 1
+    artifacts: tuple[RustArtifact, ...] = ()
+
+
 class PrepareReleaseRequest(ContractModel):
     nickname: str = Field(min_length=1, max_length=128)
     version: StrictSemVer
     python: PythonAssociationInput | None = None
     module_federation: ModuleFederationAssociationInput | None = None
+    rust_stdio: RustAssociationInput | None = None
 
     @model_validator(mode="after")
     def association_is_declared(self) -> PrepareReleaseRequest:
-        if self.python is None and self.module_federation is None:
+        if self.python is None and self.module_federation is None and self.rust_stdio is None:
             raise ValueError("at least one native Distribution association is required")
         if self.python is not None:
             python_project_version(self.version)
@@ -286,6 +331,7 @@ class ReleaseRecord(ContractModel):
     state: ReleaseState
     python: PythonDistribution | None = None
     module_federation: ModuleFederationDistribution | None = None
+    rust_stdio: RustDistribution | None = None
 
 
 class NativeReleaseRecord(ReleaseRecord):
@@ -293,10 +339,12 @@ class NativeReleaseRecord(ReleaseRecord):
 
     @model_validator(mode="after")
     def native_association_matches(self) -> NativeReleaseRecord:
-        if self.distribution == "python":
-            valid = self.python is not None and self.module_federation is None
-        else:
-            valid = self.module_federation is not None and self.python is None
+        present = {
+            name
+            for name in ("python", "module_federation", "rust_stdio")
+            if getattr(self, name) is not None
+        }
+        valid = present == {self.distribution}
         if not valid:
             raise ValueError("native Release must have exactly its own Distribution association")
         return self
@@ -305,7 +353,10 @@ class NativeReleaseRecord(ReleaseRecord):
 class NativePrepareReleaseRequest(PrepareReleaseRequest):
     @model_validator(mode="after")
     def exactly_one_association(self) -> NativePrepareReleaseRequest:
-        if (self.python is None) == (self.module_federation is None):
+        if (
+            sum(item is not None for item in (self.python, self.module_federation, self.rust_stdio))
+            != 1
+        ):
             raise ValueError("prepare exactly one native Distribution")
         return self
 

@@ -1097,6 +1097,48 @@ def create_app() -> FastAPI:
         return Response(status_code=status.HTTP_200_OK)
 
     @app.post(
+        "/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}",
+        response_model=NativeReleaseRecord,
+    )
+    async def upload_rust(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        target: str,
+        request: Request,
+        _publisher: Annotated[str, Depends(_publisher_namespace)],
+    ):
+        content = bytearray()
+        async for chunk in request.stream():
+            if len(chunk) > MAX_UPLOAD_BYTES - len(content):
+                raise HTTPException(413, "Rust executable exceeds 20 MiB")
+            content.extend(chunk)
+        if not content:
+            raise HTTPException(422, "Rust executable must not be empty")
+        try:
+            return await _repository(request).put_rust_artifact(
+                _validate_identity(namespace, name, version), version, target, bytes(content)
+            )
+        except Exception as error:
+            raise _map_repository_error(error) from error
+
+    @app.get("/extensions/{namespace}/{name}/{version}/rust/{target}")
+    async def rust_file(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        target: str,
+        request: Request,
+    ):
+        try:
+            descriptor = await _repository(request).rust_public_file(
+                _validate_identity(namespace, name, version), version, target
+            )
+            return await _public_response(request, descriptor)
+        except Exception as error:
+            raise _map_repository_error(error) from error
+
+    @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation",
         response_model=NativeReleaseRecord,
     )

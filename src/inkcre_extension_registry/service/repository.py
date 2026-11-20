@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -29,6 +30,8 @@ from ..contracts.models import (
     PythonEntryPoint,
     ReleaseRecord,
     ReleaseState,
+    RustArtifact,
+    RustDistribution,
     normalize_project_name,
     python_project_version,
 )
@@ -183,6 +186,7 @@ def legacy_descriptor(row: db.Release) -> ReleaseRecord:
 
 def _publication_snapshot(row: db.NativeRelease) -> tuple:
     return (
+        row.rust_stdio,
         (row.python.pk, tuple(sorted(file.pk for file in row.python.files)))
         if row.python is not None
         else None,
@@ -223,6 +227,16 @@ def _descriptor(row: db.NativeRelease, *, public: bool) -> NativeReleaseRecord:
         state=cast(ReleaseState, row.state),
         python=python,
         module_federation=module_federation,
+        rust_stdio=(
+            RustDistribution(
+                host_sdk_version=row.rust_stdio["association"]["host_sdk_version"],
+                artifacts=tuple(
+                    RustArtifact(**artifact) for artifact in row.rust_stdio["artifacts"].values()
+                ),
+            )
+            if row.rust_stdio is not None
+            else None
+        ),
     )
 
 
@@ -278,7 +292,7 @@ class RegistryRepository:
         distribution: NativeDistribution,
     ) -> NativeReleaseRecord:
         extension_name = f"{namespace}/{name}"
-        if (distribution == "python") != (request.python is not None):
+        if getattr(request, distribution) is None:
             raise RegistryConflictError("prepare association must match the selected distribution")
         try:
             async with in_transaction():
@@ -295,6 +309,16 @@ class RegistryRepository:
                     extension=extension, distribution=distribution, version=request.version
                 )
                 release = await db.NativeRelease.filter(pk=release.pk).select_for_update().get()
+                if request.rust_stdio is not None:
+                    association = request.rust_stdio.model_dump(mode="json")
+                    if release.rust_stdio is not None:
+                        if release.rust_stdio["association"] != association:
+                            raise RegistryConflictError("Rust association is immutable")
+                    elif release.state != "preparing":
+                        raise RegistryStateError("Rust association requires a preparing release")
+                    else:
+                        release.rust_stdio = {"association": association, "artifacts": {}}
+                        await release.save(update_fields=["rust_stdio"])
                 for model, association, values, label in (
                     (
                         db.PythonDistribution,
@@ -366,7 +390,10 @@ class RegistryRepository:
             NativePublisherRelease(
                 **_descriptor(row, public=False).model_dump(),
                 uploaded=(
-                    bool(list(row.python.files))
+                    set(row.rust_stdio["artifacts"])
+                    == set(row.rust_stdio["association"]["targets"])
+                    if row.rust_stdio is not None
+                    else bool(list(row.python.files))
                     if row.python is not None
                     else row.module_federation is not None
                     and row.module_federation.manifest_r2_key is not None
@@ -515,7 +542,76 @@ class RegistryRepository:
         assert result is not None
         return result
 
+    async def put_rust_artifact(self, name: str, version: str, target: str, content: bytes):
+        digest = hashlib.sha256(content).hexdigest()
+        # Validate association before allocating blob storage. A content-addressed
+        # object may remain unreferenced if a concurrent release transition wins.
+        row = await db.NativeRelease.filter(
+            extension_id=name, distribution="rust_stdio", version=version
+        ).first()
+        if row is None or row.rust_stdio is None:
+            raise RegistryNotFoundError("Rust release is not prepared")
+        if target not in row.rust_stdio["association"]["targets"]:
+            raise RegistryConflictError("target is not declared by the immutable association")
+        artifact = {
+            "target": target,
+            "sha256": digest,
+            "size": len(content),
+            "executable_url": f"/extensions/{name}/{version}/rust/{target}",
+        }
+        previous = row.rust_stdio["artifacts"].get(target)
+        if previous is not None and previous != artifact:
+            raise RegistryConflictError("Rust target artifact is immutable")
+        if row.state != "preparing":
+            raise RegistryStateError("Rust upload requires a preparing release")
+        await self.artifacts.put(
+            rust_key(name, version, target, digest),
+            content,
+            content_type="application/octet-stream",
+        )
+        async with in_transaction():
+            locked = await self._locked_release(name, version, "rust_stdio")
+            if locked.state != "preparing":
+                raise RegistryStateError("Rust upload requires a preparing release")
+            snapshot = locked.rust_stdio
+            previous = snapshot["artifacts"].get(target)
+            if previous is not None and previous != artifact:
+                raise RegistryConflictError("Rust target artifact is immutable")
+            snapshot["artifacts"][target] = artifact
+            locked.rust_stdio = snapshot
+            await locked.save(update_fields=["rust_stdio"])
+        return await self.get_native_release(name, version, distribution="rust_stdio", public=False)
+
+    async def rust_public_file(self, name: str, version: str, target: str) -> PublicObject:
+        row = await db.NativeRelease.filter(
+            extension_id=name, distribution="rust_stdio", version=version
+        ).first()
+        if row is not None and row.state == "blocked":
+            raise RegistryBlockedError("Release is operator-blocked")
+        if row is None or row.state not in {"published", "yanked"} or row.rust_stdio is None:
+            raise RegistryNotFoundError("Rust artifact is unavailable")
+        artifact = row.rust_stdio["artifacts"].get(target)
+        if artifact is None:
+            raise RegistryNotFoundError("Rust target is unavailable")
+        return PublicObject(
+            rust_key(name, version, target, artifact["sha256"]),
+            "application/octet-stream",
+            artifact["sha256"],
+        )
+
     async def _release_objects_available(self, row: db.NativeRelease) -> bool:
+        if row.rust_stdio is not None:
+            snapshot = row.rust_stdio
+            if set(snapshot["artifacts"]) != set(snapshot["association"]["targets"]):
+                return False
+            for artifact in snapshot["artifacts"].values():
+                key = rust_key(
+                    row.extension_id, row.version, artifact["target"], artifact["sha256"]
+                )
+                stored = await self.artifacts.head(key)
+                if stored is None or stored.size != artifact["size"]:
+                    return False
+            return True
         files = list(row.python.files) if row.python is not None else []
         if row.python is not None and not files:
             return False
@@ -879,3 +975,7 @@ class RegistryRepository:
             media_type=media_type,
             etag=row.internal_snapshot_hash,
         )
+
+
+def rust_key(name: str, version: str, target: str, digest: str) -> str:
+    return f"rust/{name}/{version}/{target}/{digest}"

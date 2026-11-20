@@ -65,7 +65,7 @@ export const zNativeDocumentationReceipt = z.object({
   build_id: z.string().max(256).nullish(),
   committed_at: z.string(),
   content_sha256: z.string().regex(/^[0-9a-f]{64}$/),
-  distribution: z.enum(['python', 'module_federation']),
+  distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
   entry: z.string().min(1).max(768).optional().default('index.html'),
   name: z
     .string()
@@ -91,7 +91,7 @@ export const zNativeDocumentationReceipt = z.object({
  * NativeReleaseDocumentation
  */
 export const zNativeReleaseDocumentation = z.object({
-  distribution: z.enum(['python', 'module_federation']),
+  distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
   name: z
     .string()
     .min(3)
@@ -147,22 +147,6 @@ export const zPythonAssociationInput = z.object({
 })
 
 /**
- * NativePrepareReleaseRequest
- */
-export const zNativePrepareReleaseRequest = z.object({
-  module_federation: zModuleFederationAssociationInput.nullish(),
-  nickname: z.string().min(1).max(128),
-  python: zPythonAssociationInput.nullish(),
-  version: z
-    .string()
-    .min(5)
-    .max(128)
-    .regex(
-      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
-    ),
-})
-
-/**
  * PythonDistribution
  */
 export const zPythonDistribution = z.object({
@@ -174,10 +158,96 @@ export const zPythonDistribution = z.object({
 })
 
 /**
+ * RegistryError
+ */
+export const zRegistryError = z.object({
+  detail: z.string(),
+})
+
+/**
+ * ReleaseDocumentation
+ */
+export const zReleaseDocumentation = z.object({
+  name: z
+    .string()
+    .min(3)
+    .max(129)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  sets: z.array(zDocumentationRecord),
+  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
+ * RustArtifact
+ */
+export const zRustArtifact = z.object({
+  executable_url: z.string(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  size: z.int().gt(0),
+  target: z.string(),
+})
+
+/**
+ * RustAssociationInput
+ */
+export const zRustAssociationInput = z.object({
+  build_id: z.string().min(1).max(256).nullish(),
+  host_sdk: z.literal('core-rs'),
+  host_sdk_version: z.string().min(1).max(256),
+  source_repository: z.string().min(1).max(512),
+  source_revision: z.string().min(1).max(128),
+  targets: z
+    .array(
+      z.enum([
+        'aarch64-apple-darwin',
+        'x86_64-apple-darwin',
+        'x86_64-unknown-linux-gnu',
+        'aarch64-unknown-linux-gnu',
+        'x86_64-pc-windows-msvc',
+      ]),
+    )
+    .min(1),
+})
+
+/**
+ * NativePrepareReleaseRequest
+ */
+export const zNativePrepareReleaseRequest = z.object({
+  module_federation: zModuleFederationAssociationInput.nullish(),
+  nickname: z.string().min(1).max(128),
+  python: zPythonAssociationInput.nullish(),
+  rust_stdio: zRustAssociationInput.nullish(),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+})
+
+/**
+ * RustDistribution
+ */
+export const zRustDistribution = z.object({
+  artifacts: z.array(zRustArtifact).optional().default([]),
+  host_sdk: z.literal('core-rs').optional().default('core-rs'),
+  host_sdk_version: z.string(),
+  protocol_version: z.literal(1).optional().default(1),
+})
+
+/**
  * NativePublisherRelease
  */
 export const zNativePublisherRelease = z.object({
-  distribution: z.enum(['python', 'module_federation']),
+  distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
   module_federation: zModuleFederationDistribution.nullish(),
   name: z
     .string()
@@ -186,6 +256,7 @@ export const zNativePublisherRelease = z.object({
     .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
   nickname: z.string(),
   python: zPythonDistribution.nullish(),
+  rust_stdio: zRustDistribution.nullish(),
   state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
   uploaded: z.boolean(),
   version: z
@@ -215,7 +286,7 @@ export const zNativePublisherWorkspace = z.object({
  * NativeReleaseRecord
  */
 export const zNativeReleaseRecord = z.object({
-  distribution: z.enum(['python', 'module_federation']),
+  distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
   module_federation: zModuleFederationDistribution.nullish(),
   name: z
     .string()
@@ -224,6 +295,7 @@ export const zNativeReleaseRecord = z.object({
     .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
   nickname: z.string(),
   python: zPythonDistribution.nullish(),
+  rust_stdio: zRustDistribution.nullish(),
   state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
   version: z
     .string()
@@ -260,6 +332,7 @@ export const zPublisherRelease = z.object({
   nickname: z.string(),
   python: zPythonDistribution.nullish(),
   python_uploaded: z.boolean(),
+  rust_stdio: zRustDistribution.nullish(),
   state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
   version: z
     .string()
@@ -286,33 +359,6 @@ export const zPublisherWorkspace = z.object({
 })
 
 /**
- * RegistryError
- */
-export const zRegistryError = z.object({
-  detail: z.string(),
-})
-
-/**
- * ReleaseDocumentation
- */
-export const zReleaseDocumentation = z.object({
-  name: z
-    .string()
-    .min(3)
-    .max(129)
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  sets: z.array(zDocumentationRecord),
-  state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
-  version: z
-    .string()
-    .min(5)
-    .max(128)
-    .regex(
-      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
-    ),
-})
-
-/**
  * ReleaseRecord
  */
 export const zReleaseRecord = z.object({
@@ -324,6 +370,7 @@ export const zReleaseRecord = z.object({
     .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\/[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
   nickname: z.string(),
   python: zPythonDistribution.nullish(),
+  rust_stdio: zRustDistribution.nullish(),
   state: z.enum(['preparing', 'published', 'yanked', 'blocked']),
   version: z
     .string()
@@ -393,6 +440,27 @@ export const zModuleFederationFileExtensionsNamespaceNameVersionModuleFederation
       ),
     relative_path: z.string(),
   })
+
+export const zRustFileExtensionsNamespaceNameVersionRustTargetGetPath = z.object({
+  namespace: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  name: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+  version: z
+    .string()
+    .min(5)
+    .max(128)
+    .regex(
+      /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+    ),
+  target: z.string(),
+})
 
 export const zLegacyUploadLegacyPostHeaders = z.object({
   authorization: z.string().nullish(),
@@ -549,6 +617,39 @@ export const zPublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVe
  */
 export const zNativeExtensionsV2ExtensionsGetResponse = z.array(zExtensionSummary)
 
+export const zUploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostHeaders =
+  z.object({
+    authorization: z.string().nullish(),
+  })
+
+export const zUploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostPath =
+  z.object({
+    namespace: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
+    version: z
+      .string()
+      .min(5)
+      .max(128)
+      .regex(
+        /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$/,
+      ),
+    target: z.string(),
+  })
+
+/**
+ * Successful Response
+ */
+export const zUploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponse =
+  zNativeReleaseRecord
+
 export const zNativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetPath = z.object({
   namespace: z
     .string()
@@ -560,7 +661,7 @@ export const zNativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionG
     .min(1)
     .max(64)
     .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/),
-  distribution: z.enum(['python', 'module_federation']),
+  distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
 })
 
 /**
@@ -579,7 +680,7 @@ export const zPrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistribu
 
 export const zPrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesPostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -600,7 +701,7 @@ export const zPrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistribu
 
 export const zGetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionGetPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -628,7 +729,7 @@ export const zGetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistribution
 
 export const zGetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -667,7 +768,7 @@ export const zUploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDis
 
 export const zUploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationScopePostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -701,7 +802,7 @@ export const zUploadNativeModuleFederationV2ExtensionsNamespaceNameDistributions
 
 export const zUploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -734,7 +835,7 @@ export const zPublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistribu
 
 export const zPublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionPublishPostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -767,7 +868,7 @@ export const zUnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistribut
 
 export const zUnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionUnyankPostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -806,7 +907,7 @@ export const zYankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributio
 
 export const zYankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)
@@ -852,7 +953,7 @@ export const zPublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDist
 
 export const zPublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistributionsDistributionReleasesVersionDocumentationGetPath =
   z.object({
-    distribution: z.enum(['python', 'module_federation']),
+    distribution: z.enum(['python', 'module_federation', 'rust_stdio']),
     namespace: z
       .string()
       .min(1)

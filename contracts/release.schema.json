@@ -92,6 +92,71 @@
       ],
       "title": "PythonEntryPoint",
       "type": "object"
+    },
+    "RustArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "executable_url": {
+          "title": "Executable Url",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "exclusiveMinimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "executable_url",
+        "sha256",
+        "size"
+      ],
+      "title": "RustArtifact",
+      "type": "object"
+    },
+    "RustDistribution": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/RustArtifact"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "host_sdk": {
+          "const": "core-rs",
+          "default": "core-rs",
+          "title": "Host Sdk",
+          "type": "string"
+        },
+        "host_sdk_version": {
+          "title": "Host Sdk Version",
+          "type": "string"
+        },
+        "protocol_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Protocol Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host_sdk_version"
+      ],
+      "title": "RustDistribution",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -122,6 +187,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/PythonDistribution"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "rust_stdio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RustDistribution"
         },
         {
           "type": "null"

@@ -126,7 +126,10 @@ class NativeDocumentationReceipt(BaseModel):
     build_id: Annotated[BuildId | None, Field(title="Build Id")] = None
     committed_at: Annotated[str, Field(title="Committed At")]
     content_sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$", title="Content Sha256")]
-    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    distribution: Annotated[
+        Literal["python", "module_federation", "rust_stdio"],
+        Field(title="Distribution"),
+    ]
     entry: Annotated[str, Field(max_length=768, min_length=1, title="Entry")] = "index.html"
     name: Annotated[
         str,
@@ -161,7 +164,10 @@ class NativeReleaseDocumentation(BaseModel):
         extra="forbid",
         frozen=True,
     )
-    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    distribution: Annotated[
+        Literal["python", "module_federation", "rust_stdio"],
+        Field(title="Distribution"),
+    ]
     name: Annotated[
         str,
         Field(
