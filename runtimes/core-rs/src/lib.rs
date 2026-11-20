@@ -15,6 +15,8 @@ mod capabilities;
 pub use capabilities::*;
 mod http;
 pub use http::*;
+mod storage_host;
+pub use storage_host::*;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -296,6 +298,17 @@ enum Mode {
     Knowledge,
 }
 
+fn decode_storage_write(
+    value: Value,
+    packed: bool,
+) -> Result<StorageWriteRequest, serde_json::Error> {
+    if packed {
+        serde_json::from_value::<StorageBytesWriteRequest>(value).map(Into::into)
+    } else {
+        serde_json::from_value(value)
+    }
+}
+
 /// 顺序运行扩展。宿主拥有请求超时与强制回收；SDK 保证状态机和 stdout 协议。
 pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut input = BufReader::new(tokio::io::stdin());
@@ -303,10 +316,13 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut initialized = false;
     let mut mode = None;
     let mut capabilities = Capabilities::default();
+    let mut host_storage = false;
     loop {
         let active = mode == Some(Mode::Active);
         let limit = if active && capabilities.http_ingress.is_some() {
             MAX_HTTP_FRAME_BYTES
+        } else if mode.is_some() && host_storage && !capabilities.storages.is_empty() {
+            MAX_STORAGE_FRAME_BYTES
         } else {
             MAX_FRAME_BYTES
         };
@@ -314,269 +330,323 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
             break;
         };
         let request: Request = serde_json::from_slice(&frame)?;
+        let request_id = request.id;
         let stopping = request.method == "stop";
         let http_call =
             active && capabilities.http_ingress.is_some() && request.method == "http_request";
-        let result = if !http_call && frame.len() + 1 > MAX_FRAME_BYTES {
-            Err(RpcError::new("frame_size", "非 HTTP 请求帧超过默认上限"))
+        let storage_transfer = host_storage
+            && !capabilities.storages.is_empty()
+            && match request.method.as_str() {
+                "storage_read_bytes" => mode.is_some(),
+                "storage_create_bytes" | "storage_update_bytes" => active,
+                _ => false,
+            };
+        let response_limit = if http_call {
+            MAX_HTTP_FRAME_BYTES
+        } else if storage_transfer {
+            MAX_STORAGE_FRAME_BYTES
+        } else {
+            MAX_FRAME_BYTES
+        };
+        let access = (host_storage && mode.is_some())
+            .then(|| HostStorageAccess::for_method(&request.method))
+            .flatten();
+        let result = if frame.len() + 1 > response_limit {
+            Err(RpcError::new("frame_size", "请求帧超过该操作上限"))
         } else if request.protocol_version != PROTOCOL_VERSION {
             Err(RpcError::new("protocol_version", "不支持的协议版本"))
         } else {
-            match request.method.as_str() {
-                "initialize" if !initialized => {
-                    let descriptor = extension.descriptor();
-                    if descriptor.capabilities.validate().is_err()
-                        || descriptor
-                            .capabilities
-                            .http_ingress
-                            .as_ref()
-                            .is_some_and(|ingress| {
-                                ingress.validate_mount(&descriptor.name).is_err()
-                            })
-                    {
-                        Err(RpcError::new("descriptor", "业务能力声明无效"))
-                    } else {
-                        initialized = true;
-                        capabilities = descriptor.capabilities.clone();
-                        serialize_result(descriptor)
+            storage_host::scope(&mut input, &mut output, access, async {
+                match request.method.as_str() {
+                    "initialize" if !initialized => {
+                        let descriptor = extension.descriptor();
+                        if descriptor.capabilities.validate().is_err()
+                            || descriptor.capabilities.http_ingress.as_ref().is_some_and(
+                                |ingress| ingress.validate_mount(&descriptor.name).is_err(),
+                            )
+                        {
+                            Err(RpcError::new("descriptor", "业务能力声明无效"))
+                        } else {
+                            initialized = true;
+                            host_storage = request.params["host_services"].as_array().is_some_and(
+                                |services| {
+                                    services.iter().any(|value| value == HOST_STORAGE_SERVICE)
+                                },
+                            );
+                            capabilities = descriptor.capabilities.clone();
+                            serialize_result(descriptor)
+                        }
                     }
-                }
-                "start" if initialized && mode.is_none() => {
-                    match serde_json::from_value(request.params) {
-                        Ok(context) => match extension.start(context).await {
-                            Ok(value) => {
-                                mode = Some(Mode::Active);
-                                Ok(value)
-                            }
-                            Err(error) => Err(error),
-                        },
-                        Err(_) => Err(RpcError::new("invalid_params", "start 参数无效")),
-                    }
-                }
-                "start_knowledge"
-                    if initialized && mode.is_none() && capabilities.passive_knowledge =>
-                {
-                    match serde_json::from_value(request.params) {
-                        Ok(context) => extension.start_knowledge(context).await.map(|()| {
-                            mode = Some(Mode::Knowledge);
-                            json!({"started":true})
-                        }),
-                        Err(_) => Err(RpcError::new("invalid_params", "start_knowledge 参数无效")),
-                    }
-                }
-                "invoke" if active => {
-                    match serde_json::from_value::<InvokeParams>(request.params) {
-                        Ok(params) => extension.invoke(&params.method, params.params).await,
-                        Err(_) => Err(RpcError::new("invalid_params", "invoke 参数无效")),
-                    }
-                }
-                "http_request" if active => {
-                    match serde_json::from_value::<HttpRequest>(request.params) {
-                        Ok(params) => match capabilities.http_ingress.as_ref() {
-                            Some(ingress)
-                                if ingress.admit(&params.method, &params.path).is_some() =>
-                            {
-                                match params.validate() {
-                                    Ok(()) => {
-                                        extension.http_request(params).await.and_then(|response| {
-                                            response.validate().map_err(|_| {
-                                                RpcError::new("http_response", "HTTP 响应无效")
-                                            })?;
-                                            serialize_result(response)
-                                        })
-                                    }
-                                    Err(_) => Err(RpcError::new("invalid_params", "HTTP 请求无效")),
+                    "start" if initialized && mode.is_none() => {
+                        match serde_json::from_value(request.params) {
+                            Ok(context) => match extension.start(context).await {
+                                Ok(value) => {
+                                    mode = Some(Mode::Active);
+                                    Ok(value)
                                 }
+                                Err(error) => Err(error),
+                            },
+                            Err(_) => Err(RpcError::new("invalid_params", "start 参数无效")),
+                        }
+                    }
+                    "start_knowledge"
+                        if initialized && mode.is_none() && capabilities.passive_knowledge =>
+                    {
+                        match serde_json::from_value(request.params) {
+                            Ok(context) => extension.start_knowledge(context).await.map(|()| {
+                                mode = Some(Mode::Knowledge);
+                                json!({"started":true})
+                            }),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "start_knowledge 参数无效"))
                             }
-                            _ => Err(capabilities::unsupported()),
-                        },
-                        Err(_) => Err(RpcError::new("invalid_params", "http_request 参数无效")),
+                        }
                     }
-                }
-                "resolver_read" if mode.is_some() => {
-                    match serde_json::from_value::<ResolverRequest>(request.params) {
-                        Ok(params)
-                            if capabilities.resolvers.iter().any(|capability| {
-                                capability.id == params.resolver
-                                    && match &params.operation {
-                                        ResolverOperation::Read { method, .. } => capability
-                                            .read_methods
-                                            .iter()
-                                            .any(|known| known.name == *method),
-                                        _ => true,
+                    "invoke" if active => {
+                        match serde_json::from_value::<InvokeParams>(request.params) {
+                            Ok(params) => extension.invoke(&params.method, params.params).await,
+                            Err(_) => Err(RpcError::new("invalid_params", "invoke 参数无效")),
+                        }
+                    }
+                    "http_request" if active => {
+                        match serde_json::from_value::<HttpRequest>(request.params) {
+                            Ok(params) => match capabilities.http_ingress.as_ref() {
+                                Some(ingress)
+                                    if ingress.admit(&params.method, &params.path).is_some() =>
+                                {
+                                    match params.validate() {
+                                        Ok(()) => extension.http_request(params).await.and_then(
+                                            |response| {
+                                                response.validate().map_err(|_| {
+                                                    RpcError::new("http_response", "HTTP 响应无效")
+                                                })?;
+                                                serialize_result(response)
+                                            },
+                                        ),
+                                        Err(_) => {
+                                            Err(RpcError::new("invalid_params", "HTTP 请求无效"))
+                                        }
                                     }
-                            }) =>
-                        {
-                            extension.resolver_read(params).await
+                                }
+                                _ => Err(capabilities::unsupported()),
+                            },
+                            Err(_) => Err(RpcError::new("invalid_params", "http_request 参数无效")),
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "resolver_read 参数无效")),
                     }
-                }
-                "resolver_draft" if mode.is_some() => {
-                    match serde_json::from_value::<ResolverDraftRequest>(request.params) {
-                        Ok(params)
-                            if capabilities.resolvers.iter().any(|capability| {
-                                capability.id == params.resolver && capability.draft.is_some()
-                            }) =>
-                        {
-                            extension
-                                .resolver_draft(params)
-                                .await
-                                .and_then(serialize_result)
+                    "resolver_read" if mode.is_some() => {
+                        match serde_json::from_value::<ResolverRequest>(request.params) {
+                            Ok(params)
+                                if capabilities.resolvers.iter().any(|capability| {
+                                    capability.id == params.resolver
+                                        && match &params.operation {
+                                            ResolverOperation::Read { method, .. } => capability
+                                                .read_methods
+                                                .iter()
+                                                .any(|known| known.name == *method),
+                                            _ => true,
+                                        }
+                                }) =>
+                            {
+                                extension.resolver_read(params).await
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "resolver_read 参数无效"))
+                            }
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "resolver_draft 参数无效")),
                     }
-                }
-                "storage_read" if mode.is_some() => {
-                    match serde_json::from_value::<StorageReadRequest>(request.params) {
-                        Ok(params)
-                            if capabilities
-                                .storages
-                                .iter()
-                                .any(|capability| capability.id == params.storage.type_id) =>
-                        {
-                            extension
-                                .storage_read(params)
-                                .await
-                                .and_then(serialize_result)
+                    "resolver_draft" if mode.is_some() => {
+                        match serde_json::from_value::<ResolverDraftRequest>(request.params) {
+                            Ok(params)
+                                if capabilities.resolvers.iter().any(|capability| {
+                                    capability.id == params.resolver && capability.draft.is_some()
+                                }) =>
+                            {
+                                extension
+                                    .resolver_draft(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "resolver_draft 参数无效"))
+                            }
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "storage_read 参数无效")),
                     }
-                }
-                "storage_create" if active => {
-                    match serde_json::from_value::<StorageWriteRequest>(request.params) {
-                        Ok(params)
-                            if params.pointer.is_none()
-                                && capabilities.storages.iter().any(|capability| {
+                    "storage_read" | "storage_read_bytes"
+                        if mode.is_some()
+                            && (request.method == "storage_read" || storage_transfer) =>
+                    {
+                        match serde_json::from_value::<StorageReadRequest>(request.params) {
+                            Ok(params)
+                                if capabilities
+                                    .storages
+                                    .iter()
+                                    .any(|capability| capability.id == params.storage.type_id) =>
+                            {
+                                extension.storage_read(params).await.and_then(|bytes| {
+                                    if storage_transfer {
+                                        serialize_result(StorageBytes(bytes))
+                                    } else {
+                                        serialize_result(bytes)
+                                    }
+                                })
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => Err(RpcError::new("invalid_params", "storage_read 参数无效")),
+                        }
+                    }
+                    "storage_create" | "storage_create_bytes"
+                        if active && (request.method == "storage_create" || storage_transfer) =>
+                    {
+                        match decode_storage_write(request.params, storage_transfer) {
+                            Ok(params)
+                                if params.pointer.is_none()
+                                    && capabilities.storages.iter().any(|capability| {
+                                        capability.id == params.storage.type_id
+                                            && capability.writable
+                                    }) =>
+                            {
+                                extension
+                                    .storage_create(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "storage_create 参数无效"))
+                            }
+                        }
+                    }
+                    "storage_update" | "storage_update_bytes"
+                        if active && (request.method == "storage_update" || storage_transfer) =>
+                    {
+                        match decode_storage_write(request.params, storage_transfer) {
+                            Ok(params)
+                                if params.pointer.is_some()
+                                    && capabilities.storages.iter().any(|capability| {
+                                        capability.id == params.storage.type_id
+                                            && capability.writable
+                                    }) =>
+                            {
+                                extension
+                                    .storage_update(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "storage_update 参数无效"))
+                            }
+                        }
+                    }
+                    "storage_delete" if active => {
+                        match serde_json::from_value::<StorageReadRequest>(request.params) {
+                            Ok(params)
+                                if capabilities.storages.iter().any(|capability| {
                                     capability.id == params.storage.type_id && capability.writable
                                 }) =>
-                        {
-                            extension
-                                .storage_create(params)
-                                .await
-                                .and_then(serialize_result)
+                            {
+                                extension
+                                    .storage_delete(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "storage_delete 参数无效"))
+                            }
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "storage_create 参数无效")),
                     }
-                }
-                "storage_update" if active => {
-                    match serde_json::from_value::<StorageWriteRequest>(request.params) {
-                        Ok(params)
-                            if params.pointer.is_some()
-                                && capabilities.storages.iter().any(|capability| {
-                                    capability.id == params.storage.type_id && capability.writable
+                    "source_collect" if active => {
+                        match serde_json::from_value::<SourceRequest>(request.params) {
+                            Ok(params)
+                                if capabilities
+                                    .sources
+                                    .iter()
+                                    .any(|capability| capability.id == params.type_id) =>
+                            {
+                                extension
+                                    .source_collect(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "source_collect 参数无效"))
+                            }
+                        }
+                    }
+                    "source_backfill" if active => {
+                        match serde_json::from_value::<SourceRequest>(request.params) {
+                            Ok(params)
+                                if capabilities.sources.iter().any(|capability| {
+                                    capability.id == params.type_id
+                                        && capability.backfill_config_schema.is_some()
                                 }) =>
-                        {
-                            extension
-                                .storage_update(params)
-                                .await
-                                .and_then(serialize_result)
+                            {
+                                extension
+                                    .source_backfill(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "source_backfill 参数无效"))
+                            }
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "storage_update 参数无效")),
                     }
-                }
-                "storage_delete" if active => {
-                    match serde_json::from_value::<StorageReadRequest>(request.params) {
-                        Ok(params)
-                            if capabilities.storages.iter().any(|capability| {
-                                capability.id == params.storage.type_id && capability.writable
-                            }) =>
-                        {
-                            extension
-                                .storage_delete(params)
-                                .await
-                                .and_then(serialize_result)
+                    "job_can_handle" if active => {
+                        match serde_json::from_value::<JobRequest>(request.params) {
+                            Ok(params)
+                                if capabilities
+                                    .jobs
+                                    .iter()
+                                    .any(|capability| capability.id == params.type_id) =>
+                            {
+                                extension
+                                    .job_can_handle(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => {
+                                Err(RpcError::new("invalid_params", "job_can_handle 参数无效"))
+                            }
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "storage_delete 参数无效")),
                     }
-                }
-                "source_collect" if active => {
-                    match serde_json::from_value::<SourceRequest>(request.params) {
-                        Ok(params)
-                            if capabilities
-                                .sources
-                                .iter()
-                                .any(|capability| capability.id == params.type_id) =>
-                        {
-                            extension
-                                .source_collect(params)
-                                .await
-                                .and_then(serialize_result)
+                    "job_execute" if active => {
+                        match serde_json::from_value::<JobRequest>(request.params) {
+                            Ok(params)
+                                if capabilities
+                                    .jobs
+                                    .iter()
+                                    .any(|capability| capability.id == params.type_id) =>
+                            {
+                                extension
+                                    .job_execute(params)
+                                    .await
+                                    .and_then(serialize_result)
+                            }
+                            Ok(_) => Err(capabilities::unsupported()),
+                            Err(_) => Err(RpcError::new("invalid_params", "job_execute 参数无效")),
                         }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "source_collect 参数无效")),
                     }
-                }
-                "source_backfill" if active => {
-                    match serde_json::from_value::<SourceRequest>(request.params) {
-                        Ok(params)
-                            if capabilities.sources.iter().any(|capability| {
-                                capability.id == params.type_id
-                                    && capability.backfill_config_schema.is_some()
-                            }) =>
-                        {
-                            extension
-                                .source_backfill(params)
-                                .await
-                                .and_then(serialize_result)
-                        }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "source_backfill 参数无效")),
+                    "stop" => {
+                        let stopped = match mode {
+                            Some(Mode::Active) => extension.stop().await,
+                            Some(Mode::Knowledge) => extension.stop_knowledge().await,
+                            None => Ok(()),
+                        };
+                        stopped.map(|()| json!({"stopped":true}))
                     }
+                    _ => Err(RpcError::new(
+                        "invalid_state",
+                        "方法未知或不适用于当前生命周期",
+                    )),
                 }
-                "job_can_handle" if active => {
-                    match serde_json::from_value::<JobRequest>(request.params) {
-                        Ok(params)
-                            if capabilities
-                                .jobs
-                                .iter()
-                                .any(|capability| capability.id == params.type_id) =>
-                        {
-                            extension
-                                .job_can_handle(params)
-                                .await
-                                .and_then(serialize_result)
-                        }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "job_can_handle 参数无效")),
-                    }
-                }
-                "job_execute" if active => {
-                    match serde_json::from_value::<JobRequest>(request.params) {
-                        Ok(params)
-                            if capabilities
-                                .jobs
-                                .iter()
-                                .any(|capability| capability.id == params.type_id) =>
-                        {
-                            extension
-                                .job_execute(params)
-                                .await
-                                .and_then(serialize_result)
-                        }
-                        Ok(_) => Err(capabilities::unsupported()),
-                        Err(_) => Err(RpcError::new("invalid_params", "job_execute 参数无效")),
-                    }
-                }
-                "stop" => {
-                    let stopped = match mode {
-                        Some(Mode::Active) => extension.stop().await,
-                        Some(Mode::Knowledge) => extension.stop_knowledge().await,
-                        None => Ok(()),
-                    };
-                    stopped.map(|()| json!({"stopped":true}))
-                }
-                _ => Err(RpcError::new(
-                    "invalid_state",
-                    "方法未知或不适用于当前生命周期",
-                )),
-            }
+            })
+            .await?
         };
         let (result, error) = match result {
             Ok(value) => (Some(value), None),
@@ -586,15 +656,11 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
             &mut output,
             &Response {
                 protocol_version: PROTOCOL_VERSION,
-                id: request.id,
+                id: request_id,
                 result,
                 error,
             },
-            if http_call {
-                MAX_HTTP_FRAME_BYTES
-            } else {
-                MAX_FRAME_BYTES
-            },
+            response_limit,
         )
         .await?;
         if stopping {
