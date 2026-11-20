@@ -105,3 +105,20 @@ python3 runtimes/core-rs/scripts/accept_http.py
 提供 exact Resolver 或 Storage 读取能力的扩展可声明 `capabilities.passive_knowledge = true`。宿主在保留已安装 Decoder、且当前 Peer 停用扩展时，为该精确产物选择 `start_knowledge`。该启动只携带 `peer_id`，作者在 `Extension::start_knowledge` 中打开读取或 drafting 所需的资源，并由 `stop_knowledge` 对称关闭。
 
 此进程只处理声明的 `resolver_read`、`resolver_draft` 与 `storage_read`。Source、Job、HTTP 路由、通用 invoke 和 Storage 写操作由普通启动模式处理。一次进程生命周期只选一种模式，切换由宿主通过新进程完成。未声明此能力的 executable 维持原有启动行为和 wire 形状。
+
+### 使用当前 Peer 的 Storage
+
+宿主在 initialize 中通过 `host_services: ["storage.v1"]` 宣布支持回调。扩展可以在
+Source、Job、HTTP 和 invoke 业务调用内用 `host_storage` 访问当前 Peer 已注册的
+Storage。Resolver 只获得读取能力。调用使用持久 Storage ID 和该 handler 的 opaque
+pointer。调用环境中没有协商该服务时，函数返回 `None`。
+
+借用 handler 期间，宿主会在同一次 stdio 调用中处理 `HostStorageCall` 并回复
+`HostStorageReply`。SDK 验证回调序号和协议版本。子进程不需要新的 HTTP 凭据或
+监听地址。宿主对正在处理其他工作的 Storage 进程返回 `storage_busy`，防止进程
+相互等待。回调须在原业务调用的异步上下文内发出。
+
+SDK 0.1.2 的 Storage bytes 使用 base64，单条内容上限为 32 MiB，传输帧上限为
+48 MiB。较旧产物继续使用原有 Storage 帧。业务进程自身能用 native Core transaction
+访问 Storage 时优先使用该连接。调用其他进程或外部服务时，其写入由相应 handler
+负责，无法跟随调用方 SQL transaction 回滚。
