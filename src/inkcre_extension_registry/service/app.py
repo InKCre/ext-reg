@@ -791,11 +791,14 @@ def create_app() -> FastAPI:
         extension = await _repository(request).get_native_extension(
             extension_name, selected_distribution
         )
-        if extension is None and distribution is None:
-            selected_distribution = "python"
-            extension = await _repository(request).get_native_extension(
-                extension_name, selected_distribution
-            )
+        if distribution is None:
+            for fallback in ("python", "rust_stdio"):
+                if extension is not None:
+                    break
+                selected_distribution = fallback
+                extension = await _repository(request).get_native_extension(
+                    extension_name, selected_distribution
+                )
         selected = select_release(extension, version) if extension else None
         hosted = None
         if selected is not None and request.app.state.settings.documentation_origin_template:
@@ -1095,6 +1098,56 @@ def create_app() -> FastAPI:
         finally:
             await form.close()
         return Response(status_code=status.HTTP_200_OK)
+
+    @app.post(
+        "/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}",
+        response_model=NativeReleaseRecord,
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+                },
+            }
+        },
+    )
+    async def upload_rust(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        target: str,
+        request: Request,
+        _publisher: Annotated[str, Depends(_publisher_namespace)],
+    ):
+        content = bytearray()
+        async for chunk in request.stream():
+            if len(chunk) > 128 * 1024 * 1024 - len(content):
+                raise HTTPException(413, "Rust executable exceeds 128 MiB")
+            content.extend(chunk)
+        if not content:
+            raise HTTPException(422, "Rust executable must not be empty")
+        try:
+            return await _repository(request).put_rust_artifact(
+                _validate_identity(namespace, name, version), version, target, bytes(content)
+            )
+        except Exception as error:
+            raise _map_repository_error(error) from error
+
+    @app.get("/extensions/{namespace}/{name}/{version}/rust/{target}")
+    async def rust_file(
+        namespace: RegistrySegment,
+        name: RegistrySegment,
+        version: StrictSemVer,
+        target: str,
+        request: Request,
+    ):
+        try:
+            descriptor = await _repository(request).rust_public_file(
+                _validate_identity(namespace, name, version), version, target
+            )
+            return await _public_response(request, descriptor)
+        except Exception as error:
+            raise _map_repository_error(error) from error
 
     @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/{distribution}/releases/{version}/module-federation",

@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, conint, constr
 
 
 class DocumentationHosting(BaseModel):
@@ -74,6 +74,7 @@ class ModuleFederationDistribution(BaseModel):
 class Distribution(Enum):
     python = "python"
     module_federation = "module_federation"
+    rust_stdio = "rust_stdio"
 
 
 class NativeDocumentationReceipt(BaseModel):
@@ -175,6 +176,46 @@ class ReleaseDocumentation(BaseModel):
     ) = Field(..., title="Version")
 
 
+class RustArtifact(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    executable_url: str = Field(..., title="Executable Url")
+    sha256: constr(pattern=r"^[0-9a-f]{64}$") = Field(..., title="Sha256")
+    size: PositiveInt = Field(..., title="Size")
+    target: str = Field(..., title="Target")
+
+
+class Target(Enum):
+    aarch64_apple_darwin = "aarch64-apple-darwin"
+    x86_64_apple_darwin = "x86_64-apple-darwin"
+    x86_64_unknown_linux_gnu = "x86_64-unknown-linux-gnu"
+    aarch64_unknown_linux_gnu = "aarch64-unknown-linux-gnu"
+    x86_64_pc_windows_msvc = "x86_64-pc-windows-msvc"
+
+
+class RustAssociationInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    build_id: constr(min_length=1, max_length=256) | None = Field(None, title="Build Id")
+    host_sdk: Literal["core-rs"] = Field(..., title="Host Sdk")
+    host_sdk_version: constr(min_length=1, max_length=256) = Field(..., title="Host Sdk Version")
+    source_repository: constr(min_length=1, max_length=512) = Field(..., title="Source Repository")
+    source_revision: constr(min_length=1, max_length=128) = Field(..., title="Source Revision")
+    targets: list[Target] = Field(..., min_length=1, title="Targets")
+
+
+class RustDistribution(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    artifacts: list[RustArtifact] | None = Field([], title="Artifacts")
+    host_sdk: Literal["core-rs"] = Field("core-rs", title="Host Sdk")
+    host_sdk_version: str = Field(..., title="Host Sdk Version")
+    protocol_version: Literal[1] = Field(1, title="Protocol Version")
+
+
 class ValidationError(BaseModel):
     ctx: dict[str, Any] | None = Field(None, title="Context")
     input: Any | None = Field(None, title="Input")
@@ -238,6 +279,7 @@ class ReleaseRecord(BaseModel):
     ) = Field(..., title="Name")
     nickname: str = Field(..., title="Nickname")
     python: PythonDistribution | None = None
+    rust_stdio: RustDistribution | None = None
     state: State = Field(..., title="State")
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
@@ -266,6 +308,7 @@ class NativePrepareReleaseRequest(BaseModel):
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: constr(min_length=1, max_length=128) = Field(..., title="Nickname")
     python: PythonAssociationInput | None = None
+    rust_stdio: RustAssociationInput | None = None
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
         min_length=5,
@@ -286,6 +329,7 @@ class NativePublisherRelease(BaseModel):
     ) = Field(..., title="Name")
     nickname: str = Field(..., title="Nickname")
     python: PythonDistribution | None = None
+    rust_stdio: RustDistribution | None = None
     state: State = Field(..., title="State")
     uploaded: bool = Field(..., title="Uploaded")
     version: constr(
@@ -320,6 +364,7 @@ class NativeReleaseRecord(BaseModel):
     ) = Field(..., title="Name")
     nickname: str = Field(..., title="Nickname")
     python: PythonDistribution | None = None
+    rust_stdio: RustDistribution | None = None
     state: State = Field(..., title="State")
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
@@ -341,6 +386,7 @@ class PublisherRelease(BaseModel):
     nickname: str = Field(..., title="Nickname")
     python: PythonDistribution | None = None
     python_uploaded: bool = Field(..., title="Python Uploaded")
+    rust_stdio: RustDistribution | None = None
     state: State = Field(..., title="State")
     version: constr(
         pattern=r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",

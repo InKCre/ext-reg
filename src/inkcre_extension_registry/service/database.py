@@ -91,6 +91,7 @@ class NativeRelease(Model):
         "models.Extension", related_name="native_releases", on_delete=fields.RESTRICT
     )
     distribution = fields.CharField(max_length=32)
+    rust_stdio = fields.JSONField(null=True)
     version = fields.CharField(max_length=128)
     state = fields.CharField(max_length=16, default="preparing")
     yank_reason: str | None = fields.TextField(null=True)
@@ -106,7 +107,8 @@ class NativeRelease(Model):
         indexes = (("extension_id", "distribution", "state", "created_at"),)
         constraints: ClassVar = [
             CheckConstraint(
-                "distribution IN ('python', 'module_federation')", "native_distribution"
+                "distribution IN ('python', 'module_federation', 'rust_stdio')",
+                "native_distribution",
             ),
             CheckConstraint(
                 "state IN ('preparing', 'published', 'yanked', 'blocked')", "native_release_state"

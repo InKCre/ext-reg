@@ -346,7 +346,8 @@
         "distribution": {
           "enum": [
             "python",
-            "module_federation"
+            "module_federation",
+            "rust_stdio"
           ],
           "title": "Distribution",
           "type": "string"
@@ -429,7 +430,8 @@
         "distribution": {
           "enum": [
             "python",
-            "module_federation"
+            "module_federation",
+            "rust_stdio"
           ],
           "title": "Distribution",
           "type": "string"

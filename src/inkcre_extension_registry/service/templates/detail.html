@@ -18,9 +18,10 @@
       <nav aria-label="Distribution">
         <a href="/explore/{{ extension.name }}?distribution=python">Python</a>
         <a href="/explore/{{ extension.name }}?distribution=module_federation">Web</a>
+        <a href="/explore/{{ extension.name }}?distribution=rust_stdio">Rust</a>
       </nav>
       <div class="section-heading">
-        <h2>{{ "Python" if distribution == "python" else "Web" }} distribution</h2>
+        <h2>{{ {"python": "Python", "module_federation": "Web", "rust_stdio": "Rust"}[distribution] }} distribution</h2>
         <code>{{ release.version }}</code>
       </div>
       {% if release.python %}
@@ -56,6 +57,29 @@
           </div>
         </dl>
         <a class="button" href="{{ release.module_federation.manifest_url }}">Manifest ↗</a>
+      </section>
+      {% endif %}
+      {% if release.rust_stdio %}
+      <section class="distribution-panel">
+        <h3>Rust</h3>
+        <dl class="metadata">
+          <div>
+            <dt>Host SDK</dt>
+            <dd><code>{{ release.rust_stdio.host_sdk }} {{ release.rust_stdio.host_sdk_version }}</code></dd>
+          </div>
+          <div>
+            <dt>Protocol</dt>
+            <dd><code>{{ release.rust_stdio.protocol_version }}</code></dd>
+          </div>
+        </dl>
+        <ul>
+          {% for artifact in release.rust_stdio.artifacts %}
+          <li>
+            <a href="{{ artifact.executable_url }}">{{ artifact.target }} executable ↗</a>
+            <p>{{ artifact.size }} bytes · SHA-256 <code>{{ artifact.sha256 }}</code></p>
+          </li>
+          {% endfor %}
+        </ul>
       </section>
       {% endif %}
       {% if documentation and documentation.sets %}

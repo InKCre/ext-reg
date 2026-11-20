@@ -90,6 +90,54 @@ class PythonEntryPoint(BaseModel):
     ]
 
 
+class RustArtifact(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    executable_url: Annotated[str, Field(title="Executable Url")]
+    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$", title="Sha256")]
+    size: Annotated[int, Field(gt=0, title="Size")]
+    target: Annotated[str, Field(title="Target")]
+
+
+class RustAssociationInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    build_id: Annotated[BuildId | None, Field(title="Build Id")] = None
+    host_sdk: Annotated[Literal["core-rs"], Field(title="Host Sdk")]
+    host_sdk_version: Annotated[str, Field(max_length=256, min_length=1, title="Host Sdk Version")]
+    source_repository: Annotated[
+        str, Field(max_length=512, min_length=1, title="Source Repository")
+    ]
+    source_revision: Annotated[str, Field(max_length=128, min_length=1, title="Source Revision")]
+    targets: Annotated[
+        list[
+            Literal[
+                "aarch64-apple-darwin",
+                "x86_64-apple-darwin",
+                "x86_64-unknown-linux-gnu",
+                "aarch64-unknown-linux-gnu",
+                "x86_64-pc-windows-msvc",
+            ]
+        ],
+        Field(min_length=1, title="Targets"),
+    ]
+
+
+class RustDistribution(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+    artifacts: Annotated[list[RustArtifact], Field(title="Artifacts")] = []
+    host_sdk: Annotated[Literal["core-rs"], Field(title="Host Sdk")] = "core-rs"
+    host_sdk_version: Annotated[str, Field(title="Host Sdk Version")]
+    protocol_version: Annotated[Literal[1], Field(title="Protocol Version")] = 1
+
+
 class YankRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -159,6 +207,7 @@ class ReleaseRecord(BaseModel):
     ]
     nickname: Annotated[str, Field(title="Nickname")]
     python: PythonDistribution | None = None
+    rust_stdio: RustDistribution | None = None
     state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
     version: Annotated[
         str,
@@ -197,6 +246,7 @@ class NativePrepareReleaseRequest(BaseModel):
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
     python: PythonAssociationInput | None = None
+    rust_stdio: RustAssociationInput | None = None
     version: Annotated[
         str,
         Field(
@@ -213,7 +263,10 @@ class NativeReleaseRecord(BaseModel):
         extra="forbid",
         frozen=True,
     )
-    distribution: Annotated[Literal["python", "module_federation"], Field(title="Distribution")]
+    distribution: Annotated[
+        Literal["python", "module_federation", "rust_stdio"],
+        Field(title="Distribution"),
+    ]
     module_federation: ModuleFederationDistribution | None = None
     name: Annotated[
         str,
@@ -226,6 +279,7 @@ class NativeReleaseRecord(BaseModel):
     ]
     nickname: Annotated[str, Field(title="Nickname")]
     python: PythonDistribution | None = None
+    rust_stdio: RustDistribution | None = None
     state: Annotated[Literal["preparing", "published", "yanked", "blocked"], Field(title="State")]
     version: Annotated[
         str,
@@ -246,6 +300,7 @@ class PrepareReleaseRequest(BaseModel):
     module_federation: ModuleFederationAssociationInput | None = None
     nickname: Annotated[str, Field(max_length=128, min_length=1, title="Nickname")]
     python: PythonAssociationInput | None = None
+    rust_stdio: RustAssociationInput | None = None
     version: Annotated[
         str,
         Field(

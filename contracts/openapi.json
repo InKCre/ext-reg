@@ -265,7 +265,8 @@
           "distribution": {
             "enum": [
               "python",
-              "module_federation"
+              "module_federation",
+              "rust_stdio"
             ],
             "title": "Distribution",
             "type": "string"
@@ -401,6 +402,16 @@
               }
             ]
           },
+          "rust_stdio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RustAssociationInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "maxLength": 128,
             "minLength": 5,
@@ -422,7 +433,8 @@
           "distribution": {
             "enum": [
               "python",
-              "module_federation"
+              "module_federation",
+              "rust_stdio"
             ],
             "title": "Distribution",
             "type": "string"
@@ -452,6 +464,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PythonDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rust_stdio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RustDistribution"
               },
               {
                 "type": "null"
@@ -541,7 +563,8 @@
           "distribution": {
             "enum": [
               "python",
-              "module_federation"
+              "module_federation",
+              "rust_stdio"
             ],
             "title": "Distribution",
             "type": "string"
@@ -594,7 +617,8 @@
           "distribution": {
             "enum": [
               "python",
-              "module_federation"
+              "module_federation",
+              "rust_stdio"
             ],
             "title": "Distribution",
             "type": "string"
@@ -624,6 +648,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PythonDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rust_stdio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RustDistribution"
               },
               {
                 "type": "null"
@@ -695,6 +729,16 @@
           "python_uploaded": {
             "title": "Python Uploaded",
             "type": "boolean"
+          },
+          "rust_stdio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RustDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "state": {
             "enum": [
@@ -994,6 +1038,16 @@
               }
             ]
           },
+          "rust_stdio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RustDistribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "state": {
             "enum": [
               "preparing",
@@ -1019,6 +1073,136 @@
           "state"
         ],
         "title": "ReleaseRecord",
+        "type": "object"
+      },
+      "RustArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "executable_url": {
+            "title": "Executable Url",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size": {
+            "exclusiveMinimum": 0.0,
+            "title": "Size",
+            "type": "integer"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "executable_url",
+          "sha256",
+          "size"
+        ],
+        "title": "RustArtifact",
+        "type": "object"
+      },
+      "RustAssociationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "build_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Id"
+          },
+          "host_sdk": {
+            "const": "core-rs",
+            "title": "Host Sdk",
+            "type": "string"
+          },
+          "host_sdk_version": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Host Sdk Version",
+            "type": "string"
+          },
+          "source_repository": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Source Repository",
+            "type": "string"
+          },
+          "source_revision": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Revision",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "enum": [
+                "aarch64-apple-darwin",
+                "x86_64-apple-darwin",
+                "x86_64-unknown-linux-gnu",
+                "aarch64-unknown-linux-gnu",
+                "x86_64-pc-windows-msvc"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "host_sdk",
+          "host_sdk_version",
+          "source_repository",
+          "source_revision",
+          "targets"
+        ],
+        "title": "RustAssociationInput",
+        "type": "object"
+      },
+      "RustDistribution": {
+        "additionalProperties": false,
+        "properties": {
+          "artifacts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RustArtifact"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "host_sdk": {
+            "const": "core-rs",
+            "default": "core-rs",
+            "title": "Host Sdk",
+            "type": "string"
+          },
+          "host_sdk_version": {
+            "title": "Host Sdk Version",
+            "type": "string"
+          },
+          "protocol_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Protocol Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "host_sdk_version"
+        ],
+        "title": "RustDistribution",
         "type": "object"
       },
       "ValidationError": {
@@ -1155,6 +1339,79 @@
           }
         },
         "summary": "Module Federation File"
+      }
+    },
+    "/extensions/{namespace}/{name}/{version}/rust/{target}": {
+      "get": {
+        "operationId": "rust_file_extensions__namespace___name___version__rust__target__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "title": "Target",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rust File"
       }
     },
     "/legacy/": {
@@ -1809,6 +2066,108 @@
         "summary": "Native Extensions"
       }
     },
+    "/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}": {
+      "post": {
+        "operationId": "upload_rust_v2_extensions__namespace___name__distributions_rust_stdio_releases__version__artifacts__target__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 5,
+              "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))(?:\\.(?:(?:0|[1-9][0-9]*)|(?:[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)))*)?$",
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeReleaseRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Rust"
+      }
+    },
     "/v2/extensions/{namespace}/{name}/distributions/{distribution}": {
       "get": {
         "operationId": "native_extension_v2_extensions__namespace___name__distributions__distribution__get",
@@ -1844,7 +2203,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -1887,7 +2247,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -1980,7 +2341,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2059,7 +2421,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2168,7 +2531,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2469,7 +2833,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2564,7 +2929,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2659,7 +3025,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2754,7 +3121,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"
@@ -2923,7 +3291,8 @@
             "schema": {
               "enum": [
                 "python",
-                "module_federation"
+                "module_federation",
+                "rust_stdio"
               ],
               "title": "Distribution",
               "type": "string"

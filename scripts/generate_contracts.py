@@ -58,7 +58,7 @@ def generated_contracts() -> dict[Path, bytes]:
         {
             "contract_revision": 4,
             "documentation_scopes": ["global", "module-federation", "python"],
-            "distribution_kinds": ["module_federation", "python"],
+            "distribution_kinds": ["module_federation", "python", "rust_stdio"],
             "extension_version": "strict-semver-without-build-metadata",
             "python_upload_filetypes": ["bdist_wheel"],
             "release_states": ["preparing", "published", "yanked", "blocked"],

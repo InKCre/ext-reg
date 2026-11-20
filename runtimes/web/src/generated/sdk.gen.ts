@@ -64,6 +64,9 @@ import type {
   PythonFilePackagesProjectProjectVersionFilenameGetData,
   PythonFilePackagesProjectProjectVersionFilenameGetErrors,
   PythonFilePackagesProjectProjectVersionFilenameGetResponses,
+  RustFileExtensionsNamespaceNameVersionRustTargetGetData,
+  RustFileExtensionsNamespaceNameVersionRustTargetGetErrors,
+  RustFileExtensionsNamespaceNameVersionRustTargetGetResponses,
   SimpleProjectSimpleProjectGetData,
   SimpleProjectSimpleProjectGetErrors,
   SimpleProjectSimpleProjectGetResponses,
@@ -78,6 +81,9 @@ import type {
   UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostData,
   UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostErrors,
   UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionModuleFederationPostResponses,
+  UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostData,
+  UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors,
+  UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses,
   YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostData,
   YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostErrors,
   YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionReleasesVersionYankPostResponses,
@@ -124,6 +130,24 @@ export const moduleFederationFileExtensionsNamespaceNameVersionModuleFederationR
     url: '/extensions/{namespace}/{name}/{version}/module-federation/{relative_path}',
     ...options,
   })
+
+/**
+ * Rust File
+ */
+export const rustFileExtensionsNamespaceNameVersionRustTargetGet = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<RustFileExtensionsNamespaceNameVersionRustTargetGetData, ThrowOnError>,
+): RequestResult<
+  RustFileExtensionsNamespaceNameVersionRustTargetGetResponses,
+  RustFileExtensionsNamespaceNameVersionRustTargetGetErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    RustFileExtensionsNamespaceNameVersionRustTargetGetResponses,
+    RustFileExtensionsNamespaceNameVersionRustTargetGetErrors,
+    ThrowOnError
+  >({ url: '/extensions/{namespace}/{name}/{version}/rust/{target}', ...options })
 
 /**
  * Legacy Upload
@@ -324,6 +348,34 @@ export const nativeExtensionsV2ExtensionsGet = <ThrowOnError extends boolean = f
     url: '/v2/extensions',
     ...options,
   })
+
+/**
+ * Upload Rust
+ */
+export const uploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPost =
+  <ThrowOnError extends boolean = false>(
+    options: Options<
+      UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostData,
+      ThrowOnError
+    >,
+  ): RequestResult<
+    UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses,
+    UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors,
+    ThrowOnError
+  > =>
+    (options.client ?? client).post<
+      UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses,
+      UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors,
+      ThrowOnError
+    >({
+      bodySerializer: null,
+      url: '/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}',
+      ...options,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ...options.headers,
+      },
+    })
 
 /**
  * Native Extension

@@ -2,7 +2,8 @@
   "contract_revision": 4,
   "distribution_kinds": [
     "module_federation",
-    "python"
+    "python",
+    "rust_stdio"
   ],
   "documentation_scopes": [
     "global",

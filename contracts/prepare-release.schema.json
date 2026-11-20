@@ -144,6 +144,72 @@
       ],
       "title": "PythonEntryPoint",
       "type": "object"
+    },
+    "RustAssociationInput": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Id"
+        },
+        "host_sdk": {
+          "const": "core-rs",
+          "title": "Host Sdk",
+          "type": "string"
+        },
+        "host_sdk_version": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Host Sdk Version",
+          "type": "string"
+        },
+        "source_repository": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Source Revision",
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "enum": [
+              "aarch64-apple-darwin",
+              "x86_64-apple-darwin",
+              "x86_64-unknown-linux-gnu",
+              "aarch64-unknown-linux-gnu",
+              "x86_64-pc-windows-msvc"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "host_sdk",
+        "host_sdk_version",
+        "source_repository",
+        "source_revision",
+        "targets"
+      ],
+      "title": "RustAssociationInput",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -169,6 +235,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/PythonAssociationInput"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "rust_stdio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RustAssociationInput"
         },
         {
           "type": "null"

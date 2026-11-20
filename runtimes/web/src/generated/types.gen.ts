@@ -169,7 +169,7 @@ export type NativeDocumentationReceipt = {
   /**
    * Distribution
    */
-  distribution: 'python' | 'module_federation'
+  distribution: 'python' | 'module_federation' | 'rust_stdio'
   /**
    * Entry
    */
@@ -236,6 +236,7 @@ export type NativePrepareReleaseRequest = {
    */
   nickname: string
   python?: PythonAssociationInput | null
+  rust_stdio?: RustAssociationInput | null
   /**
    * Version
    */
@@ -249,7 +250,7 @@ export type NativePublisherRelease = {
   /**
    * Distribution
    */
-  distribution: 'python' | 'module_federation'
+  distribution: 'python' | 'module_federation' | 'rust_stdio'
   module_federation?: ModuleFederationDistribution | null
   /**
    * Name
@@ -260,6 +261,7 @@ export type NativePublisherRelease = {
    */
   nickname: string
   python?: PythonDistribution | null
+  rust_stdio?: RustDistribution | null
   /**
    * State
    */
@@ -303,7 +305,7 @@ export type NativeReleaseDocumentation = {
   /**
    * Distribution
    */
-  distribution: 'python' | 'module_federation'
+  distribution: 'python' | 'module_federation' | 'rust_stdio'
   /**
    * Name
    */
@@ -329,7 +331,7 @@ export type NativeReleaseRecord = {
   /**
    * Distribution
    */
-  distribution: 'python' | 'module_federation'
+  distribution: 'python' | 'module_federation' | 'rust_stdio'
   module_federation?: ModuleFederationDistribution | null
   /**
    * Name
@@ -340,6 +342,7 @@ export type NativeReleaseRecord = {
    */
   nickname: string
   python?: PythonDistribution | null
+  rust_stdio?: RustDistribution | null
   /**
    * State
    */
@@ -368,6 +371,7 @@ export type PublisherRelease = {
    * Python Uploaded
    */
   python_uploaded: boolean
+  rust_stdio?: RustDistribution | null
   /**
    * State
    */
@@ -522,6 +526,7 @@ export type ReleaseRecord = {
    */
   nickname: string
   python?: PythonDistribution | null
+  rust_stdio?: RustDistribution | null
   /**
    * State
    */
@@ -530,6 +535,86 @@ export type ReleaseRecord = {
    * Version
    */
   version: string
+}
+
+/**
+ * RustArtifact
+ */
+export type RustArtifact = {
+  /**
+   * Executable Url
+   */
+  executable_url: string
+  /**
+   * Sha256
+   */
+  sha256: string
+  /**
+   * Size
+   */
+  size: number
+  /**
+   * Target
+   */
+  target: string
+}
+
+/**
+ * RustAssociationInput
+ */
+export type RustAssociationInput = {
+  /**
+   * Build Id
+   */
+  build_id?: string | null
+  /**
+   * Host Sdk
+   */
+  host_sdk: 'core-rs'
+  /**
+   * Host Sdk Version
+   */
+  host_sdk_version: string
+  /**
+   * Source Repository
+   */
+  source_repository: string
+  /**
+   * Source Revision
+   */
+  source_revision: string
+  /**
+   * Targets
+   */
+  targets: Array<
+    | 'aarch64-apple-darwin'
+    | 'x86_64-apple-darwin'
+    | 'x86_64-unknown-linux-gnu'
+    | 'aarch64-unknown-linux-gnu'
+    | 'x86_64-pc-windows-msvc'
+  >
+}
+
+/**
+ * RustDistribution
+ */
+export type RustDistribution = {
+  /**
+   * Artifacts
+   */
+  artifacts?: Array<RustArtifact>
+  /**
+   * Host Sdk
+   */
+  host_sdk?: 'core-rs'
+  /**
+   * Host Sdk Version
+   */
+  host_sdk_version: string
+  /**
+   * Protocol Version
+   */
+  protocol_version?: 1
 }
 
 /**
@@ -613,6 +698,47 @@ export type ModuleFederationFileExtensionsNamespaceNameVersionModuleFederationRe
      */
     200: unknown
   }
+
+export type RustFileExtensionsNamespaceNameVersionRustTargetGetData = {
+  body?: never
+  path: {
+    /**
+     * Namespace
+     */
+    namespace: string
+    /**
+     * Name
+     */
+    name: string
+    /**
+     * Version
+     */
+    version: string
+    /**
+     * Target
+     */
+    target: string
+  }
+  query?: never
+  url: '/extensions/{namespace}/{name}/{version}/rust/{target}'
+}
+
+export type RustFileExtensionsNamespaceNameVersionRustTargetGetErrors = {
+  /**
+   * Validation Error
+   */
+  422: HttpValidationError
+}
+
+export type RustFileExtensionsNamespaceNameVersionRustTargetGetError =
+  RustFileExtensionsNamespaceNameVersionRustTargetGetErrors[keyof RustFileExtensionsNamespaceNameVersionRustTargetGetErrors]
+
+export type RustFileExtensionsNamespaceNameVersionRustTargetGetResponses = {
+  /**
+   * Successful Response
+   */
+  200: unknown
+}
 
 export type LegacyUploadLegacyPostData = {
   body?: never
@@ -1044,6 +1170,59 @@ export type NativeExtensionsV2ExtensionsGetResponses = {
 export type NativeExtensionsV2ExtensionsGetResponse =
   NativeExtensionsV2ExtensionsGetResponses[keyof NativeExtensionsV2ExtensionsGetResponses]
 
+export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostData =
+  {
+    body: Blob | File
+    headers?: {
+      /**
+       * Authorization
+       */
+      authorization?: string | null
+    }
+    path: {
+      /**
+       * Namespace
+       */
+      namespace: string
+      /**
+       * Name
+       */
+      name: string
+      /**
+       * Version
+       */
+      version: string
+      /**
+       * Target
+       */
+      target: string
+    }
+    query?: never
+    url: '/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}'
+  }
+
+export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors =
+  {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError
+  }
+
+export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostError =
+  UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors[keyof UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors]
+
+export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses =
+  {
+    /**
+     * Successful Response
+     */
+    200: NativeReleaseRecord
+  }
+
+export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponse =
+  UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses[keyof UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostResponses]
+
 export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGetData = {
   body?: never
   path: {
@@ -1058,7 +1237,7 @@ export type NativeExtensionV2ExtensionsNamespaceNameDistributionsDistributionGet
     /**
      * Distribution
      */
-    distribution: 'python' | 'module_federation'
+    distribution: 'python' | 'module_federation' | 'rust_stdio'
   }
   query?: never
   url: '/v2/extensions/{namespace}/{name}/distributions/{distribution}'
@@ -1097,7 +1276,7 @@ export type PrepareNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributi
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1140,7 +1319,7 @@ export type GetNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionRe
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1187,7 +1366,7 @@ export type GetNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistribu
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1258,7 +1437,7 @@ export type UploadNativeDocumentationV2ExtensionsNamespaceNameDistributionsDistr
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1355,7 +1534,7 @@ export type UploadNativeModuleFederationV2ExtensionsNamespaceNameDistributionsDi
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1408,7 +1587,7 @@ export type PublishNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributi
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1461,7 +1640,7 @@ export type UnyankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributio
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1517,7 +1696,7 @@ export type YankNativeReleaseV2ExtensionsNamespaceNameDistributionsDistributionR
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
@@ -1608,7 +1787,7 @@ export type PublisherNativeDocumentationV2PublisherExtensionsNamespaceNameDistri
       /**
        * Distribution
        */
-      distribution: 'python' | 'module_federation'
+      distribution: 'python' | 'module_federation' | 'rust_stdio'
       /**
        * Namespace
        */
