@@ -5,11 +5,13 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{Error, RpcError};
+use crate::{Error, HttpIngress, RpcError};
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Capabilities {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub http_ingress: Option<HttpIngress>,
     #[serde(default)]
     pub resolvers: Vec<ResolverCapability>,
     #[serde(default)]
@@ -22,6 +24,9 @@ pub struct Capabilities {
 
 impl Capabilities {
     pub fn validate(&self) -> Result<(), Error> {
+        if let Some(ingress) = &self.http_ingress {
+            ingress.validate()?;
+        }
         unique_ids(self.resolvers.iter().map(|item| item.id.as_str()))?;
         unique_ids(self.storages.iter().map(|item| item.id.as_str()))?;
         unique_ids(self.sources.iter().map(|item| item.id.as_str()))?;

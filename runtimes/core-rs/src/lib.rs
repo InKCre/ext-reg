@@ -13,6 +13,8 @@ use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufRea
 
 mod capabilities;
 pub use capabilities::*;
+mod http;
+pub use http::*;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const SDK_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -173,6 +175,14 @@ pub struct Response {
 
 /// 读取一条严格有界帧；不会先无界分配再检查长度。
 pub async fn read_frame<R: AsyncBufRead + Unpin>(reader: &mut R) -> Result<Option<Vec<u8>>, Error> {
+    read_frame_with_limit(reader, MAX_FRAME_BYTES).await
+}
+
+/// 只有已协商的 HTTP ingress 可以选择 MAX_HTTP_FRAME_BYTES；其余调用保持默认限制。
+pub async fn read_frame_with_limit<R: AsyncBufRead + Unpin>(
+    reader: &mut R,
+    limit: usize,
+) -> Result<Option<Vec<u8>>, Error> {
     let mut frame = Vec::new();
     loop {
         let bytes = reader.fill_buf().await?;
@@ -185,7 +195,7 @@ pub async fn read_frame<R: AsyncBufRead + Unpin>(reader: &mut R) -> Result<Optio
         }
         let newline = bytes.iter().position(|c| *c == b'\n');
         let take = newline.map_or(bytes.len(), |n| n + 1);
-        if frame.len() + take > MAX_FRAME_BYTES {
+        if frame.len() + take > limit {
             return Err(Error::Protocol("帧超过大小上限".into()));
         }
         frame.extend_from_slice(&bytes[..take]);
@@ -201,8 +211,16 @@ pub async fn write_frame<W: AsyncWrite + Unpin, T: Serialize>(
     writer: &mut W,
     value: &T,
 ) -> Result<(), Error> {
+    write_frame_with_limit(writer, value, MAX_FRAME_BYTES).await
+}
+
+pub async fn write_frame_with_limit<W: AsyncWrite + Unpin, T: Serialize>(
+    writer: &mut W,
+    value: &T,
+    limit: usize,
+) -> Result<(), Error> {
     let mut frame = serde_json::to_vec(value)?;
-    if frame.len() + 1 > MAX_FRAME_BYTES {
+    if frame.len() + 1 > limit {
         return Err(Error::Protocol("帧超过大小上限".into()));
     }
     frame.push(b'\n');
@@ -217,6 +235,9 @@ pub trait Extension: Send {
     async fn start(&mut self, context: StartContext) -> Result<Value, RpcError>;
     async fn invoke(&mut self, method: &str, params: Value) -> Result<Value, RpcError>;
     async fn stop(&mut self) -> Result<(), RpcError>;
+    async fn http_request(&mut self, _request: HttpRequest) -> Result<HttpResponse, RpcError> {
+        Err(capabilities::unsupported())
+    }
     async fn resolver_read(&mut self, _request: ResolverRequest) -> Result<Value, RpcError> {
         Err(capabilities::unsupported())
     }
@@ -262,16 +283,36 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut initialized = false;
     let mut active = false;
     let mut capabilities = Capabilities::default();
-    while let Some(frame) = read_frame(&mut input).await? {
+    loop {
+        let limit = if active && capabilities.http_ingress.is_some() {
+            MAX_HTTP_FRAME_BYTES
+        } else {
+            MAX_FRAME_BYTES
+        };
+        let Some(frame) = read_frame_with_limit(&mut input, limit).await? else {
+            break;
+        };
         let request: Request = serde_json::from_slice(&frame)?;
         let stopping = request.method == "stop";
-        let result = if request.protocol_version != PROTOCOL_VERSION {
+        let http_call =
+            active && capabilities.http_ingress.is_some() && request.method == "http_request";
+        let result = if !http_call && frame.len() + 1 > MAX_FRAME_BYTES {
+            Err(RpcError::new("frame_size", "非 HTTP 请求帧超过默认上限"))
+        } else if request.protocol_version != PROTOCOL_VERSION {
             Err(RpcError::new("protocol_version", "不支持的协议版本"))
         } else {
             match request.method.as_str() {
                 "initialize" if !initialized => {
                     let descriptor = extension.descriptor();
-                    if descriptor.capabilities.validate().is_err() {
+                    if descriptor.capabilities.validate().is_err()
+                        || descriptor
+                            .capabilities
+                            .http_ingress
+                            .as_ref()
+                            .is_some_and(|ingress| {
+                                ingress.validate_mount(&descriptor.name).is_err()
+                            })
+                    {
                         Err(RpcError::new("descriptor", "业务能力声明无效"))
                     } else {
                         initialized = true;
@@ -293,6 +334,29 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                     match serde_json::from_value::<InvokeParams>(request.params) {
                         Ok(params) => extension.invoke(&params.method, params.params).await,
                         Err(_) => Err(RpcError::new("invalid_params", "invoke 参数无效")),
+                    }
+                }
+                "http_request" if active => {
+                    match serde_json::from_value::<HttpRequest>(request.params) {
+                        Ok(params) => match capabilities.http_ingress.as_ref() {
+                            Some(ingress)
+                                if ingress.admit(&params.method, &params.path).is_some() =>
+                            {
+                                match params.validate() {
+                                    Ok(()) => {
+                                        extension.http_request(params).await.and_then(|response| {
+                                            response.validate().map_err(|_| {
+                                                RpcError::new("http_response", "HTTP 响应无效")
+                                            })?;
+                                            serialize_result(response)
+                                        })
+                                    }
+                                    Err(_) => Err(RpcError::new("invalid_params", "HTTP 请求无效")),
+                                }
+                            }
+                            _ => Err(capabilities::unsupported()),
+                        },
+                        Err(_) => Err(RpcError::new("invalid_params", "http_request 参数无效")),
                     }
                 }
                 "resolver_read" if active => {
@@ -483,13 +547,18 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
             Ok(value) => (Some(value), None),
             Err(error) => (None, Some(error)),
         };
-        write_frame(
+        write_frame_with_limit(
             &mut output,
             &Response {
                 protocol_version: PROTOCOL_VERSION,
                 id: request.id,
                 result,
                 error,
+            },
+            if http_call {
+                MAX_HTTP_FRAME_BYTES
+            } else {
+                MAX_FRAME_BYTES
             },
         )
         .await?;
