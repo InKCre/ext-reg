@@ -12,6 +12,9 @@ use crate::{Error, HttpIngress, RpcError};
 pub struct Capabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub http_ingress: Option<HttpIngress>,
+    /// The executable can initialize only its installed knowledge handlers.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub passive_knowledge: bool,
     #[serde(default)]
     pub resolvers: Vec<ResolverCapability>,
     #[serde(default)]
@@ -26,6 +29,11 @@ impl Capabilities {
     pub fn validate(&self) -> Result<(), Error> {
         if let Some(ingress) = &self.http_ingress {
             ingress.validate()?;
+        }
+        if self.passive_knowledge && self.resolvers.is_empty() && self.storages.is_empty() {
+            return Err(Error::Protocol(
+                "独立知识启动需要 Resolver 或 Storage 声明".into(),
+            ));
         }
         unique_ids(self.resolvers.iter().map(|item| item.id.as_str()))?;
         unique_ids(self.storages.iter().map(|item| item.id.as_str()))?;
