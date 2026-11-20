@@ -329,7 +329,9 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
         let Some(frame) = read_frame_with_limit(&mut input, limit).await? else {
             break;
         };
+        let frame_len = frame.len() + 1;
         let request: Request = serde_json::from_slice(&frame)?;
+        drop(frame);
         let request_id = request.id;
         let stopping = request.method == "stop";
         let http_call =
@@ -351,7 +353,7 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
         let access = (host_storage && mode.is_some())
             .then(|| HostStorageAccess::for_method(&request.method))
             .flatten();
-        let result = if frame.len() + 1 > response_limit {
+        let result = if frame_len > response_limit {
             Err(RpcError::new("frame_size", "请求帧超过该操作上限"))
         } else if request.protocol_version != PROTOCOL_VERSION {
             Err(RpcError::new("protocol_version", "不支持的协议版本"))
