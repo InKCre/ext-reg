@@ -791,11 +791,14 @@ def create_app() -> FastAPI:
         extension = await _repository(request).get_native_extension(
             extension_name, selected_distribution
         )
-        if extension is None and distribution is None:
-            selected_distribution = "python"
-            extension = await _repository(request).get_native_extension(
-                extension_name, selected_distribution
-            )
+        if distribution is None:
+            for fallback in ("python", "rust_stdio"):
+                if extension is not None:
+                    break
+                selected_distribution = fallback
+                extension = await _repository(request).get_native_extension(
+                    extension_name, selected_distribution
+                )
         selected = select_release(extension, version) if extension else None
         hosted = None
         if selected is not None and request.app.state.settings.documentation_origin_template:
