@@ -50,7 +50,7 @@ def main() -> None:
         )
         ordinary = call("invoke", {"method": "x", "params": "x" * (2 * 1024 * 1024)})
         assert ordinary["error"]["code"] == "frame_size"
-        body = bytes(range(256)) * (32 * 1024 * 1024 // 256)
+        body = bytes(range(256)) * (45 * 1024 * 1024 // 256)
         request["body"] = base64.b64encode(body).decode("ascii")
         response = call("http_request", request)["result"]
         decoded = base64.b64decode(response["body"], validate=True)
@@ -64,7 +64,7 @@ def main() -> None:
             process.wait(timeout=10)
     print(
         "PASS: real HTTP ingress descriptor, protocol auth, exact method and path admission, "
-        "32 MiB binary round trip, ordinary 1 MiB limit, stop"
+        "45 MiB binary round trip, ordinary 1 MiB limit, stop"
     )
 
 

@@ -8,7 +8,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use crate::Error;
 
 pub const MAX_HTTP_FRAME_BYTES: usize = 64 * 1024 * 1024;
-pub const MAX_HTTP_BODY_BYTES: usize = 32 * 1024 * 1024;
+pub const MAX_HTTP_BODY_BYTES: usize = 45 * 1024 * 1024;
 pub const MAX_HTTP_HEADER_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -143,7 +143,7 @@ pub struct HttpBody(pub Vec<u8>);
 impl Serialize for HttpBody {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if self.0.len() > MAX_HTTP_BODY_BYTES {
-            return Err(serde::ser::Error::custom("HTTP body 超过 32 MiB"));
+            return Err(serde::ser::Error::custom("HTTP body 超过 45 MiB"));
         }
         serializer.serialize_str(&STANDARD.encode(&self.0))
     }
@@ -153,11 +153,11 @@ impl<'de> Deserialize<'de> for HttpBody {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let encoded = String::deserialize(deserializer)?;
         if encoded.len() > MAX_HTTP_BODY_BYTES.div_ceil(3) * 4 {
-            return Err(de::Error::custom("HTTP body 超过 32 MiB"));
+            return Err(de::Error::custom("HTTP body 超过 45 MiB"));
         }
         let body = STANDARD.decode(encoded).map_err(de::Error::custom)?;
         if body.len() > MAX_HTTP_BODY_BYTES {
-            return Err(de::Error::custom("HTTP body 超过 32 MiB"));
+            return Err(de::Error::custom("HTTP body 超过 45 MiB"));
         }
         Ok(Self(body))
     }
