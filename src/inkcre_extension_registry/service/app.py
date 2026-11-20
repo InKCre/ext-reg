@@ -1110,8 +1110,8 @@ def create_app() -> FastAPI:
     ):
         content = bytearray()
         async for chunk in request.stream():
-            if len(chunk) > MAX_UPLOAD_BYTES - len(content):
-                raise HTTPException(413, "Rust executable exceeds 20 MiB")
+            if len(chunk) > 128 * 1024 * 1024 - len(content):
+                raise HTTPException(413, "Rust executable exceeds 128 MiB")
             content.extend(chunk)
         if not content:
             raise HTTPException(422, "Rust executable must not be empty")

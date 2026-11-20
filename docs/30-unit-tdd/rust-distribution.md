@@ -4,7 +4,7 @@
 
 发布者先用 namespace credential 调用 `POST /v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases`。请求包含 nickname、version 和 rust_stdio association。association 保存 core-rs SDK 范围、源码仓库与 revision、可选 build_id，以及非空唯一 targets。支持 Apple Darwin 的 aarch64/x86_64、GNU Linux 的 aarch64/x86_64、Windows MSVC x86_64。准备后这些字段不可替换。
 
-每个 target 通过 `POST /v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}` 上传原始 executable。单文件上限20 MiB，服务器计算 SHA-256，并以内容寻址存储。同 target 的相同 bytes 可以在 preparing 状态重复上传；不同 bytes 会返回409。所有声明 target 完整存储后，才可调用同版本的 `/publish`。
+每个 target 通过 `POST /v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}` 上传原始 executable。单文件上限128 MiB，服务器计算 SHA-256，并以内容寻址存储。同 target 的相同 bytes 可以在 preparing 状态重复上传；不同 bytes 会返回409。所有声明 target 完整存储后，才可调用同版本的 `/publish`。
 
 精确公开版本的 rust_stdio 字段包含 host_sdk、host_sdk_version、protocol_version，以及 artifacts 数组。每项具有 target、executable_url、sha256、size。executable_url 是同 Registry origin 下的相对路径。Host 按目标平台选择，检查 SDK 范围、协议、字节数与摘要，然后构造本机可信 manifest，并通过实际 initialize 握手检查业务身份。
 
