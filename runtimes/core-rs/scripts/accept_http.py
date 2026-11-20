@@ -1,4 +1,4 @@
-"""显式运行真实 executable HTTP ingress 的关键验收；不接入自动化测试套件。"""
+"""显式运行真实 executable HTTP ingress 的关键验收。不接入自动化测试套件。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import subprocess
+import threading
 from pathlib import Path
 
 
@@ -15,6 +16,8 @@ def main() -> None:
     process = subprocess.Popen(
         [str(executable)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
+    deadline = threading.Timer(60, process.kill)
+    deadline.start()
     assert process.stdin is not None and process.stdout is not None
     identifier = 0
 
@@ -59,6 +62,7 @@ def main() -> None:
         assert call("stop", None)["result"]["stopped"]
         assert process.wait(timeout=10) == 0
     finally:
+        deadline.cancel()
         if process.poll() is None:
             process.kill()
             process.wait(timeout=10)
