@@ -128,6 +128,13 @@ pub struct StartContext {
     pub state: Value,
 }
 
+/// The context for decoding persisted data without enabling the Extension.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnowledgeStartContext {
+    pub peer_id: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InvokeParams {
@@ -235,6 +242,13 @@ pub trait Extension: Send {
     async fn start(&mut self, context: StartContext) -> Result<Value, RpcError>;
     async fn invoke(&mut self, method: &str, params: Value) -> Result<Value, RpcError>;
     async fn stop(&mut self) -> Result<(), RpcError>;
+    /// Initialize only resources needed for persisted reads and graph drafting.
+    async fn start_knowledge(&mut self, _context: KnowledgeStartContext) -> Result<(), RpcError> {
+        Err(capabilities::unsupported())
+    }
+    async fn stop_knowledge(&mut self) -> Result<(), RpcError> {
+        Ok(())
+    }
     async fn http_request(&mut self, _request: HttpRequest) -> Result<HttpResponse, RpcError> {
         Err(capabilities::unsupported())
     }
@@ -276,14 +290,21 @@ pub trait Extension: Send {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Active,
+    Knowledge,
+}
+
 /// 顺序运行扩展。宿主拥有请求超时与强制回收；SDK 保证状态机和 stdout 协议。
 pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut input = BufReader::new(tokio::io::stdin());
     let mut output = tokio::io::stdout();
     let mut initialized = false;
-    let mut active = false;
+    let mut mode = None;
     let mut capabilities = Capabilities::default();
     loop {
+        let active = mode == Some(Mode::Active);
         let limit = if active && capabilities.http_ingress.is_some() {
             MAX_HTTP_FRAME_BYTES
         } else {
@@ -320,16 +341,29 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                         serialize_result(descriptor)
                     }
                 }
-                "start" if initialized && !active => match serde_json::from_value(request.params) {
-                    Ok(context) => match extension.start(context).await {
-                        Ok(value) => {
-                            active = true;
-                            Ok(value)
-                        }
-                        Err(error) => Err(error),
-                    },
-                    Err(_) => Err(RpcError::new("invalid_params", "start 参数无效")),
-                },
+                "start" if initialized && mode.is_none() => {
+                    match serde_json::from_value(request.params) {
+                        Ok(context) => match extension.start(context).await {
+                            Ok(value) => {
+                                mode = Some(Mode::Active);
+                                Ok(value)
+                            }
+                            Err(error) => Err(error),
+                        },
+                        Err(_) => Err(RpcError::new("invalid_params", "start 参数无效")),
+                    }
+                }
+                "start_knowledge"
+                    if initialized && mode.is_none() && capabilities.passive_knowledge =>
+                {
+                    match serde_json::from_value(request.params) {
+                        Ok(context) => extension.start_knowledge(context).await.map(|()| {
+                            mode = Some(Mode::Knowledge);
+                            json!({"started":true})
+                        }),
+                        Err(_) => Err(RpcError::new("invalid_params", "start_knowledge 参数无效")),
+                    }
+                }
                 "invoke" if active => {
                     match serde_json::from_value::<InvokeParams>(request.params) {
                         Ok(params) => extension.invoke(&params.method, params.params).await,
@@ -359,7 +393,7 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                         Err(_) => Err(RpcError::new("invalid_params", "http_request 参数无效")),
                     }
                 }
-                "resolver_read" if active => {
+                "resolver_read" if mode.is_some() => {
                     match serde_json::from_value::<ResolverRequest>(request.params) {
                         Ok(params)
                             if capabilities.resolvers.iter().any(|capability| {
@@ -379,7 +413,7 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                         Err(_) => Err(RpcError::new("invalid_params", "resolver_read 参数无效")),
                     }
                 }
-                "resolver_draft" if active => {
+                "resolver_draft" if mode.is_some() => {
                     match serde_json::from_value::<ResolverDraftRequest>(request.params) {
                         Ok(params)
                             if capabilities.resolvers.iter().any(|capability| {
@@ -395,7 +429,7 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                         Err(_) => Err(RpcError::new("invalid_params", "resolver_draft 参数无效")),
                     }
                 }
-                "storage_read" if active => {
+                "storage_read" if mode.is_some() => {
                     match serde_json::from_value::<StorageReadRequest>(request.params) {
                         Ok(params)
                             if capabilities
@@ -531,11 +565,12 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                     }
                 }
                 "stop" => {
-                    if active {
-                        extension.stop().await.map(|()| json!({"stopped": true}))
-                    } else {
-                        Ok(json!({"stopped": true}))
-                    }
+                    let stopped = match mode {
+                        Some(Mode::Active) => extension.stop().await,
+                        Some(Mode::Knowledge) => extension.stop_knowledge().await,
+                        None => Ok(()),
+                    };
+                    stopped.map(|()| json!({"stopped":true}))
                 }
                 _ => Err(RpcError::new(
                     "invalid_state",
@@ -566,8 +601,14 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
             return Ok(());
         }
     }
-    if active {
-        let _ = extension.stop().await;
+    match mode {
+        Some(Mode::Active) => {
+            let _ = extension.stop().await;
+        }
+        Some(Mode::Knowledge) => {
+            let _ = extension.stop_knowledge().await;
+        }
+        None => (),
     }
     Ok(())
 }

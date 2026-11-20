@@ -99,3 +99,9 @@ python3 runtimes/core-rs/scripts/accept_http.py
 该脚本覆盖协议认证、路径/方法拒绝、45 MiB bytes 完整往返、普通命令保留 1 MiB
 限制及正常停止，不接入自动化测试套件。Host 的实际 HTTP/JWT 与挂载生命周期仍由
 各 Host 自身验收。详细字段、准入和兼容策略见 [SDK 设计](../../docs/30-unit-tdd/rust-extension-sdk.md#http-ingress)。
+
+### 仅加载持久资料读取能力
+
+提供 exact Resolver 或 Storage 读取能力的扩展可声明 `capabilities.passive_knowledge = true`。宿主在保留已安装 Decoder、且当前 Peer 停用扩展时，为该精确产物选择 `start_knowledge`。该启动只携带 `peer_id`，作者在 `Extension::start_knowledge` 中打开读取或 drafting 所需的资源，并由 `stop_knowledge` 对称关闭。
+
+此进程只处理声明的 `resolver_read`、`resolver_draft` 与 `storage_read`。Source、Job、HTTP 路由、通用 invoke 和 Storage 写操作由普通启动模式处理。一次进程生命周期只选一种模式，切换由宿主通过新进程完成。未声明此能力的 executable 维持原有启动行为和 wire 形状。
