@@ -368,8 +368,13 @@ export const uploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVe
       UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostErrors,
       ThrowOnError
     >({
+      bodySerializer: null,
       url: '/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}',
       ...options,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ...options.headers,
+      },
     })
 
 /**

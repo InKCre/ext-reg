@@ -617,6 +617,9 @@ export const zPublisherDocumentationV1PublisherExtensionsNamespaceNameReleasesVe
  */
 export const zNativeExtensionsV2ExtensionsGetResponse = z.array(zExtensionSummary)
 
+export const zUploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostBody =
+  z.string()
+
 export const zUploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostHeaders =
   z.object({
     authorization: z.string().nullish(),

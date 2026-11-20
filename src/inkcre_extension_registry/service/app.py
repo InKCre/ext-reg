@@ -1102,6 +1102,14 @@ def create_app() -> FastAPI:
     @app.post(
         "/v2/extensions/{namespace}/{name}/distributions/rust_stdio/releases/{version}/artifacts/{target}",
         response_model=NativeReleaseRecord,
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+                },
+            }
+        },
     )
     async def upload_rust(
         namespace: RegistrySegment,

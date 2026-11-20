@@ -1172,7 +1172,7 @@ export type NativeExtensionsV2ExtensionsGetResponse =
 
 export type UploadRustV2ExtensionsNamespaceNameDistributionsRustStdioReleasesVersionArtifactsTargetPostData =
   {
-    body?: never
+    body: Blob | File
     headers?: {
       /**
        * Authorization
