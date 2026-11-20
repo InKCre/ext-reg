@@ -1,6 +1,6 @@
 [package]
 name = "inkcre-extension-sdk"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 rust-version = "1.93"
 description = "InKCre Rust executable extension protocol and author SDK"

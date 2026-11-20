@@ -110,8 +110,12 @@ python3 runtimes/core-rs/scripts/accept_http.py
 
 宿主在 initialize 中通过 `host_services: ["storage.v1"]` 宣布支持回调。扩展可以在
 Source、Job、HTTP 和 invoke 业务调用内用 `host_storage` 访问当前 Peer 已注册的
-Storage。Resolver 只获得读取能力。调用使用持久 Storage ID 和该 handler 的 opaque
-pointer。调用环境中没有协商该服务时，函数返回 `None`。
+Storage。调用使用持久 Storage ID 和该 handler 的 opaque pointer。调用环境中没有
+协商该服务时，函数返回 `None`。
+
+Resolver 默认只可读。SDK 0.1.4 与宿主协商 `resolver.storage.materialization.v1` 后，
+活动进程的 Solve/Text 请求在 `materialize_missing=true` 时也可创建 Storage 对象。
+自定义读方法、普通读取与停用进程仍只可读；Resolver 无法通过此权限更新或删除对象。
 
 借用 handler 期间，宿主会在同一次 stdio 调用中处理 `HostStorageCall` 并回复
 `HostStorageReply`。SDK 验证回调序号和协议版本。子进程不需要新的 HTTP 凭据或

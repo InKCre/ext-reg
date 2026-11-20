@@ -338,6 +338,7 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut capabilities = Capabilities::default();
     let mut host_storage = false;
     let mut resolver_values = false;
+    let mut resolver_storage_materialization = false;
     loop {
         let active = mode == Some(Mode::Active);
         let limit = if active && capabilities.http_ingress.is_some() {
@@ -380,7 +381,13 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
             MAX_FRAME_BYTES
         };
         let access = (host_storage && mode.is_some())
-            .then(|| HostStorageAccess::for_method(&request.method))
+            .then(|| {
+                HostStorageAccess::for_request(
+                    &request.method,
+                    &request.params,
+                    active && resolver_storage_materialization,
+                )
+            })
             .flatten();
         let result = if frame_len > response_limit {
             Err(RpcError::new("frame_size", "请求帧超过该操作上限"))
@@ -407,6 +414,8 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                                 };
                             host_storage = advertised(HOST_STORAGE_SERVICE);
                             resolver_values = advertised(RESOLVER_VALUE_SERVICE);
+                            resolver_storage_materialization =
+                                advertised(RESOLVER_STORAGE_MATERIALIZATION_SERVICE);
                             capabilities = descriptor.capabilities.clone();
                             serialize_result(descriptor)
                         }
