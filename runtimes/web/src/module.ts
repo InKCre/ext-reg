@@ -16,6 +16,7 @@ export class WebExtensionModuleHandle<T extends WebExtensionModule = WebExtensio
     readonly name: string,
     readonly version: string,
     readonly module: T,
+    readonly sourceRepository: string | null = null,
   ) {}
 
   async activate(): Promise<void> {
@@ -57,15 +58,21 @@ export async function loadExtensionModule<T extends WebExtensionModule>(
   name: string,
   version: string,
   manifestUrl: string,
+  sourceRepository: string | null = null,
 ): Promise<WebExtensionModuleHandle<T>> {
-  const remoteName = webExtensionRemoteName(name, version)
+  const remoteName = webExtensionRemoteName(name, version, sourceRepository)
   moduleFederation.registerRemotes([{ name: remoteName, entry: manifestUrl }], { force: true })
   const loaded = await moduleFederation.loadRemote<T | { default: T }>(remoteName)
   if (!loaded) throw new Error(`${name}@${version} returned no Module Federation module.`)
   const extensionModule = 'default' in loaded ? loaded.default : loaded
-  return new WebExtensionModuleHandle(name, version, extensionModule)
+  return new WebExtensionModuleHandle(name, version, extensionModule, sourceRepository)
 }
 
-export function webExtensionRemoteName(name: string, version: string): string {
-  return `extension.${name.replace('/', '.')}.${version}`
+export function webExtensionRemoteName(
+  name: string,
+  version: string,
+  sourceRepository: string | null = null,
+): string {
+  const coordinate = `extension.${name.replace('/', '.')}.${version}`
+  return sourceRepository ? `${coordinate}.${encodeURIComponent(sourceRepository)}` : coordinate
 }

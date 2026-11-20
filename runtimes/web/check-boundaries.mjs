@@ -5,6 +5,7 @@ import {
   configStore,
   PeerManager,
   PeerOutcomeUnknown,
+  ExtensionModel,
   ExtensionParticipationModel,
 } from '@inkcre/core'
 import {
@@ -201,6 +202,12 @@ try {
     (await releases.get('inkcre/catalog', '1.10.0', true)).distribution,
     'module_federation',
   )
+  const firstSource = 'https://github.com/example/first'
+  const secondSource = 'https://github.com/example/second'
+  await assert.rejects(
+    releases.get('inkcre/catalog', '1.10.0', true, firstSource),
+    /repository release reader is required/,
+  )
   const originalGet = ExtensionParticipationModel.get
   const selection = {
     name: 'inkcre/catalog',
@@ -241,8 +248,119 @@ try {
     await manager.shutdown()
     ExtensionParticipationModel.get = originalGet
   }
-  // Restore consumes durable intent; delayed modules cannot resurrect revoked selections.
+
+  // Sources are part of exact pins even when the release version does not change.
+  const originalInstall = ExtensionModel.install
+  const originalSelect = ExtensionParticipationModel.select
   const originalList = ExtensionParticipationModel.list
+  let selected = null
+  const selections = []
+  const releaseReads = []
+  const loadedRemotes = []
+  const sourceReader = {
+    async get(name, version, requirePublished, sourceRepository) {
+      releaseReads.push({ version, requirePublished, sourceRepository })
+      return {
+        ...catalogReleases[1],
+        name,
+        version,
+        module_federation: {
+          ...catalogReleases[1].module_federation,
+          manifest_url: `${sourceRepository ?? origin}/mf-manifest.json`,
+        },
+      }
+    },
+  }
+  const startRuntime = () => {
+    const remotes = new Map()
+    return new ExtensionManager({
+      peerId: current,
+      releases: sourceReader,
+      moduleFederation: {
+        registerRemotes([remote]) {
+          remotes.set(remote.name, remote.entry)
+        },
+        async loadRemote(name) {
+          loadedRemotes.push({ name, manifest: remotes.get(name) })
+          return {}
+        },
+      },
+    })
+  }
+  let sourceRuntime = startRuntime()
+  try {
+    ExtensionModel.install = async (input) => input
+    ExtensionParticipationModel.get = async () => selected
+    ExtensionParticipationModel.list = async () => (selected ? [selected] : [])
+    ExtensionParticipationModel.select = async (input) => {
+      selections.push(input)
+      selected = {
+        peer_id: input.peerId,
+        name: input.name,
+        version: input.version,
+        distribution: input.distribution,
+        source_repository: input.sourceRepository,
+        enabled: selected?.enabled ?? false,
+        async setEnabled(enabled) {
+          this.enabled = enabled
+          return this
+        },
+      }
+      return selected
+    }
+    const fromFirst = {
+      name: selection.name,
+      version: selection.version,
+      sourceRepository: firstSource,
+    }
+    assert.equal((await sourceRuntime.install(fromFirst, current)).source_repository, firstSource)
+    assert.equal(
+      (await sourceRuntime.changeVersion(selection.name, '1.2.0', current)).source_repository,
+      firstSource,
+    )
+    assert.equal(
+      (await sourceRuntime.changeVersion(selection.name, selection.version, current))
+        .source_repository,
+      firstSource,
+    )
+    await sourceRuntime.enable(selection.name, current)
+    assert.equal((await sourceRuntime.getStatus(selection.name)).source_repository, firstSource)
+    await assert.rejects(
+      sourceRuntime.install({ ...fromFirst, sourceRepository: secondSource }, current),
+      ExtensionEnabledError,
+    )
+    await sourceRuntime.disable(selection.name, current)
+    assert.equal(
+      (await sourceRuntime.install({ ...fromFirst, sourceRepository: secondSource }, current))
+        .source_repository,
+      secondSource,
+    )
+    assert.equal(selections.at(-1).expectedSourceRepository, firstSource)
+    await sourceRuntime.enable(selection.name, current)
+    assert.notEqual(loadedRemotes[0].name, loadedRemotes[1].name)
+    await sourceRuntime.shutdown()
+    sourceRuntime = startRuntime()
+    await sourceRuntime.startup(current)
+    assert.equal(loadedRemotes.at(-1).manifest, `${secondSource}/mf-manifest.json`)
+    assert.deepEqual(releaseReads.at(-1), {
+      version: selection.version,
+      requirePublished: false,
+      sourceRepository: secondSource,
+    })
+    assert.equal(selections.length, 4, 'restoring a repository pin must not rewrite it')
+    await sourceRuntime.disable(selection.name, current)
+    await sourceRuntime.changeVersion(selection.name, selection.version, current, null)
+    assert.equal(selections.at(-1).sourceRepository, null)
+    assert.equal(selections.at(-1).expectedSourceRepository, secondSource)
+  } finally {
+    await sourceRuntime.shutdown()
+    ExtensionModel.install = originalInstall
+    ExtensionParticipationModel.get = originalGet
+    ExtensionParticipationModel.list = originalList
+    ExtensionParticipationModel.select = originalSelect
+  }
+
+  // Restore consumes durable intent; delayed modules cannot resurrect revoked selections.
   const deferred = () => {
     let resolve
     const promise = new Promise((done) => {
@@ -256,6 +374,7 @@ try {
       'disable-command',
       'external-disable',
       'external-pin',
+      'external-source',
       'shutdown',
     ]) {
       const entered = deferred()
@@ -321,6 +440,8 @@ try {
         rows.get(current).enabled = false
       } else if (scenario === 'external-pin') {
         rows.get(current).version = '1.2.0'
+      } else if (scenario === 'external-source') {
+        rows.get(current).source_repository = firstSource
       } else {
         command = runtime.shutdown()
       }
@@ -361,6 +482,7 @@ try {
       extension: installed.name,
       distribution: 'python',
       version: installed.version,
+      source_repository: firstSource,
     },
     { action: 'enable', extension: installed.name },
     { action: 'disable', extension: installed.name },
