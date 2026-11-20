@@ -1,7 +1,8 @@
 # InKCre Rust Extension SDK
 
 `inkcre-extension-sdk` 提供独立 executable 扩展的协议类型与异步 runner。
-它不依赖 Registry 或 Core；本阶段没有 Rust Registry 发布/下载接口。
+它不依赖 Registry 或 Core。Registry 的 Rust 原生分发采用同一 executable 协议，
+发布/下载约定见 [Rust 分发](../../docs/30-unit-tdd/rust-distribution.md)。
 持久化和业务能力可由扩展自行采用 `inkcre-core` SDK 直连已准入 PostgreSQL。
 
 ```bash
@@ -40,7 +41,8 @@ python3 runtimes/core-rs/scripts/accept_echo.py
 config/state 启动快照；需要读取最新业务 state 或原子写入时，使用已准入数据库协议，
 不要把快照当作最新值整对象覆盖。
 
-每帧包含换行最多 1 MiB。宿主拥有超时、精确选择复核和进程回收；扩展作者负责
+普通命令每帧包含换行最多 1 MiB；已声明 HTTP ingress 的已启动扩展，其
+`http_request` 使用独立的 64 MiB 帧上限。宿主拥有超时、精确选择复核和进程回收；扩展作者负责
 业务副作用与幂等性。原生 executable 是可信代码，进程边界不是安全沙箱。
 
 完整运行边界见 [Rust SDK 设计](../../docs/30-unit-tdd/rust-extension-sdk.md)。
@@ -67,3 +69,33 @@ Source/Job 执行由 Job timeout 和取消控制，不受通用 invoke 的 20 �
 短 RPC 的期限包含协议锁排队；仅排队超时不会终止另一个正在执行的工作。
 Storage bytes 使用 JSON 字节数组，仍须遵守每帧 1 MiB 限制。取消、进程恢复和外部
 Storage 的事务边界见[能力注册与撤销](../../docs/30-unit-tdd/rust-extension-sdk.md#typed-业务能力与撤销)。
+
+## HTTP ingress
+
+`Capabilities.http_ingress` 声明扩展自己的 HTTP route 与 Peer inbound。每条 route
+明确 method、path、path_match（exact/prefix）和 auth（peer/protocol/public）。默认
+peer 表示 Host 先验证 Peer JWT；protocol 表示插件拥有并实际执行外部协议认证。
+公开观察必须显式写 public。前缀按路径段匹配，精确路由优先，再选择最长前缀。
+
+`HttpIngress::validate_mount(name)` 把路径限定在 `/{extension name}` 根及其子路径；
+Host 还必须拒绝不同 namespace 的同名 mount 冲突。`admit(method,path)` 是 Host 与
+runner 共享的精确 admission。路径为一次解码后的值，不含百分号、dot 段或 query；
+Host 不得让 HTTP framework 在 admission 后再次规范化或解码。
+
+`Extension::http_request(HttpRequest)` 返回 `HttpResponse`，body 在 Rust 中是
+`HttpBody(Vec<u8>)`，wire 为标准 padded Base64 string，decoded HTTP body 最多
+45 MiB，足以容纳产品 JSON 内已编码的 32 MiB Memos attachment。具体产品继续
+自行执行更小的语义限额。headers 保留同名重复与非 UTF-8 bytes；Host 负责剔除
+hop-by-hop/framing headers，并从真实请求建立 authority，不能相信转发者提供的
+内部 mount 或认证标记。SDK 的 typed 数据和固定分派不授予认证。
+
+显式运行真实 executable 的关键协议验收：
+
+```bash
+cargo build --manifest-path runtimes/core-rs/Cargo.toml --example http_echo --locked
+python3 runtimes/core-rs/scripts/accept_http.py
+```
+
+该脚本覆盖协议认证、路径/方法拒绝、45 MiB bytes 完整往返、普通命令保留 1 MiB
+限制及正常停止，不接入自动化测试套件。Host 的实际 HTTP/JWT 与挂载生命周期仍由
+各 Host 自身验收。详细字段、准入和兼容策略见 [SDK 设计](../../docs/30-unit-tdd/rust-extension-sdk.md#http-ingress)。

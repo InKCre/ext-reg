@@ -10,9 +10,9 @@
 
 ## 分发边界
 
-当前只支持操作者显式提供的本地 manifest 和 executable。Registry 服务现有
-Python/Module Federation 发布接口未扩充，不应把 Rust 本地安装描述为 Registry
-发布、下载或完整性背书。Rust SDK 采用自身 Cargo 版本，原生安装 manifest 标识
+操作者可以显式提供本地 manifest 和 executable，或按 [Rust 原生分发](rust-distribution.md)
+下载 Registry 精确发布版本。Registry 托管发布者的原生 bytes 与摘要，不执行文件或
+承诺源码/平台真实性。Rust SDK 采用自身 Cargo 版本，原生安装 manifest 标识
 精确 Extension name/version、宿主 SDK 条件、协议版本和 executable SHA-256。
 
 manifest 数据结构和严格输入规则由 SDK `Manifest` 及 `validate` 拥有。
@@ -22,7 +22,8 @@ executable 是 manifest 目录内相对路径；宿主复制产物到自己的�
 
 ## 运行协议
 
-stdin/stdout 使用 UTF-8 JSON-line，每帧（包含换行）最多 1 MiB。SDK 读取时逐块
+stdin/stdout 使用 UTF-8 JSON-line，普通帧（包含换行）最多 1 MiB。已协商的
+HTTP ingress 使用下文独立限制。SDK 读取时逐块
 检查边界，不先无界读入；stdout 只输出协议，日志写 stderr。请求包含
 `protocol_version`、`id`、`method`、`params`。响应返回相同版本与 ID，并恰有
 `result` 或 `error`；成功结果可为 JSON null。协议 v1 按顺序请求/响应，不提供并发
@@ -102,3 +103,68 @@ impl-rs 宿主周期性复核远端变化，停止已撤回的运行实例，并
 新启用选择。相同版本启动失败后记录错误，不反复自动重启；显式 enable、观察到
 停用或选择新版本可触发下一次尝试。running 只表示已完成启动且仍存活的本机进程，
 不由 selection 或 enabled 推断。
+
+## HTTP ingress
+
+这是一条已安装扩展的本机访问协议，不是 `core.peer.protocol.http.v1` 的 Peer
+委派传输。SDK 只拥有 stdio 上的 typed bytes、路由 admission 与分派；HTTP server、
+Peer JWT、实际 mount 以及 Peer capability advertisement 由 Host 拥有，外部协议的
+凭证验证由插件拥有。普通扩展 route 默认使用 Peer JWT。协议根的 auth-neutral
+边界通过每条 `auth=protocol/public` 的显式声明表达，不会从方法名或 URL 猜测。
+
+`Descriptor.capabilities.http_ingress` 是可选对象：
+
+```json
+{
+  "routes": [
+    { "method": "GET", "path": "/memos/connection", "path_match": "exact", "auth": "peer" },
+    { "method": "POST", "path": "/memos/api/v1", "path_match": "prefix", "auth": "protocol" }
+  ],
+  "peer_inbounds": [
+    { "capability": "memos.connection.v1", "method": "GET", "path": "/memos/connection" }
+  ]
+}
+```
+
+method 使用有界 RFC HTTP token，保持大小写，不以 GET/POST 白名单排除 DAV 方法。
+path_match 默认 exact，prefix 匹配路径本身或随后带 `/` 的后代，不能把 `/memosx`
+当作 `/memos`。exact 优先，其次最长 prefix；相同 method/path/path_match 声明
+不可重复。auth 默认 peer；protocol 要求插件实际验证其协议凭证；public 表示明确
+公开的结果。Peer inbound 只能精确引用一条 peer/exact route，不允许通过 protocol
+或 public 路径发布部署 Peer capability。
+
+Host 和 runner 都调用 `validate_mount(descriptor.name)`。canonical Extension Name
+`namespace/name` 只可声明 `/name` 及其后代；不同 namespace 的同名 mount 必须由
+Host 在发布前检查冲突。生命周期 start 完成且精确选择仍有效后才挂载，停用、失败、
+替换或进程退出时撤销同一次启动拥有的 route 与 inbound，不能留悬空转发入口。
+
+path 是 Host 从 URI 解码一次得到的 Unicode 绝对路径。共享验证拒绝 `%`、`.`/`..`
+段、双斜杠、反斜杠、控制字符、query 或 fragment，避免 Host、路由器与插件采用
+不同解码次数造成认证绕过。有百分号字面量的路径也明确拒绝。admission 后不可
+二次解码、折叠路径或改写到另一个 route。query 字段另行保留原始 query string，
+不含前导 `?`。Host 必须在解码失败或出现歧义时拒绝请求。
+
+固定命令 `http_request` 的 params 字段为 method/path/query/headers/body；result
+字段为 status/headers/body。`HttpHeader` 是 `{name,value}`，name 必须为小写 RFC
+header token，value 是 JSON bytes 数组，重复字段保留顺序；总 decoded header 上限
+64 KiB、最多 256 项，拒绝控制字符（HTAB 除外）。Host 剔除 hop-by-hop 和 framing
+字段，不能把未经核验的转发地址或内部认证标记当作 authority。
+
+`HttpBody(Vec<u8>)` 的 JSON 编码为标准 padded Base64 string，反序列化与序列化
+都验证 decoded body 不超过 45 MiB；这是 HTTP bytes 上限，产品内的 JSON base64
+等编码仍属于 HTTP bytes。Memos 的 32 MiB decoded attachment 可具有45 MiB的HTTP
+request envelope；CalDAV仍由插件执行16 MiB请求限制。query 上限64 KiB、path上限
+8192 bytes。status为200..599；没有长连接、HTTP upgrade或流式响应。
+
+SDK 的 read_frame/write_frame 保留默认 1 MiB；显式
+read_frame_with_limit/write_frame_with_limit 支持 Host 按调用方法选界限。
+runner 只在已启动且声明了 http_ingress 时把读取上限提高为64 MiB，只有
+http_request 可使用这个额度；解析后发现普通命令超过1 MiB会返回frame_size。
+HTTP响应最多64 MiB，其他响应仍为1 MiB；45 MiB body编码后约60 MiB，保留元数据
+余量。initialize、start和未声明HTTP的旧插件始终使用原限制。
+
+外层 stdio protocol_version 仍为1：这是 optional typed capability 的新增，不更改
+旧帧字段。None 的 http_ingress 不序列化，新 SDK 的普通扩展可与旧 Host 互通；
+旧插件省略字段时，新 Host 读取为 None。声明HTTP的扩展对不认识该字段的旧Host
+会明确握手失败，不能退化为未经准入的通用 invoke 或绕过认证。Host 应使用SDK类型
+解析与验证 HTTP result，不能把任意 JSON 转成 server response。
