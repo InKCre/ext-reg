@@ -122,3 +122,14 @@ SDK 0.1.2 的 Storage bytes 使用 base64，单条内容上限为 32 MiB，传�
 48 MiB。较旧产物继续使用原有 Storage 帧。业务进程自身能用 native Core transaction
 访问 Storage 时优先使用该连接。调用其他进程或外部服务时，其写入由相应 handler
 负责，无法跟随调用方 SQL transaction 回滚。
+
+### 保留 Resolver 的二进制内容
+
+支持 `resolver.value.v1` 的宿主调用 `resolver_read_value`。扩展可返回
+`ResolverValue::Bytes(BinaryContent(bytes))`，也可在对象或数组中组合 JSON 和 bytes。
+普通 `ResolverValue::Json` 内的字段由作者拥有，形状类似协议字段的对象也保留为 JSON。
+只实现了 `resolver_read` 的扩展会经默认实现提供原有 JSON。
+
+此请求的 hydrated bytes 与返回值使用同一个二进制编解码器。单一字节值上限为
+32 MiB，整个消息上限为 48 MiB。旧 executable 保留原有 JSON Resolver 请求。需要
+这个结果合同的发布产物应声明宿主 SDK 0.1.3 或更高版本。

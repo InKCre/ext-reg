@@ -11,10 +11,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 
+mod binary_content;
+pub use binary_content::*;
 mod capabilities;
 pub use capabilities::*;
 mod http;
 pub use http::*;
+mod resolver_value;
+pub use resolver_value::*;
 mod storage_host;
 pub use storage_host::*;
 
@@ -257,6 +261,14 @@ pub trait Extension: Send {
     async fn resolver_read(&mut self, _request: ResolverRequest) -> Result<Value, RpcError> {
         Err(capabilities::unsupported())
     }
+    /// Retain concrete bytes when the host negotiates Resolver values.
+    /// Existing JSON Resolver handlers use their original projection by default.
+    async fn resolver_read_value(
+        &mut self,
+        request: ResolverRequest,
+    ) -> Result<ResolverValue, RpcError> {
+        self.resolver_read(request).await.map(ResolverValue::Json)
+    }
     async fn resolver_draft(
         &mut self,
         _request: ResolverDraftRequest,
@@ -309,6 +321,14 @@ fn decode_storage_write(
     }
 }
 
+fn decode_resolver_read(value: Value, packed: bool) -> Result<ResolverRequest, serde_json::Error> {
+    if packed {
+        serde_json::from_value::<ResolverValueRequest>(value).map(Into::into)
+    } else {
+        serde_json::from_value(value)
+    }
+}
+
 /// 顺序运行扩展。宿主拥有请求超时与强制回收；SDK 保证状态机和 stdout 协议。
 pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut input = BufReader::new(tokio::io::stdin());
@@ -317,12 +337,15 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
     let mut mode = None;
     let mut capabilities = Capabilities::default();
     let mut host_storage = false;
+    let mut resolver_values = false;
     loop {
         let active = mode == Some(Mode::Active);
         let limit = if active && capabilities.http_ingress.is_some() {
             MAX_HTTP_FRAME_BYTES
         } else if mode.is_some() && host_storage && !capabilities.storages.is_empty() {
             MAX_STORAGE_FRAME_BYTES
+        } else if mode.is_some() && resolver_values && !capabilities.resolvers.is_empty() {
+            MAX_RESOLVER_FRAME_BYTES
         } else {
             MAX_FRAME_BYTES
         };
@@ -343,10 +366,16 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                 "storage_create_bytes" | "storage_update_bytes" => active,
                 _ => false,
             };
+        let resolver_transfer = resolver_values
+            && mode.is_some()
+            && !capabilities.resolvers.is_empty()
+            && request.method == "resolver_read_value";
         let response_limit = if http_call {
             MAX_HTTP_FRAME_BYTES
         } else if storage_transfer {
             MAX_STORAGE_FRAME_BYTES
+        } else if resolver_transfer {
+            MAX_RESOLVER_FRAME_BYTES
         } else {
             MAX_FRAME_BYTES
         };
@@ -370,11 +399,14 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                             Err(RpcError::new("descriptor", "业务能力声明无效"))
                         } else {
                             initialized = true;
-                            host_storage = request.params["host_services"].as_array().is_some_and(
-                                |services| {
-                                    services.iter().any(|value| value == HOST_STORAGE_SERVICE)
-                                },
-                            );
+                            let advertised =
+                                |service: &str| {
+                                    request.params["host_services"].as_array().is_some_and(
+                                        |services| services.iter().any(|value| value == service),
+                                    )
+                                };
+                            host_storage = advertised(HOST_STORAGE_SERVICE);
+                            resolver_values = advertised(RESOLVER_VALUE_SERVICE);
                             capabilities = descriptor.capabilities.clone();
                             serialize_result(descriptor)
                         }
@@ -435,8 +467,11 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                             Err(_) => Err(RpcError::new("invalid_params", "http_request 参数无效")),
                         }
                     }
-                    "resolver_read" if mode.is_some() => {
-                        match serde_json::from_value::<ResolverRequest>(request.params) {
+                    "resolver_read" | "resolver_read_value"
+                        if mode.is_some()
+                            && (request.method == "resolver_read" || resolver_transfer) =>
+                    {
+                        match decode_resolver_read(request.params, resolver_transfer) {
                             Ok(params)
                                 if capabilities.resolvers.iter().any(|capability| {
                                     capability.id == params.resolver
@@ -449,7 +484,14 @@ pub async fn serve<E: Extension>(mut extension: E) -> Result<(), Error> {
                                         }
                                 }) =>
                             {
-                                extension.resolver_read(params).await
+                                if resolver_transfer {
+                                    extension
+                                        .resolver_read_value(params)
+                                        .await
+                                        .and_then(serialize_result)
+                                } else {
+                                    extension.resolver_read(params).await
+                                }
                             }
                             Ok(_) => Err(capabilities::unsupported()),
                             Err(_) => {

@@ -2,47 +2,22 @@
 
 use std::future::Future;
 
-use base64::{Engine, engine::general_purpose::STANDARD};
-use serde::{Deserialize, Deserializer, Serialize, Serializer, de, ser};
+use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncBufRead, AsyncWrite},
     sync::{mpsc, oneshot},
 };
 
 use crate::{
-    Error, PROTOCOL_VERSION, RpcError, StorageSnapshot, StorageWriteRequest, read_frame_with_limit,
-    write_frame_with_limit,
+    Error, MAX_BINARY_CONTENT_BYTES, PROTOCOL_VERSION, RpcError, StorageSnapshot,
+    StorageWriteRequest, read_frame_with_limit, write_frame_with_limit,
 };
 
+pub use crate::BinaryContent as StorageBytes;
+
 pub const HOST_STORAGE_SERVICE: &str = "storage.v1";
-pub const MAX_STORAGE_CONTENT_BYTES: usize = 32 * 1024 * 1024;
+pub const MAX_STORAGE_CONTENT_BYTES: usize = MAX_BINARY_CONTENT_BYTES;
 pub const MAX_STORAGE_FRAME_BYTES: usize = 48 * 1024 * 1024;
-
-#[derive(Debug)]
-pub struct StorageBytes(pub Vec<u8>);
-
-impl Serialize for StorageBytes {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.0.len() > MAX_STORAGE_CONTENT_BYTES {
-            return Err(ser::Error::custom("storage content exceeds byte limit"));
-        }
-        serializer.serialize_str(&STANDARD.encode(&self.0))
-    }
-}
-
-impl<'de> Deserialize<'de> for StorageBytes {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let encoded = String::deserialize(deserializer)?;
-        if encoded.len() > MAX_STORAGE_CONTENT_BYTES.div_ceil(3) * 4 {
-            return Err(de::Error::custom("storage content exceeds byte limit"));
-        }
-        let data = STANDARD.decode(encoded).map_err(de::Error::custom)?;
-        if data.len() > MAX_STORAGE_CONTENT_BYTES {
-            return Err(de::Error::custom("storage content exceeds byte limit"));
-        }
-        Ok(Self(data))
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -131,7 +106,7 @@ pub enum HostStorageAccess {
 impl HostStorageAccess {
     pub fn for_method(method: &str) -> Option<Self> {
         match method {
-            "resolver_read" => Some(Self::Read),
+            "resolver_read" | "resolver_read_value" => Some(Self::Read),
             "source_collect" | "source_backfill" | "job_execute" | "invoke" | "http_request" => {
                 Some(Self::ReadWrite)
             }
