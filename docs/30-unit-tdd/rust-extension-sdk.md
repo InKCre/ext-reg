@@ -26,8 +26,8 @@ stdin/stdout 使用 UTF-8 JSON-line，普通帧（包含换行）最多 1 MiB。
 HTTP ingress 使用下文独立限制。SDK 读取时逐块
 检查边界，不先无界读入；stdout 只输出协议，日志写 stderr。请求包含
 `protocol_version`、`id`、`method`、`params`。响应返回相同版本与 ID，并恰有
-`result` 或 `error`；成功结果可为 JSON null。协议 v1 按顺序请求/响应，不提供并发
-多路复用、宿主回调或任意 SQL RPC。
+`result` 或 `error`；成功结果可为 JSON null。协议 v1 按顺序请求/响应。宿主可以协商
+同一次请求内的 Storage 回调。多路复用和任意 SQL RPC 不属于此协议。
 
 生命周期顺序为 `initialize`、`start`、零到多次 `invoke`、`stop`。initialize
 返回插件精确身份、实际 SDK 版本、协议版本、config schema 和可调用方法。
@@ -60,9 +60,14 @@ Storage 负责不透明 pointer 与字节；writable 声明必须对应 create/u
 Source 普通采集与 backfill 使用独立命令，不支持 backfill 时 schema 为 null。
 Job 的参数 schema、默认 timeout 和领取前 eligibility 单独声明。Source/Job 返回的
 state 是 Job.state 对象 patch；Source 自身的 state/cursor 通过已准入数据库维护，
-不借启动快照覆盖其他参与者的新状态。字节及图结果仍遵守 1 MiB 帧边界，当前没有
-跨进程大对象流式 API。外部 Storage 不能加入宿主传入的 PostgreSQL connection，
-宿主图事务回滚不意味着外部字节已经回滚。
+不借启动快照覆盖其他参与者的新状态。普通业务结果遵守 1 MiB 帧边界。已协商的
+Storage/Resolver 二进制值单个最多 32 MiB，帧最多 48 MiB。
+
+`storage.v1` 回调可借用当前 Peer 的 Storage handler，使用持久 Storage ID 与 opaque
+pointer。协商 `resolver.storage.materialization.v1` 后，活动 Resolver 的 Solve/Text
+仅在 `materialize_missing=true` 时可借用 Create，其他 Resolver 调用只可借用 Read。
+调用端应优先采用能加入当前 PostgreSQL 事务的本地 Storage。借用外部 handler 的创建
+独立提交；后续图事务失败时，调用者负责处理已创建对象的生命周期。
 
 宿主在 start 成功并复核精确选择后注册能力，注册集合由该次启动的唯一 owner 标识。
 停止、替换或部分启动失败只撤销这个 owner，不删除共享 catalog。注册 adapter 只持

@@ -3,6 +3,7 @@
 use std::future::Future;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::{
     io::{AsyncBufRead, AsyncWrite},
     sync::{mpsc, oneshot},
@@ -16,6 +17,7 @@ use crate::{
 pub use crate::BinaryContent as StorageBytes;
 
 pub const HOST_STORAGE_SERVICE: &str = "storage.v1";
+pub const RESOLVER_STORAGE_MATERIALIZATION_SERVICE: &str = "resolver.storage.materialization.v1";
 pub const MAX_STORAGE_CONTENT_BYTES: usize = MAX_BINARY_CONTENT_BYTES;
 pub const MAX_STORAGE_FRAME_BYTES: usize = 48 * 1024 * 1024;
 
@@ -100,6 +102,7 @@ pub struct HostStorageReply {
 #[derive(Clone, Copy)]
 pub enum HostStorageAccess {
     Read,
+    ReadCreate,
     ReadWrite,
 }
 
@@ -114,8 +117,26 @@ impl HostStorageAccess {
         }
     }
 
+    /// Compute the same scope in the runner and the Host. The caller must already
+    /// have negotiated the service and verified that the current process is active.
+    pub fn for_request(method: &str, params: &Value, can_materialize: bool) -> Option<Self> {
+        let access = Self::for_method(method)?;
+        let operation = &params["operation"];
+        if matches!(access, Self::Read)
+            && can_materialize
+            && matches!(operation["kind"].as_str(), Some("solve" | "text"))
+            && operation["materialize_missing"].as_bool() == Some(true)
+        {
+            return Some(Self::ReadCreate);
+        }
+        Some(access)
+    }
+
     pub fn allows(self, operation: &HostStorageOperation) -> bool {
-        matches!(self, Self::ReadWrite) || matches!(operation, HostStorageOperation::Read { .. })
+        matches!(self, Self::ReadWrite)
+            || matches!(operation, HostStorageOperation::Read { .. })
+            || (matches!(self, Self::ReadCreate)
+                && matches!(operation, HostStorageOperation::Create { .. }))
     }
 }
 
@@ -144,7 +165,7 @@ pub async fn host_storage(
     if !access.allows(&operation) {
         return Some(Err(RpcError::new(
             "storage_read_only",
-            "host Storage call is read-only",
+            "host Storage write is unavailable for this operation",
         )));
     }
     if operation.input_size() > MAX_STORAGE_CONTENT_BYTES {
