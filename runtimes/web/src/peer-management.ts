@@ -17,6 +17,7 @@ export type ExtensionManagementCommand =
       extension: string
       distribution: string
       version: string
+      source_repository?: string | null
     }
   | { action: 'enable' | 'disable' | 'unselect'; extension: string }
   | { action: 'patch_config'; extension: string; patch: Record<string, JsonValue> }

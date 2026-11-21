@@ -1,5 +1,12 @@
 import type { ModuleFederation } from '@module-federation/runtime'
 import { asError, combinedError } from './errors'
+import type { ModuleFederationDistribution } from './generated/types.gen'
+
+export type WebModuleFederationDistribution =
+  | ModuleFederationDistribution
+  | (Omit<ModuleFederationDistribution, 'manifest_url'> & {
+      script: { url: string; global_name: string }
+    })
 
 export interface WebExtensionModule {
   initialize?(): void | Promise<void>
@@ -16,6 +23,7 @@ export class WebExtensionModuleHandle<T extends WebExtensionModule = WebExtensio
     readonly name: string,
     readonly version: string,
     readonly module: T,
+    readonly sourceRepository: string | null = null,
   ) {}
 
   async activate(): Promise<void> {
@@ -56,16 +64,35 @@ export async function loadExtensionModule<T extends WebExtensionModule>(
   moduleFederation: ModuleFederation,
   name: string,
   version: string,
-  manifestUrl: string,
+  distribution: string | WebModuleFederationDistribution,
+  sourceRepository: string | null = null,
 ): Promise<WebExtensionModuleHandle<T>> {
-  const remoteName = webExtensionRemoteName(name, version)
-  moduleFederation.registerRemotes([{ name: remoteName, entry: manifestUrl }], { force: true })
+  const remoteName = webExtensionRemoteName(name, version, sourceRepository)
+  const entry = typeof distribution === 'string' ? { manifest_url: distribution } : distribution
+  moduleFederation.registerRemotes(
+    [
+      'script' in entry
+        ? {
+            name: remoteName,
+            entry: entry.script.url,
+            type: 'global',
+            entryGlobalName: entry.script.global_name,
+          }
+        : { name: remoteName, entry: entry.manifest_url },
+    ],
+    { force: true },
+  )
   const loaded = await moduleFederation.loadRemote<T | { default: T }>(remoteName)
   if (!loaded) throw new Error(`${name}@${version} returned no Module Federation module.`)
   const extensionModule = 'default' in loaded ? loaded.default : loaded
-  return new WebExtensionModuleHandle(name, version, extensionModule)
+  return new WebExtensionModuleHandle(name, version, extensionModule, sourceRepository)
 }
 
-export function webExtensionRemoteName(name: string, version: string): string {
-  return `extension.${name.replace('/', '.')}.${version}`
+export function webExtensionRemoteName(
+  name: string,
+  version: string,
+  sourceRepository: string | null = null,
+): string {
+  const coordinate = `extension.${name.replace('/', '.')}.${version}`
+  return sourceRepository ? `${coordinate}.${encodeURIComponent(sourceRepository)}` : coordinate
 }

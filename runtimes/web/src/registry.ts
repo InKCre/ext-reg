@@ -91,7 +91,15 @@ export class RegistryReleaseReader {
     return this.#getRelease(origin, name, version, requirePublished, distribution)
   }
 
-  async get(name: string, version: string, requirePublished: boolean): Promise<WebReleaseRecord> {
+  async get(
+    name: string,
+    version: string,
+    requirePublished: boolean,
+    sourceRepository?: string | null,
+  ): Promise<WebReleaseRecord> {
+    if (sourceRepository != null) {
+      throw new RegistryReleaseError('A repository release reader is required for this selection.')
+    }
     const origin = registryOrigin(await this.#origin())
     const release = await this.#getRelease(origin, name, version, requirePublished)
     const distribution = release.module_federation

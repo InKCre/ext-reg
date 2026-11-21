@@ -5,6 +5,7 @@ import {
   configStore,
   PeerManager,
   PeerOutcomeUnknown,
+  ExtensionModel,
   ExtensionParticipationModel,
 } from '@inkcre/core'
 import {
@@ -13,6 +14,7 @@ import {
   ExtensionEnabledError,
   getExtensionDocumentation,
   listAdvertisedExtensionManagementPeers,
+  loadExtensionModule,
   manageExtensionOnPeer,
   preferredPublishedRelease,
   RegistryDocumentationError,
@@ -201,6 +203,12 @@ try {
     (await releases.get('inkcre/catalog', '1.10.0', true)).distribution,
     'module_federation',
   )
+  const firstSource = 'https://github.com/example/first'
+  const secondSource = 'https://github.com/example/second'
+  await assert.rejects(
+    releases.get('inkcre/catalog', '1.10.0', true, firstSource),
+    /repository release reader is required/,
+  )
   const originalGet = ExtensionParticipationModel.get
   const selection = {
     name: 'inkcre/catalog',
@@ -214,19 +222,36 @@ try {
     },
   }
   ExtensionParticipationModel.get = async () => selection
+  const legacyRemotes = []
+  const legacyModuleFederation = {
+    registerRemotes([remote], options) {
+      assert.deepEqual(options, { force: true })
+      legacyRemotes.push(remote)
+    },
+    async loadRemote() {
+      return {}
+    },
+  }
   const manager = new ExtensionManager({
     peerId: current,
     releases,
-    moduleFederation: {
-      registerRemotes() {},
-      async loadRemote() {
-        return {}
-      },
-    },
+    moduleFederation: legacyModuleFederation,
   })
   try {
     await assert.rejects(manager.getStatus(selection.name, target), /different Peer/)
     await manager.enable(selection.name, current)
+    const legacyRemote = {
+      name: webExtensionRemoteName(selection.name, selection.version),
+      entry: `${origin}/mf-manifest.json`,
+    }
+    assert.deepEqual(legacyRemotes, [legacyRemote])
+    await loadExtensionModule(
+      legacyModuleFederation,
+      selection.name,
+      selection.version,
+      legacyRemote.entry,
+    )
+    assert.deepEqual(legacyRemotes, [legacyRemote, legacyRemote])
     assert.equal(
       await manager.install({ name: selection.name, version: selection.version }, current),
       selection,
@@ -241,8 +266,144 @@ try {
     await manager.shutdown()
     ExtensionParticipationModel.get = originalGet
   }
-  // Restore consumes durable intent; delayed modules cannot resurrect revoked selections.
+
+  // Sources are part of exact pins even when the release version does not change.
+  const originalInstall = ExtensionModel.install
+  const originalSelect = ExtensionParticipationModel.select
   const originalList = ExtensionParticipationModel.list
+  let selected = null
+  const selections = []
+  const releaseReads = []
+  const loadedRemotes = []
+  const manifestUrl = `${firstSource}/mf-manifest.json`
+  const script = {
+    url: `${secondSource}/releases/download/v1.10.0/remoteEntry.js`,
+    global_name: 'catalog_1_10_0',
+  }
+  const sourceReader = {
+    async get(name, version, requirePublished, sourceRepository) {
+      releaseReads.push({ version, requirePublished, sourceRepository })
+      return {
+        ...catalogReleases[1],
+        name,
+        version,
+        module_federation: {
+          host_sdk: '@inkcre/core',
+          host_sdk_version: catalogReleases[1].module_federation.host_sdk_version,
+          ...(sourceRepository === secondSource
+            ? { script }
+            : { manifest_url: `${sourceRepository ?? origin}/mf-manifest.json` }),
+        },
+      }
+    },
+  }
+  const startRuntime = () => {
+    const remotes = new Map()
+    return new ExtensionManager({
+      peerId: current,
+      releases: sourceReader,
+      moduleFederation: {
+        registerRemotes([remote], options) {
+          assert.deepEqual(options, { force: true })
+          remotes.set(remote.name, remote)
+        },
+        async loadRemote(name) {
+          loadedRemotes.push(remotes.get(name))
+          return {}
+        },
+      },
+    })
+  }
+  let sourceRuntime = startRuntime()
+  try {
+    ExtensionModel.install = async (input) => input
+    ExtensionParticipationModel.get = async () => selected
+    ExtensionParticipationModel.list = async () => (selected ? [selected] : [])
+    ExtensionParticipationModel.select = async (input) => {
+      selections.push(input)
+      selected = {
+        peer_id: input.peerId,
+        name: input.name,
+        version: input.version,
+        distribution: input.distribution,
+        source_repository: input.sourceRepository,
+        enabled: selected?.enabled ?? false,
+        async setEnabled(enabled) {
+          this.enabled = enabled
+          return this
+        },
+      }
+      return selected
+    }
+    const fromFirst = {
+      name: selection.name,
+      version: selection.version,
+      sourceRepository: firstSource,
+    }
+    assert.equal((await sourceRuntime.install(fromFirst, current)).source_repository, firstSource)
+    assert.equal(
+      (await sourceRuntime.changeVersion(selection.name, '1.2.0', current)).source_repository,
+      firstSource,
+    )
+    assert.equal(
+      (await sourceRuntime.changeVersion(selection.name, selection.version, current))
+        .source_repository,
+      firstSource,
+    )
+    await sourceRuntime.enable(selection.name, current)
+    assert.equal((await sourceRuntime.getStatus(selection.name)).source_repository, firstSource)
+    assert.deepEqual(loadedRemotes[0], {
+      name: webExtensionRemoteName(selection.name, selection.version, firstSource),
+      entry: manifestUrl,
+    })
+    await assert.rejects(
+      sourceRuntime.install({ ...fromFirst, sourceRepository: secondSource }, current),
+      ExtensionEnabledError,
+    )
+    await sourceRuntime.disable(selection.name, current)
+    assert.equal(
+      (await sourceRuntime.install({ ...fromFirst, sourceRepository: secondSource }, current))
+        .source_repository,
+      secondSource,
+    )
+    assert.equal(selections.at(-1).expectedSourceRepository, firstSource)
+    assert.deepEqual(releaseReads.at(-1), {
+      version: selection.version,
+      requirePublished: true,
+      sourceRepository: secondSource,
+    })
+    await sourceRuntime.enable(selection.name, current)
+    const scriptRemote = {
+      name: webExtensionRemoteName(selection.name, selection.version, secondSource),
+      entry: script.url,
+      type: 'global',
+      entryGlobalName: script.global_name,
+    }
+    assert.deepEqual(loadedRemotes[1], scriptRemote)
+    await sourceRuntime.shutdown()
+    sourceRuntime = startRuntime()
+    await sourceRuntime.startup(current)
+    assert.deepEqual(loadedRemotes.at(-1), scriptRemote)
+    assert.equal((await sourceRuntime.getStatus(selection.name)).running, true)
+    assert.deepEqual(releaseReads.at(-1), {
+      version: selection.version,
+      requirePublished: false,
+      sourceRepository: secondSource,
+    })
+    assert.equal(selections.length, 4, 'restoring a repository pin must not rewrite it')
+    await sourceRuntime.disable(selection.name, current)
+    await sourceRuntime.changeVersion(selection.name, selection.version, current, null)
+    assert.equal(selections.at(-1).sourceRepository, null)
+    assert.equal(selections.at(-1).expectedSourceRepository, secondSource)
+  } finally {
+    await sourceRuntime.shutdown()
+    ExtensionModel.install = originalInstall
+    ExtensionParticipationModel.get = originalGet
+    ExtensionParticipationModel.list = originalList
+    ExtensionParticipationModel.select = originalSelect
+  }
+
+  // Restore consumes durable intent; delayed modules cannot resurrect revoked selections.
   const deferred = () => {
     let resolve
     const promise = new Promise((done) => {
@@ -256,6 +417,7 @@ try {
       'disable-command',
       'external-disable',
       'external-pin',
+      'external-source',
       'shutdown',
     ]) {
       const entered = deferred()
@@ -321,6 +483,8 @@ try {
         rows.get(current).enabled = false
       } else if (scenario === 'external-pin') {
         rows.get(current).version = '1.2.0'
+      } else if (scenario === 'external-source') {
+        rows.get(current).source_repository = firstSource
       } else {
         command = runtime.shutdown()
       }
@@ -361,6 +525,7 @@ try {
       extension: installed.name,
       distribution: 'python',
       version: installed.version,
+      source_repository: firstSource,
     },
     { action: 'enable', extension: installed.name },
     { action: 'disable', extension: installed.name },

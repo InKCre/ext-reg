@@ -4,14 +4,39 @@ import {
   ExtensionParticipationModel,
   type ExtensionRuntimeStatus,
 } from '@inkcre/core'
-import type { NativeReleaseRecord as ReleaseRecord } from './generated/types.gen'
 import { asError, combinedError, ExtensionEnabledError, WebExtensionRuntimeError } from './errors'
-import { loadExtensionModule, type WebExtensionModule, WebExtensionModuleHandle } from './module'
-import { RegistryReleaseReader } from './registry'
+import {
+  loadExtensionModule,
+  type WebExtensionModule,
+  WebExtensionModuleHandle,
+  type WebModuleFederationDistribution,
+} from './module'
+import type { WebReleaseRecord } from './registry'
+
+export type WebRuntimeReleaseRecord = Omit<WebReleaseRecord, 'module_federation'> & {
+  module_federation: WebModuleFederationDistribution
+}
+
+export interface WebReleaseReader {
+  get(
+    name: string,
+    version: string,
+    requirePublished: boolean,
+    sourceRepository?: string | null,
+  ): Promise<WebRuntimeReleaseRecord>
+}
+
+type SelectionSource = { readonly source_repository?: string | null }
+
+function selectedSource(
+  row: (ExtensionParticipationModel & SelectionSource) | null,
+): string | null {
+  return row?.source_repository ?? null
+}
 
 export interface ExtensionManagerOptions {
   readonly peerId: string
-  readonly releases: RegistryReleaseReader
+  readonly releases: WebReleaseReader
   readonly moduleFederation: ModuleFederation
   readonly warn?: (message: string) => void
 }
@@ -19,11 +44,12 @@ export interface ExtensionManagerOptions {
 export interface InstallExtensionInput {
   readonly name: string
   readonly version: string
+  readonly sourceRepository?: string | null
 }
 
 export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule> {
   readonly #peerId: string
-  readonly #releases: RegistryReleaseReader
+  readonly #releases: WebReleaseReader
   readonly #moduleFederation: ModuleFederation
   readonly #warn: (message: string) => void
   readonly #running = new Map<string, WebExtensionModuleHandle<T>>()
@@ -58,18 +84,30 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     return this.#ordered(this.#operations, input.name, async () => {
       const current = await ExtensionParticipationModel.get(peerId, input.name)
       if (current) {
-        if (current.distribution === 'module_federation' && current.version === input.version)
+        if (
+          current.distribution === 'module_federation' &&
+          current.version === input.version &&
+          (input.sourceRepository === undefined ||
+            input.sourceRepository === selectedSource(current))
+        )
           return current
-        return this.#changeVersion(input.name, input.version, peerId)
+        return this.#changeVersion(current, input.version, input.sourceRepository)
       }
-      const release = await this.#releases.get(input.name, input.version, true)
+      const release = await this.#releases.get(
+        input.name,
+        input.version,
+        true,
+        input.sourceRepository,
+      )
       await ExtensionModel.install({ name: release.name, nickname: release.nickname })
-      return ExtensionParticipationModel.select({
+      const selection = {
         peerId,
         name: release.name,
-        distribution: 'module_federation',
+        distribution: 'module_federation' as const,
         version: release.version,
-      })
+        sourceRepository: input.sourceRepository,
+      }
+      return ExtensionParticipationModel.select(selection)
     })
   }
 
@@ -77,27 +115,38 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     name: string,
     version: string,
     peerId: string,
+    sourceRepository?: string | null,
   ): Promise<ExtensionParticipationModel> {
     this.#assertPeer(peerId)
     this.#assertOpen()
-    return this.#ordered(this.#operations, name, () => this.#changeVersion(name, version, peerId))
+    return this.#ordered(this.#operations, name, async () =>
+      this.#changeVersion(
+        await this.#requireParticipation(name, peerId),
+        version,
+        sourceRepository,
+      ),
+    )
   }
 
   async #changeVersion(
-    name: string,
+    current: ExtensionParticipationModel,
     version: string,
-    peerId: string,
+    sourceRepository: string | null | undefined,
   ): Promise<ExtensionParticipationModel> {
-    const current = await this.#requireParticipation(name, peerId)
-    if (this.#running.has(name)) throw new ExtensionEnabledError(name)
-    const release = await this.#releases.get(name, version, true)
-    return ExtensionParticipationModel.select({
-      peerId,
-      name,
-      distribution: 'module_federation',
+    if (this.#running.has(current.name)) throw new ExtensionEnabledError(current.name)
+    const expectedSourceRepository = selectedSource(current)
+    const source = sourceRepository === undefined ? expectedSourceRepository : sourceRepository
+    const release = await this.#releases.get(current.name, version, true, source)
+    const selection = {
+      peerId: current.peer_id,
+      name: current.name,
+      distribution: 'module_federation' as const,
       version: release.version,
       expectedVersion: current.version,
-    })
+      expectedSourceRepository,
+      sourceRepository: source,
+    }
+    return ExtensionParticipationModel.select(selection)
   }
 
   async updateConfig(name: string, config: Record<string, unknown>): Promise<ExtensionModel> {
@@ -114,7 +163,10 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     })
   }
 
-  async getStatus(name: string, peerId: string = this.#peerId): Promise<ExtensionRuntimeStatus> {
+  async getStatus(
+    name: string,
+    peerId: string = this.#peerId,
+  ): Promise<ExtensionRuntimeStatus & SelectionSource> {
     this.#assertPeer(peerId)
     const participation = await ExtensionParticipationModel.get(peerId, name)
     const handle = this.#running.get(name)
@@ -124,6 +176,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
       supported_distributions: ['module_federation'],
       distribution: participation?.distribution ?? null,
       version: participation?.version ?? null,
+      source_repository: selectedSource(participation),
       enabled: participation?.enabled ?? false,
       config_schema: participation?.config_schema ?? null,
       loaded_version: handle?.version ?? null,
@@ -134,7 +187,9 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     }
   }
 
-  async listStatus(peerId: string = this.#peerId): Promise<ExtensionRuntimeStatus[]> {
+  async listStatus(
+    peerId: string = this.#peerId,
+  ): Promise<(ExtensionRuntimeStatus & SelectionSource)[]> {
     this.#assertPeer(peerId)
     return Promise.all(
       (await ExtensionParticipationModel.list(peerId)).map((row) =>
@@ -256,14 +311,17 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     if (row.distribution === 'module_federation') return row
     if (row.distribution !== null)
       throw new WebExtensionRuntimeError('The selected distribution cannot run in this Peer.')
-    await this.#releases.get(row.name, row.version, false)
-    return ExtensionParticipationModel.select({
+    const source = selectedSource(row)
+    await this.#releases.get(row.name, row.version, false, source)
+    const selection = {
       peerId: row.peer_id,
       name: row.name,
-      distribution: 'module_federation',
+      distribution: 'module_federation' as const,
       version: row.version,
       expectedVersion: row.version,
-    })
+      expectedSourceRepository: source,
+    }
+    return ExtensionParticipationModel.select(selection)
   }
 
   #matches(
@@ -276,7 +334,8 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
       current.enabled &&
       current.distribution === 'module_federation' &&
       current.version === selected.version &&
-      current.distribution === selected.distribution
+      current.distribution === selected.distribution &&
+      selectedSource(current) === selectedSource(selected)
     )
   }
 
@@ -288,7 +347,8 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
         !this.#closing &&
         selected?.enabled &&
         selected.distribution === 'module_federation' &&
-        selected.version === running.version
+        selected.version === running.version &&
+        selectedSource(selected) === running.sourceRepository
       )
         return selected
       await this.#stop(name)
@@ -297,13 +357,15 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     selected = await this.#resolveLegacy(selected)
     let current = await ExtensionParticipationModel.get(peerId, name)
     if (!this.#matches(current, selected)) return current
-    const release = await this.#releases.get(name, selected.version, false)
+    const source = selectedSource(selected)
+    const release = await this.#releases.get(name, selected.version, false, source)
     this.#warnIfYanked(release)
     const handle = await loadExtensionModule<T>(
       this.#moduleFederation,
       name,
       selected.version,
-      release.module_federation!.manifest_url,
+      release.module_federation,
+      source,
     )
     try {
       current = await ExtensionParticipationModel.get(peerId, name)
@@ -374,7 +436,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     return participation
   }
 
-  #warnIfYanked(release: ReleaseRecord): void {
+  #warnIfYanked(release: WebRuntimeReleaseRecord): void {
     if (release.state === 'yanked')
       this.#warn(`Starting exact installed yanked Release ${release.name}@${release.version}.`)
   }

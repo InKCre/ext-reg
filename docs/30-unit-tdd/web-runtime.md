@@ -1,6 +1,6 @@
 # Web Extension Runtime
 
-`@inkcre/extension-runtime-web` 是独立发行的浏览器 Runtime。Host SDK `@inkcre/core` 拥有部署持久化模型、Peer 发现、传输和错误分类；Runtime 拥有 Extension 生命周期编排、管理命令消费和 Registry 发行读取。应用继续决定操作当前浏览器 Runtime、在线远端 Host，还是只改变部署中的 desired state。
+`@inkcre/extension-runtime-web` 是独立发行的浏览器 Runtime。Host SDK `@inkcre/core` 拥有部署持久化模型、Peer 发现、传输和错误分类；Runtime 拥有 Extension 生命周期编排、管理命令和精确发行读取的入口。应用决定操作当前浏览器 Runtime、在线远端 Host，还是只改变部署中的 desired state。
 
 `listAdvertisedExtensionManagementPeers()` 读取 `PeerManager.listLive()`，只保留宣告精确管理 capability 的 Peer。宣告不是协议支持、路由就绪或运行证明。`manageExtensionOnPeer(peerId, command)` 使用调用者指定的精确 Peer 和固定 capability，发送一次 select、enable、disable 或 patch_config 命令。它不替换目标、不重试、不改写 PeerManager 的传输失败分类；管理 HTTP 错误及无效业务响应不附带可能回显配置凭据的原始正文或校验详情。返回的运行投影区分持久化选择与实际加载结果。
 
@@ -12,13 +12,13 @@ Runtime 的 Core peer dependency 以实际类型与构建验证为准，不使�
 
 Core SDK 开发依赖固定官方 `core-v0.4.2` GitHub Release 的预构建 tgz，冻结锁文件验证下载完整性。该产物同时包含 ESM 和类型声明，type-check 与 build 直接消费它，不检出 Web app 源码、不安装生产者 workspace，也不需要私有 UI 包凭据。仓库门禁通过真实 SDK 和本地 HTTP 运行 `check-boundaries.mjs`；正式 Runtime 包由本仓独立版本流程发布，Core 的 peer dependency 要求至少 0.4.2，以支持宿主声明的开放分发标识。
 
-Runtime 使用 Registry v2 原生坐标查询 MF，公开 catalog 可明确选择 distribution；返回坐标和唯一原生关联均须匹配。安装将共享 Extension 身份与当前 Peer 的精确参与选择分别保存，enable/startup 读取当前 Peer 选择，不追随 latest，不修改其他 Peer 或清理业务 state。旧未知分发仅用当前浏览器支持的 MF 查询同一精确版本，缺失时失败而不替换版本。
+Runtime 通过 `WebReleaseReader` 读取精确 MF 发行，应用按来源提供仓库读取或现有的 Registry v2 读取。仓库安装需要支持 `source_repository` 的 Host SDK 和数据库。安装将共享 Extension 身份与当前 Peer 的精确参与选择分别保存。换版时省略来源会沿用已选来源，显式传入 `null` 选择 Registry。未知分发的历史选择按同一精确版本解析成宿主支持的 MF。
 
-管理能力为 `core.extension.management.v2`。`select` 明确指定分发与版本，`status` 返回目标 Peer 的能力和实际运行事实；所有响应采用 `{peer_id,supported_distributions,extensions}`，逐行包含精确选择和实际 loaded_version/running。Runtime SDK 校验目标身份与每行身份，保留原 PeerManager 的传输失败分类，不能由持久化 enabled 推断正在运行。删除参与记录保留部署配置和业务 state。
+管理能力为 `core.extension.management.v2`。`select` 指定分发、版本及可选的仓库来源。`status` 返回目标 Peer 的能力和实际运行事实，所有响应采用 `{peer_id,supported_distributions,extensions}`，逐行包含精确选择和实际 loaded_version/running。Runtime SDK 校验目标身份与每行身份，保留原 PeerManager 的传输失败分类。删除参与记录保留部署配置和业务 state。
 
 显式 enable/disable 先按同一 Host、同一 Extension 的命令顺序保存 enabled 意图，再串行执行模块生命周期。disable 在等待在途启动之前保存 false，并在资源清理完成后返回。startup 只恢复已有意图，成功或失败都不反写 enabled；初始化失败保留意图及错误，允许后续恢复重试。
 
-恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回、分发或版本改变，迟到的模块会执行 dispose，不能登记为 running。shutdown 等待在途恢复与命令完成并清理模块。同 Host 的串行队列不锁住其他已准入 Peer对共享数据库的写入，因此离线意图更新不等于瞬时、原子的进程切换；这些 Peer 的修改通过重新读取被识别。
+恢复在加载前及异步 initialize/activate 后重新读取精确参与选择。若 enabled 被撤回，或分发、版本、来源发生改变，迟到的模块会执行 dispose。shutdown 等待在途恢复与命令完成并清理模块。其他已准入 Peer 的改动通过重新读取被识别。
 
 ## 名称迁移与交付
 
