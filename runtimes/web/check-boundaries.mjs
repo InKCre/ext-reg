@@ -14,6 +14,7 @@ import {
   ExtensionEnabledError,
   getExtensionDocumentation,
   listAdvertisedExtensionManagementPeers,
+  loadExtensionModule,
   manageExtensionOnPeer,
   preferredPublishedRelease,
   RegistryDocumentationError,
@@ -221,19 +222,36 @@ try {
     },
   }
   ExtensionParticipationModel.get = async () => selection
+  const legacyRemotes = []
+  const legacyModuleFederation = {
+    registerRemotes([remote], options) {
+      assert.deepEqual(options, { force: true })
+      legacyRemotes.push(remote)
+    },
+    async loadRemote() {
+      return {}
+    },
+  }
   const manager = new ExtensionManager({
     peerId: current,
     releases,
-    moduleFederation: {
-      registerRemotes() {},
-      async loadRemote() {
-        return {}
-      },
-    },
+    moduleFederation: legacyModuleFederation,
   })
   try {
     await assert.rejects(manager.getStatus(selection.name, target), /different Peer/)
     await manager.enable(selection.name, current)
+    const legacyRemote = {
+      name: webExtensionRemoteName(selection.name, selection.version),
+      entry: `${origin}/mf-manifest.json`,
+    }
+    assert.deepEqual(legacyRemotes, [legacyRemote])
+    await loadExtensionModule(
+      legacyModuleFederation,
+      selection.name,
+      selection.version,
+      legacyRemote.entry,
+    )
+    assert.deepEqual(legacyRemotes, [legacyRemote, legacyRemote])
     assert.equal(
       await manager.install({ name: selection.name, version: selection.version }, current),
       selection,
@@ -257,6 +275,11 @@ try {
   const selections = []
   const releaseReads = []
   const loadedRemotes = []
+  const manifestUrl = `${firstSource}/mf-manifest.json`
+  const script = {
+    url: `${secondSource}/releases/download/v1.10.0/remoteEntry.js`,
+    global_name: 'catalog_1_10_0',
+  }
   const sourceReader = {
     async get(name, version, requirePublished, sourceRepository) {
       releaseReads.push({ version, requirePublished, sourceRepository })
@@ -265,8 +288,11 @@ try {
         name,
         version,
         module_federation: {
-          ...catalogReleases[1].module_federation,
-          manifest_url: `${sourceRepository ?? origin}/mf-manifest.json`,
+          host_sdk: '@inkcre/core',
+          host_sdk_version: catalogReleases[1].module_federation.host_sdk_version,
+          ...(sourceRepository === secondSource
+            ? { script }
+            : { manifest_url: `${sourceRepository ?? origin}/mf-manifest.json` }),
         },
       }
     },
@@ -277,11 +303,12 @@ try {
       peerId: current,
       releases: sourceReader,
       moduleFederation: {
-        registerRemotes([remote]) {
-          remotes.set(remote.name, remote.entry)
+        registerRemotes([remote], options) {
+          assert.deepEqual(options, { force: true })
+          remotes.set(remote.name, remote)
         },
         async loadRemote(name) {
-          loadedRemotes.push({ name, manifest: remotes.get(name) })
+          loadedRemotes.push(remotes.get(name))
           return {}
         },
       },
@@ -325,6 +352,10 @@ try {
     )
     await sourceRuntime.enable(selection.name, current)
     assert.equal((await sourceRuntime.getStatus(selection.name)).source_repository, firstSource)
+    assert.deepEqual(loadedRemotes[0], {
+      name: webExtensionRemoteName(selection.name, selection.version, firstSource),
+      entry: manifestUrl,
+    })
     await assert.rejects(
       sourceRuntime.install({ ...fromFirst, sourceRepository: secondSource }, current),
       ExtensionEnabledError,
@@ -336,12 +367,24 @@ try {
       secondSource,
     )
     assert.equal(selections.at(-1).expectedSourceRepository, firstSource)
+    assert.deepEqual(releaseReads.at(-1), {
+      version: selection.version,
+      requirePublished: true,
+      sourceRepository: secondSource,
+    })
     await sourceRuntime.enable(selection.name, current)
-    assert.notEqual(loadedRemotes[0].name, loadedRemotes[1].name)
+    const scriptRemote = {
+      name: webExtensionRemoteName(selection.name, selection.version, secondSource),
+      entry: script.url,
+      type: 'global',
+      entryGlobalName: script.global_name,
+    }
+    assert.deepEqual(loadedRemotes[1], scriptRemote)
     await sourceRuntime.shutdown()
     sourceRuntime = startRuntime()
     await sourceRuntime.startup(current)
-    assert.equal(loadedRemotes.at(-1).manifest, `${secondSource}/mf-manifest.json`)
+    assert.deepEqual(loadedRemotes.at(-1), scriptRemote)
+    assert.equal((await sourceRuntime.getStatus(selection.name)).running, true)
     assert.deepEqual(releaseReads.at(-1), {
       version: selection.version,
       requirePublished: false,

@@ -4,10 +4,18 @@ import {
   ExtensionParticipationModel,
   type ExtensionRuntimeStatus,
 } from '@inkcre/core'
-import type { NativeReleaseRecord as ReleaseRecord } from './generated/types.gen'
 import { asError, combinedError, ExtensionEnabledError, WebExtensionRuntimeError } from './errors'
-import { loadExtensionModule, type WebExtensionModule, WebExtensionModuleHandle } from './module'
+import {
+  loadExtensionModule,
+  type WebExtensionModule,
+  WebExtensionModuleHandle,
+  type WebModuleFederationDistribution,
+} from './module'
 import type { WebReleaseRecord } from './registry'
+
+export type WebRuntimeReleaseRecord = Omit<WebReleaseRecord, 'module_federation'> & {
+  module_federation: WebModuleFederationDistribution
+}
 
 export interface WebReleaseReader {
   get(
@@ -15,7 +23,7 @@ export interface WebReleaseReader {
     version: string,
     requirePublished: boolean,
     sourceRepository?: string | null,
-  ): Promise<WebReleaseRecord>
+  ): Promise<WebRuntimeReleaseRecord>
 }
 
 type SelectionSource = { readonly source_repository?: string | null }
@@ -356,7 +364,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
       this.#moduleFederation,
       name,
       selected.version,
-      release.module_federation.manifest_url,
+      release.module_federation,
       source,
     )
     try {
@@ -428,7 +436,7 @@ export class ExtensionManager<T extends WebExtensionModule = WebExtensionModule>
     return participation
   }
 
-  #warnIfYanked(release: ReleaseRecord): void {
+  #warnIfYanked(release: WebRuntimeReleaseRecord): void {
     if (release.state === 'yanked')
       this.#warn(`Starting exact installed yanked Release ${release.name}@${release.version}.`)
   }

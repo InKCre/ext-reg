@@ -1,5 +1,12 @@
 import type { ModuleFederation } from '@module-federation/runtime'
 import { asError, combinedError } from './errors'
+import type { ModuleFederationDistribution } from './generated/types.gen'
+
+export type WebModuleFederationDistribution =
+  | ModuleFederationDistribution
+  | (Omit<ModuleFederationDistribution, 'manifest_url'> & {
+      script: { url: string; global_name: string }
+    })
 
 export interface WebExtensionModule {
   initialize?(): void | Promise<void>
@@ -57,11 +64,24 @@ export async function loadExtensionModule<T extends WebExtensionModule>(
   moduleFederation: ModuleFederation,
   name: string,
   version: string,
-  manifestUrl: string,
+  distribution: string | WebModuleFederationDistribution,
   sourceRepository: string | null = null,
 ): Promise<WebExtensionModuleHandle<T>> {
   const remoteName = webExtensionRemoteName(name, version, sourceRepository)
-  moduleFederation.registerRemotes([{ name: remoteName, entry: manifestUrl }], { force: true })
+  const entry = typeof distribution === 'string' ? { manifest_url: distribution } : distribution
+  moduleFederation.registerRemotes(
+    [
+      'script' in entry
+        ? {
+            name: remoteName,
+            entry: entry.script.url,
+            type: 'global',
+            entryGlobalName: entry.script.global_name,
+          }
+        : { name: remoteName, entry: entry.manifest_url },
+    ],
+    { force: true },
+  )
   const loaded = await moduleFederation.loadRemote<T | { default: T }>(remoteName)
   if (!loaded) throw new Error(`${name}@${version} returned no Module Federation module.`)
   const extensionModule = 'default' in loaded ? loaded.default : loaded
